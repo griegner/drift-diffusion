@@ -1,0 +1,14 @@
+[project]
+name = "drift-diffusion"
+version = "0.0.1"
+description = "drift diffusion models of decision making"
+authors = [{name = "Gabriel Riegner", email = "gariegner@ucsd.edu"}]
+dependencies = ["matplotlib", "numpy", "scipy"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+docs = ["sphinx"]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"

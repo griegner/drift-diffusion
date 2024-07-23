@@ -1,0 +1,6 @@
+tmp*
+*egg-info
+*_cache
+__pycache__
+.vscode
+.DS_Store
