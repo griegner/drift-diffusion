@@ -1,6 +1,9 @@
-tmp*
-*egg-info
-*_cache
-__pycache__
+# general
 .vscode
 .DS_Store
+
+# packaging
+*.egg-info
+
+# pixi
+.pixi
