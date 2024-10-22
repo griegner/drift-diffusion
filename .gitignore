@@ -3,7 +3,9 @@
 .DS_Store
 
 # packaging
+__pycache__/
 *.egg-info
 
 # pixi
 .pixi
+pixi.lock

@@ -40,10 +40,18 @@ pytest-cov = "*"
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest -vsl --cov=drift_diffusion --cov-report=xml drift_diffusion" }
 
+[tool.pixi.feature.notebook.dependencies]
+notebook = "*"
+matplotlib = "*"
+ipympl = "*"
+ipywidgets = "*"
+
+
 [tool.pixi.environments]
 lint = ["lint"]
 test = ["test"]
-dev = ["lint", "test"]
+notebook = ["notebook"]
+dev = ["lint", "test", "notebook"]
 
 [tool.black]
 line-length = 88
