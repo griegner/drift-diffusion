@@ -10,7 +10,7 @@ description = "drift diffusion models of decision making"
 readme = "README.md"
 requires-python = ">=3.9"
 # scikit-learn: numpy, scipy, joblib
-dependencies = ["scikit-learn>=1.5.2"]
+dependencies = ["scikit-learn>=1.5.2", "statsmodels>=0.14.4"]
 
 [tool.pixi.project]
 channels = ["conda-forge"]
@@ -19,6 +19,7 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 [tool.pixi.dependencies]
 python = ">=3.9"
 scikit-learn = ">=1.5.2"
+statsmodels = ">=0.14.4"
 
 [tool.pixi.pypi-dependencies]
 drift_diffusion = { path=".", editable=true }
@@ -42,7 +43,7 @@ test = { cmd = "pytest -vsl --cov=drift_diffusion --cov-report=xml drift_diffusi
 
 [tool.pixi.feature.notebook.dependencies]
 notebook = "*"
-matplotlib = "*"
+seaborn = "*"
 ipympl = "*"
 ipywidgets = "*"
 
