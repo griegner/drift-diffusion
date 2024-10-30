@@ -23,6 +23,7 @@ statsmodels = ">=0.14.4"
 
 [tool.pixi.pypi-dependencies]
 drift_diffusion = { path=".", editable=true }
+pyddm = ">=0.8.1"
 
 [tool.pixi.feature.lint.dependencies]
 pre-commit = "4.0.1"
