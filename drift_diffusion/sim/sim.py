@@ -3,12 +3,12 @@
 import numpy as np
 
 
-def sim_ddm(tau, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, seed=0):
+def sim_ddm(dt, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, error_dist="gaussian", seed=0):
     """Simulate seven parameter drift diffusion model.
 
     Parameters
     ----------
-    tau : float
+    dt : float
         time step in seconds
     t : float, optional
         nondecision time, by default 0.1
@@ -24,10 +24,29 @@ def sim_ddm(tau, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, seed=0):
         drift rate variability (normal distribution with mean=v, sd=sv)
     a : int, optional
         symmetric threshold separation, by default 2
+    error_dist : {'gaussian', 'symmetric_bernoulli', 'asymmetric_bernoulli', 't', 'mixture'}, optional
+        error distribution, by default "gaussian"
     seed : int, optional
         random seed, by default 0
     """
     rng = np.random.default_rng(seed=seed)
+
+    # define error distributions
+    p = np.clip(0.5 * (1 + v * np.sqrt(dt)), 0, 1)
+    error_functions = {
+        "gaussian": lambda: rng.normal(loc=v * dt, scale=np.sqrt(dt)),
+        "symmetric_bernoulli": lambda: (rng.binomial(n=1, p=0.5) * 2 - 1) * np.sqrt(dt)
+        + v * dt,
+        "asymmetric_bernoulli": lambda: (rng.binomial(n=1, p=p) * 2 - 1) * np.sqrt(dt),
+        "t": lambda: rng.standard_t(df=5) / np.sqrt(5 / (5 - 2)) * np.sqrt(dt) + v * dt,
+        "mixture": lambda: (
+            rng.normal(loc=v * dt, scale=np.sqrt((0.5 / 0.9) * dt))
+            if rng.binomial(1, 0.9)
+            else rng.normal(loc=v * dt, scale=np.sqrt((0.5 / 0.1) * dt))
+        ),
+    }
+    if error_dist not in error_functions:
+        raise ValueError("invalid error distribution")
 
     # if variability parameters are given, sample t, z, and v
     if st > 0:
@@ -37,14 +56,15 @@ def sim_ddm(tau, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, seed=0):
     if sv > 0:
         v = rng.normal(v, sv)
 
-    x = [z for _ in range(int(t / tau))]
+    x = [z for _ in range(int(t / dt))]
     x_t = z
     time = 0
 
     # sim diffusion process
     while abs(x_t) < a / 2:
-        x_t += v * tau + rng.normal(0, np.sqrt(tau))  # random walk step
+        e_t = error_functions[error_dist]()
+        x_t += e_t
         x.append(x_t)
-        time += tau
+        time += dt
 
     return np.asarray(x)
