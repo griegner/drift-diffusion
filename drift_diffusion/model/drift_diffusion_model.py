@@ -20,11 +20,12 @@ class DriftDiffusionModel(BaseEstimator):
         z : float, optional
             _description_, by default 0.1
         cov_estimator : str or None, optional
-            The covariance estimator to use. Options are "sample_hessian",
-            "outer_product", "misspecification_robust", "hac_robust".
-            If None, covariance matrix will not be estimated, by default None.
+            The covariance estimator to use.
+            Options are "sample-hessian", "outer-product", "misspecification-robust", "hac-robust", "all".
+            If None, the covariance matrix will not be estimated.
+            If "all", all covariance matrices will be estimated, by default None.
         random_state : int, RandomState instance, or None
-            Random number generator of `sample_from_pdf()`, by default None.
+            Random number generator for `sample_from_pdf()`, by default None.
         """
         self.a = a
         self.v = v
@@ -108,22 +109,77 @@ class DriftDiffusionModel(BaseEstimator):
         loglikelihood_ = self._loglikelihood(params_, X, y)
         return -np.sum(loglikelihood_)
 
+    def _fit_covariance(self, X, y):
+
+        # autograd derivatives
+        ll_jacobian = jacobian(self._loglikelihood)
+        lll_hessian = hessian(self._lossloglikelihood)
+
+        def sample_hessian():
+            hessian_ = lll_hessian(self.params_, X, y)
+            return np.linalg.inv(hessian_)
+
+        def outer_product():
+            jacobian_ = ll_jacobian(self.params_, X, y)
+            return np.linalg.inv(jacobian_.T @ jacobian_)
+
+        def misspecification_robust():
+            hessian_inv_ = sample_hessian()
+            jacobian_ = ll_jacobian(self.params_, X, y)
+            fisher_ = jacobian_.T @ jacobian_
+            return hessian_inv_ @ fisher_ @ hessian_inv_
+
+        def newey_west(jac, n_lags=None):
+            jac = jac[:, np.newaxis] if jac.ndim == 1 else jac
+            if n_lags is None:
+                n_lags = int(np.floor(4 * (len(jac) / 100.0) ** (2.0 / 9.0)))
+            weights = 1 - np.arange(n_lags + 1) / (n_lags + 1)
+            outer_product = jac.T @ jac
+            for lag in range(1, n_lags + 1):
+                lagged_product = jac[lag:].T @ jac[:-lag]
+                outer_product += weights[lag] * (lagged_product + lagged_product.T)
+            return outer_product
+
+        def hac_robust():
+            hessian_inv_ = sample_hessian()
+            jacobian_ = ll_jacobian(self.params_, X, y)
+            newey_west_ = newey_west(jacobian_)
+            return hessian_inv_ @ newey_west_ @ hessian_inv_
+
+        cov_estimators = {
+            "sample-hessian": sample_hessian,
+            "outer-product": outer_product,
+            "misspecification-robust": misspecification_robust,
+            "hac-robust": hac_robust,
+        }
+
+        if self.cov_estimator == "all":
+            return {k: v() for k, v in cov_estimators.items()}
+        else:
+            return cov_estimators.get(self.cov_estimator, lambda: None)()
+
     def fit(self, X, y):
 
-        # define autograd derivatives
-        ll_jacobian = jacobian(self._loglikelihood)
+        x = X if X.ndim == 1 else X[:, 0]
+
+        # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
 
+        # estimate parameters
         fit_ = minimize(
             fun=self._lossloglikelihood,
             x0=[1, 0, 0],
-            args=(X, y),
+            args=(x, y),
             method="Newton-CG",
             jac=lll_jacobian,
             hess=lll_hessian,
         )
-        self.params_ = fit_.x.tolist()
-        self.set_params(**{k: v for k, v in zip(["a", "v", "z"], self.params_)})
+        self.params_ = fit_.x
+        self.set_params(
+            **{k: v for k, v in zip(["a", "v", "z"], self.params_.tolist())}
+        )
+        self.covariance_ = self._fit_covariance(x, y)
         self.fitted_ = True
+
         return self
