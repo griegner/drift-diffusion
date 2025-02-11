@@ -1,6 +1,9 @@
 """simulate drift diffusion models"""
 
 import numpy as np
+from sklearn.utils.validation import check_random_state
+
+from drift_diffusion.model import pdf
 
 
 def sim_ddm(dt, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, error_dist="gaussian", seed=0):
@@ -68,3 +71,20 @@ def sim_ddm(dt, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, error_dist="gaussian", s
         time += dt
 
     return np.asarray(x)
+
+
+def sample_from_pdf(a, v, z, n_samples=1000, x_range=(1e-5, 3), random_state=None):
+    """
+    random_state : int, RandomState instance, or None
+        Random number generator for `sample_from_pdf()`, by default None.
+    """
+    random_state = check_random_state(random_state)
+
+    num = 1000  # discretize pdf
+    X = np.r_[np.linspace(*x_range, num), np.linspace(*x_range, num)]
+    y = np.r_[-np.ones(num), np.ones(num)]
+
+    pdfs = pdf(X, y, a, v, z)
+    probs_ = pdfs / np.sum(pdfs)
+    samples = random_state.choice(X * y, size=n_samples, p=probs_)
+    return np.abs(samples), np.sign(samples)

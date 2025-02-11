@@ -1,3 +1,3 @@
 """simulations"""
 
-from .sim import sim_ddm
+from .sim import sample_from_pdf, sim_ddm
