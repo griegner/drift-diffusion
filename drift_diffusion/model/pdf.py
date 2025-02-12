@@ -3,7 +3,7 @@
 import autograd.numpy as np
 
 
-def pdf(X, y, a, v, z, err=1e-3):
+def pdf(X, y, a, t, v, z, err=1e-3):
     """Probability density function (PDF).
 
     Parameters
@@ -13,6 +13,8 @@ def pdf(X, y, a, v, z, err=1e-3):
     y : _type_
         _description_
     a : _type_
+        _description_
+    t : _type_
         _description_
     v : _type_
         _description_
@@ -27,7 +29,7 @@ def pdf(X, y, a, v, z, err=1e-3):
         _description_
     """
 
-    x = X if X.ndim == 1 else X[:, 0]
+    x = X - t if X.ndim == 1 else X[:, 0] - t
 
     # to navarro 2009 notation
     a = 2 * a

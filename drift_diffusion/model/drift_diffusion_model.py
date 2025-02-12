@@ -9,12 +9,14 @@ from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a=None, v=None, z=None, cov_estimator=None):
+    def __init__(self, a=None, t=None, v=None, z=None, cov_estimator=None):
         """Drift diffusion model.
 
         Parameters
         ----------
         a : float or None
+            ...
+        t : float or None
             ...
         v : float or None
             ...
@@ -37,15 +39,16 @@ class DriftDiffusionModel(BaseEstimator):
         """
         super().__init__()
         self.a = a
+        self.t = t
         self.v = v
         self.z = z
-        self.free_params = np.array([a is None, v is None, z is None])
+        self.free_params = np.array([a is None, t is None, v is None, z is None])
         self.cov_estimator = cov_estimator
 
     def _get_params(self, params_):
         iter_params = iter(params_)
         params = []
-        for name, free in zip(["a", "v", "z"], self.free_params):
+        for name, free in zip(["a", "t", "v", "z"], self.free_params):
             if free:
                 params.append(next(iter_params))
             else:
@@ -120,7 +123,7 @@ class DriftDiffusionModel(BaseEstimator):
         # estimate parameters, covariance matrix
         fit_ = minimize(
             fun=self._lossloglikelihood,
-            x0=np.array([1, 0, 0])[self.free_params],  # initial guess
+            x0=np.array([1, 0, 0, 0])[self.free_params],  # initial guess
             args=(x, y),
             method="Newton-CG",
             jac=lll_jacobian,
