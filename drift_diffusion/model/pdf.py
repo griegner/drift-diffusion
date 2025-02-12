@@ -8,25 +8,29 @@ def pdf(X, y, a, t, v, z, err=1e-3):
 
     Parameters
     ----------
-    X : _type_
-        _description_
-    y : _type_
-        _description_
-    a : _type_
-        _description_
-    t : _type_
-        _description_
-    v : _type_
-        _description_
-    z : _type_
-        _description_
-    err : _type_, optional
-        _description_, by default 1e-3
+    X : ndarray of shape (n_samples, )
+        reaction times (`>0`)
+    y : ndarray of shape (n_samples, )
+        responses (`+/-1`) +1 is upper and -1 is lower
+    a : float
+        decision boundary (a>0) +a is upper and -a is lower
+    t : float
+        nondecision time (`t>=0`) +t is time in seconds
+    v : float
+        drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a
+    z : float
+        starting point (`-1<z<+1`), +1 is +a and -1 is -a
+    err : float, optional
+        error tolerance, by default 1e-3
 
     Returns
     -------
-    _type_
-        _description_
+    p : ndarray of shape (n_samples, )
+        probability densities
+
+    References
+    ----------
+    .. [1] Navarro & Fuss. Fast and accurate calculations for first-passage times in Wiener diffusion models. Journal of Mathematical Psychology 53, 222–230 (2009)
     """
 
     x = X - t if X.ndim == 1 else X[:, 0] - t

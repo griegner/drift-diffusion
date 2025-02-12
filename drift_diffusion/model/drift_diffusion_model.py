@@ -34,9 +34,9 @@ class DriftDiffusionModel(BaseEstimator):
 
         Attributes
         ----------
-        params_ : np.ndarray of shape (n_params, )
+        params_ : ndarray of shape (n_params, )
             estimated free parameters
-        covariance_ : np.ndarray of shape (n_params, n_params)
+        covariance_ : ndarray of shape (n_params, n_params)
             estimated covariances of free parameters
             standard errors are the square roots of the diagonal terms
         """

@@ -6,6 +6,43 @@ from sklearn.utils.validation import check_random_state
 from drift_diffusion.model import pdf
 
 
+def sample_from_pdf(a=1, t=0, v=0, z=0, n_samples=1000, random_state=None):
+    """Sample from probability density function (PDF).
+
+    Parameters
+    ----------
+    a : float, optional
+        decision boundary (a>0) +a is upper and -a is lower, by default 1
+    t : float, optional
+        nondecision time (`t>=0`) +t is time in seconds, by default 0
+    v : float, optional
+        drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default 0
+    z : float, optional
+        starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default 0
+    n_samples : int, optional
+        number of samples to return, by default 1000
+    random_state : int, RandomState instance, or None
+        random number generator, by default None
+
+    Returns
+    -------
+    X, y : tuple of ndarray of shape (n_samples, )
+        reaction times, responses
+    """
+
+    random_state = check_random_state(random_state)
+
+    num = 1000  # discretize pdf
+    x_range = (1e-5 + t, 4 + t)
+    X = np.r_[np.linspace(*x_range, num), np.linspace(*x_range, num)]
+    y = np.r_[-np.ones(num), np.ones(num)]
+
+    pdfs = pdf(X, y, a, t, v, z)
+    probs_ = pdfs / np.sum(pdfs)
+    samples = random_state.choice(X * y, size=n_samples, p=probs_)
+    return np.abs(samples), np.sign(samples)
+
+
 def sim_ddm(dt, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, error_dist="gaussian", seed=0):
     """Simulate seven parameter drift diffusion model.
 
@@ -71,21 +108,3 @@ def sim_ddm(dt, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, error_dist="gaussian", s
         time += dt
 
     return np.asarray(x)
-
-
-def sample_from_pdf(a, t, v, z, n_samples=1000, random_state=None):
-    """
-    random_state : int, RandomState instance, or None
-        Random number generator for `sample_from_pdf()`, by default None.
-    """
-    random_state = check_random_state(random_state)
-
-    num = 1000  # discretize pdf
-    x_range = (1e-5 + t, 4 + t)
-    X = np.r_[np.linspace(*x_range, num), np.linspace(*x_range, num)]
-    y = np.r_[-np.ones(num), np.ones(num)]
-
-    pdfs = pdf(X, y, a, t, v, z)
-    probs_ = pdfs / np.sum(pdfs)
-    samples = random_state.choice(X * y, size=n_samples, p=probs_)
-    return np.abs(samples), np.sign(samples)
