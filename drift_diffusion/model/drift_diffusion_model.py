@@ -9,40 +9,42 @@ from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a=None, t=None, v=None, z=None, cov_estimator=None):
-        """Drift diffusion model.
+    def __init__(self, a=None, t=None, v=None, z=None, cov_estimator="sample-hessian"):
+        """Drift diffusion model (DDM) of binary decision making.
+
+        DriftDiffusionModel fits up to four parameters (`a, t, v, z`) of the DDM by maximum likelihood estimation.
+        Each parameter can either be free (by default) or fixed, with free parameters estimated during `fit`
+        and fixed parameters set at initialization by passing a float.
+
+        The covariance matrix of the estimator can be computed by one of four methods (see `cov_estimator`),
+        each designed to be valid under increasingly general conditions on the data (`X,y`).
 
         Parameters
         ----------
         a : float or None
-            ...
+            decision boundary (a>0) +a is upper and -a is lower, by default None
         t : float or None
-            ...
+            nondecision time (`t>=0`) +t is time in seconds, by default None
         v : float or None
-            ...
+            drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default None
         z : float or None
-            ...
-        cov_estimator : str or None, optional
-            The covariance estimator to use.
-            Options are "sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust", "all".
-            If None, the covariance matrix will not be estimated.
-            If "all", all covariance matrices will be estimated, by default None.
+            starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default None
+        cov_estimator : {"sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust", "all"}, optional
+            covariance estimator, by default "sample-hessian"
 
         Attributes
         ----------
         params_ : np.ndarray of shape (n_params, )
-            The fitted parameter vector.
+            estimated free parameters
         covariance_ : np.ndarray of shape (n_params, n_params)
-            The fitted covariance matrix.
-        is_fitted_ : bool
-            Indicates whether the estimator has been fitted.
+            estimated covariances of free parameters
+            standard errors are the square roots of the diagonal terms
         """
         super().__init__()
         self.a = a
         self.t = t
         self.v = v
         self.z = z
-        self.free_params = np.array([a is None, t is None, v is None, z is None])
         self.cov_estimator = cov_estimator
 
     def _get_params(self, params_):
@@ -110,7 +112,7 @@ class DriftDiffusionModel(BaseEstimator):
         if self.cov_estimator == "all":
             return {k: v() for k, v in cov_estimators.items()}
         else:
-            return cov_estimators.get(self.cov_estimator, lambda: None)()
+            return cov_estimators[self.cov_estimator]()
 
     def fit(self, X, y):
 
@@ -119,6 +121,11 @@ class DriftDiffusionModel(BaseEstimator):
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
+
+        # mask of free parameters
+        self.free_params = np.array(
+            [param is None for param in [self.a, self.t, self.v, self.z]]
+        )
 
         # estimate parameters, covariance matrix
         fit_ = minimize(
