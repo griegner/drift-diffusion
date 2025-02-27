@@ -1,4 +1,4 @@
-"""Three parameter probability density function."""
+"""Four parameter probability density function."""
 
 import autograd.numpy as np
 
@@ -13,7 +13,7 @@ def pdf(X, y, a, t, v, z, err=1e-3):
     y : ndarray of shape (n_samples, )
         responses (`+/-1`) +1 is upper and -1 is lower
     a : float
-        decision boundary (a>0) +a is upper and -a is lower
+        decision boundary (`a>0`) +a is upper and -a is lower
     t : float
         nondecision time (`t>=0`) +t is time in seconds
     v : float
@@ -65,17 +65,13 @@ def pdf(X, y, a, t, v, z, err=1e-3):
     K_s = np.ceil(k_s).astype(int)
     Ks_s = np.arange(-((K_s.max() - 1) // 2), ((K_s.max() - 1) // 2) + 1)
     exp_s = -((w + 2 * Ks_s[:, None]) ** 2) / (2 * xt)
-    p_x_s = np.sum((w + 2 * Ks_s[:, None]) * np.exp(exp_s), axis=0) / np.sqrt(
-        2 * np.pi * xt**3
-    )
+    p_x_s = np.sum((w + 2 * Ks_s[:, None]) * np.exp(exp_s), axis=0) / np.sqrt(2 * np.pi * xt**3)
 
     # large x approximation
     K_l = np.ceil(k_l).astype(int)
     Ks_l = np.arange(1, K_l.max() + 1)
     exp_l = -(Ks_l[:, None] ** 2) * (np.pi**2) * xt / 2
-    p_x_l = np.pi * np.sum(
-        Ks_l[:, None] * np.exp(exp_l) * np.sin(Ks_l[:, None] * np.pi * w), axis=0
-    )
+    p_x_l = np.pi * np.sum(Ks_l[:, None] * np.exp(exp_l) * np.sin(Ks_l[:, None] * np.pi * w), axis=0)
 
     # combine small x and large x approximations
     p = np.where(mask_x_s, p_x_s, p_x_l)

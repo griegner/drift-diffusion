@@ -12,7 +12,7 @@ def sample_from_pdf(a=1, t=0, v=0, z=0, n_samples=1000, random_state=None):
     Parameters
     ----------
     a : float, optional
-        decision boundary (a>0) +a is upper and -a is lower, by default 1
+        decision boundary (`a>0`) +a is upper and -a is lower, by default 1
     t : float, optional
         nondecision time (`t>=0`) +t is time in seconds, by default 0
     v : float, optional
@@ -75,8 +75,7 @@ def sim_ddm(dt, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, error_dist="gaussian", s
     p = np.clip(0.5 * (1 + v * np.sqrt(dt)), 0, 1)
     error_functions = {
         "gaussian": lambda: rng.normal(loc=v * dt, scale=np.sqrt(dt)),
-        "symmetric_bernoulli": lambda: (rng.binomial(n=1, p=0.5) * 2 - 1) * np.sqrt(dt)
-        + v * dt,
+        "symmetric_bernoulli": lambda: (rng.binomial(n=1, p=0.5) * 2 - 1) * np.sqrt(dt) + v * dt,
         "asymmetric_bernoulli": lambda: (rng.binomial(n=1, p=p) * 2 - 1) * np.sqrt(dt),
         "t": lambda: rng.standard_t(df=5) / np.sqrt(5 / (5 - 2)) * np.sqrt(dt) + v * dt,
         "mixture": lambda: (

@@ -22,7 +22,7 @@ class DriftDiffusionModel(BaseEstimator):
         Parameters
         ----------
         a : float or None
-            decision boundary (a>0) +a is upper and -a is lower, by default None
+            decision boundary (`a>0`) +a is upper and -a is lower, by default None
         t : float or None
             nondecision time (`t>=0`) +t is time in seconds, by default None
         v : float or None
@@ -123,9 +123,7 @@ class DriftDiffusionModel(BaseEstimator):
         lll_hessian = hessian(self._lossloglikelihood)
 
         # mask of free parameters
-        self.free_params = np.array(
-            [param is None for param in [self.a, self.t, self.v, self.z]]
-        )
+        self.free_params = np.array([param is None for param in [self.a, self.t, self.v, self.z]])
 
         # estimate parameters, covariance matrix
         fit_ = minimize(
