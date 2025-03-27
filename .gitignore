@@ -1,6 +1,7 @@
 # general
 .vscode
 .DS_Store
+*tmp*
 
 # packaging
 __pycache__/
