@@ -9,10 +9,10 @@ from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a=None, t=None, v=None, z=None, cov_estimator="sample-hessian"):
+    def __init__(self, a=None, t0=None, v=None, z=None, cov_estimator="sample-hessian"):
         """Drift diffusion model (DDM) of binary decision making.
 
-        DriftDiffusionModel fits up to four parameters (`a, t, v, z`) of the DDM by maximum likelihood estimation.
+        DriftDiffusionModel fits up to four parameters (`a, t0, v, z`) of the DDM by maximum likelihood estimation.
         Each parameter can either be free (by default) or fixed, with free parameters estimated during `fit`
         and fixed parameters set at initialization by passing a float.
 
@@ -23,8 +23,8 @@ class DriftDiffusionModel(BaseEstimator):
         ----------
         a : float or None
             decision boundary (`a>0`) +a is upper and -a is lower, by default None
-        t : float or None
-            nondecision time (`t>=0`) +t is time in seconds, by default None
+        t0 : float or None
+            nondecision time (`t0>=0`) +t0 is time in seconds, by default None
         v : float or None
             drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default None
         z : float or None
@@ -42,7 +42,7 @@ class DriftDiffusionModel(BaseEstimator):
         """
         super().__init__()
         self.a = a
-        self.t = t
+        self.t0 = t0
         self.v = v
         self.z = z
         self.cov_estimator = cov_estimator
@@ -50,7 +50,7 @@ class DriftDiffusionModel(BaseEstimator):
     def _get_params(self, params_):
         iter_params = iter(params_)
         params = []
-        for name, free in zip(["a", "t", "v", "z"], self.free_params):
+        for name, free in zip(["a", "t0", "v", "z"], self.free_params):
             if free:
                 params.append(next(iter_params))
             else:
@@ -59,7 +59,7 @@ class DriftDiffusionModel(BaseEstimator):
 
     def _loglikelihood(self, params_, X, y, epsilon=1e-10):
         all_params = self._get_params(params_)
-        return np.log(pdf(X, y, *all_params) + epsilon)
+        return np.log(pdf(y, *all_params) + epsilon)
 
     def _lossloglikelihood(self, params_, X, y):
         loglikelihood_ = self._loglikelihood(params_, X, y)
@@ -116,26 +116,24 @@ class DriftDiffusionModel(BaseEstimator):
 
     def fit(self, X, y):
 
-        x = X if X.ndim == 1 else X[:, 0]
-
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
 
         # mask of free parameters
-        self.free_params = np.array([param is None for param in [self.a, self.t, self.v, self.z]])
+        self.free_params = np.array([param is None for param in [self.a, self.t0, self.v, self.z]])
 
         # estimate parameters, covariance matrix
         fit_ = minimize(
             fun=self._lossloglikelihood,
             x0=np.array([1, 0, 0, 0])[self.free_params],  # initial guess
-            args=(x, y),
+            args=(X, y),
             method="Newton-CG",
             jac=lll_jacobian,
             hess=lll_hessian,
         )
         self.params_ = fit_.x
-        self.covariance_ = self._fit_covariance(x, y)
+        self.covariance_ = self._fit_covariance(X, y)
 
         self.is_fitted_ = True
         return self

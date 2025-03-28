@@ -1,3 +1,4 @@
+import numpy as np
 from numpy import testing
 
 from drift_diffusion.model import DriftDiffusionModel
@@ -6,9 +7,10 @@ from drift_diffusion.sim import sample_from_pdf
 
 def test_drift_diffusion_model():
 
-    a, t, v, z = 1, 0.2, 0.25, 0
+    a, t0, v, z = 1, 0.2, 0.25, 0
 
-    X, y = sample_from_pdf(a, t, v, z, random_state=0)
+    y = sample_from_pdf(a, t0, v, z, random_state=0)
+    X = np.ones((len(y), 1))
 
     ddm = DriftDiffusionModel(z=z, cov_estimator="all")
     ddm.fit(X, y)
@@ -16,7 +18,7 @@ def test_drift_diffusion_model():
     covariance_ = ddm.covariance_.values()
 
     # test parameters close to true values
-    testing.assert_allclose([a, t, v], params_, atol=0.05)
+    testing.assert_allclose([a, t0, v], params_, atol=0.05)
 
     # test covariance matrix of expected shape
     for cov in covariance_:
