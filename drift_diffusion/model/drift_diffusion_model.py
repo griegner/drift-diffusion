@@ -47,19 +47,26 @@ class DriftDiffusionModel(BaseEstimator):
         self.z = z
         self.cov_estimator = cov_estimator
 
+    def __sklearn_tags__(self):
+        tags = super().__sklearn_tags__()
+        tags.estimator_type = "regressor"  # closest to MLE
+        tags.target_tags.required = True  # y to be passed to fit
+        tags.target_tags.one_d_labels = True  # y must be 1d
+        return tags
+
     def _get_params(self, params_):
         iter_params = iter(params_)
         params = []
-        for name, free in zip(["a", "t0", "v", "z"], self.free_params):
+        for name, free in zip(["a", "t0", "v", "z"], self.free_params_):
             if free:
                 params.append(next(iter_params))
             else:
                 params.append(getattr(self, name))
         return params
 
-    def _loglikelihood(self, params_, X, y, epsilon=1e-10):
+    def _loglikelihood(self, params_, X, y):
         all_params = self._get_params(params_)
-        return np.log(pdf(y, *all_params) + epsilon)
+        return np.log(pdf(y, *all_params))
 
     def _lossloglikelihood(self, params_, X, y):
         loglikelihood_ = self._loglikelihood(params_, X, y)
@@ -115,18 +122,30 @@ class DriftDiffusionModel(BaseEstimator):
             return cov_estimators[self.cov_estimator]()
 
     def fit(self, X, y):
+        """Fit DDM.
+
+        Parameters
+        ----------
+        X : np.ndarray of shape (n_samples, n_features)
+            sample-by-sample covariates
+        y : np.ndarray of shape (n_samples, )
+            reaction times (`abs(y)>0`) decision + nondecision time\\
+            responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
+        """
+        X = X.reshape(-1, 1) if X.ndim == 1 else X
+        X, y = self._validate_data(X, y)  # n_features_in_
 
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
 
         # mask of free parameters
-        self.free_params = np.array([param is None for param in [self.a, self.t0, self.v, self.z]])
+        self.free_params_ = np.array([param is None for param in [self.a, self.t0, self.v, self.z]])
 
         # estimate parameters, covariance matrix
         fit_ = minimize(
             fun=self._lossloglikelihood,
-            x0=np.array([1, 0, 0, 0])[self.free_params],  # initial guess
+            x0=np.array([1, 0, 0, 0])[self.free_params_],  # initial guess
             args=(X, y),
             method="Newton-CG",
             jac=lll_jacobian,

@@ -34,6 +34,7 @@ def pdf(y, a, t0, v, z, err=1e-3):
 
     # decision time = reaction time - nondecision time
     dt, resp = np.abs(y) - t0, np.sign(y)
+    dt = np.where(dt == 0, dt + 1e-10, dt)  # dt = 0 undefined
 
     # to navarro 2009 notation
     a = 2 * a

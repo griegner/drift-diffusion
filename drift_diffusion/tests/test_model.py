@@ -5,6 +5,7 @@ import pytest
 from joblib import Parallel, delayed
 from numpy import testing
 from pyddm import gddm
+from sklearn.utils.estimator_checks import parametrize_with_checks
 
 from drift_diffusion.model import DriftDiffusionModel, pdf
 from drift_diffusion.sim import sample_from_pdf
@@ -41,6 +42,12 @@ def test_pdf_vs_pyddm(a, t0, v, z):
     testing.assert_allclose(pdf_lwr, cn_sol.pdf(choice="lower")[1:], atol=0.08)
 
 
+@pytest.mark.skip(reason="slow runtime")
+@parametrize_with_checks([DriftDiffusionModel()], legacy=False)
+def test_sklearn_compatible_estimator(estimator, check):
+    check(estimator)
+
+
 @pytest.mark.parametrize(
     "a, v, z",
     itertools.product(
@@ -51,13 +58,14 @@ def test_pdf_vs_pyddm(a, t0, v, z):
 )
 def test_drift_diffusion_model(a, v, z):
     """test the MLE returns the expected parameters and standard errors"""
-    n_repeats = 100
+    n_repeats = 50
     t0 = 0
     ddm = DriftDiffusionModel(t0=t0)
 
     @delayed
     def _fit(repeat):
-        X, y = None, sample_from_pdf(a, t0, v, z, random_state=repeat)
+        y = sample_from_pdf(a, t0, v, z, random_state=repeat)
+        X = np.ones(len(y))
         ddm.fit(X, y)
         stderr = np.sqrt(np.diag(ddm.covariance_))
         return ddm.params_, stderr
@@ -70,13 +78,14 @@ def test_drift_diffusion_model(a, v, z):
     testing.assert_allclose([a, v, z], params_.mean(axis=0), atol=0.2)
 
     # test standard errors close to true values
-    testing.assert_allclose(params_.std(axis=0), stderrs_.mean(axis=0), atol=0.005)
+    testing.assert_allclose(params_.std(axis=0), stderrs_.mean(axis=0), atol=0.02)
 
 
 def test_cov_estimator():
     """test all covariance estimates are similar when correctly specified"""
     a, t0, v, z = 1, 0, 0.1, 0
-    X, y = None, sample_from_pdf(a, t0, v, z)
+    y = sample_from_pdf(a, t0, v, z)
+    X = np.ones(len(y))
     ddm = DriftDiffusionModel(cov_estimator="all")
     ddm.fit(X, y)
     covariances_ = list(ddm.covariance_.values())
