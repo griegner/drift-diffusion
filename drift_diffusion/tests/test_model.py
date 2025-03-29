@@ -42,9 +42,10 @@ def test_pdf_vs_pyddm(a, t0, v, z):
     testing.assert_allclose(pdf_lwr, cn_sol.pdf(choice="lower")[1:], atol=0.08)
 
 
-@pytest.mark.skip(reason="slow runtime")
-@parametrize_with_checks([DriftDiffusionModel()], legacy=False)
+@pytest.mark.skip(reason="5min runtime")
+@parametrize_with_checks([DriftDiffusionModel()], legacy=True)
 def test_sklearn_compatible_estimator(estimator, check):
+    """test estimator is sklearn compatible"""
     check(estimator)
 
 
@@ -65,7 +66,7 @@ def test_drift_diffusion_model(a, v, z):
     @delayed
     def _fit(repeat):
         y = sample_from_pdf(a, t0, v, z, random_state=repeat)
-        X = np.ones(len(y))
+        X = np.ones((len(y), 1))
         ddm.fit(X, y)
         stderr = np.sqrt(np.diag(ddm.covariance_))
         return ddm.params_, stderr
@@ -85,7 +86,7 @@ def test_cov_estimator():
     """test all covariance estimates are similar when correctly specified"""
     a, t0, v, z = 1, 0, 0.1, 0
     y = sample_from_pdf(a, t0, v, z)
-    X = np.ones(len(y))
+    X = np.ones((len(y), 1))
     ddm = DriftDiffusionModel(cov_estimator="all")
     ddm.fit(X, y)
     covariances_ = list(ddm.covariance_.values())

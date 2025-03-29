@@ -4,6 +4,7 @@ import autograd.numpy as np
 from autograd import hessian, jacobian
 from scipy.optimize import minimize
 from sklearn.base import BaseEstimator
+from sklearn.utils.validation import validate_data
 
 from .pdf import pdf
 
@@ -49,7 +50,7 @@ class DriftDiffusionModel(BaseEstimator):
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
-        tags.estimator_type = "regressor"  # closest to MLE
+        tags.estimator_type = None  # no type for MLE
         tags.target_tags.required = True  # y to be passed to fit
         tags.target_tags.one_d_labels = True  # y must be 1d
         return tags
@@ -132,8 +133,7 @@ class DriftDiffusionModel(BaseEstimator):
             reaction times (`abs(y)>0`) decision + nondecision time\\
             responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
         """
-        X = X.reshape(-1, 1) if X.ndim == 1 else X
-        X, y = self._validate_data(X, y)  # n_features_in_
+        X, y = validate_data(self, X, y, y_numeric=True)  # n_features_in_
 
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
