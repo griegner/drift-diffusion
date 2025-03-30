@@ -4,15 +4,16 @@ import autograd.numpy as np
 from autograd import hessian, jacobian
 from scipy.optimize import minimize
 from sklearn.base import BaseEstimator
+from sklearn.utils.validation import validate_data
 
 from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a=None, t=None, v=None, z=None, cov_estimator="sample-hessian"):
+    def __init__(self, a=None, t0=None, v=None, z=None, cov_estimator="sample-hessian"):
         """Drift diffusion model (DDM) of binary decision making.
 
-        DriftDiffusionModel fits up to four parameters (`a, t, v, z`) of the DDM by maximum likelihood estimation.
+        DriftDiffusionModel fits up to four parameters (`a, t0, v, z`) of the DDM by maximum likelihood estimation.
         Each parameter can either be free (by default) or fixed, with free parameters estimated during `fit`
         and fixed parameters set at initialization by passing a float.
 
@@ -23,14 +24,14 @@ class DriftDiffusionModel(BaseEstimator):
         ----------
         a : float or None
             decision boundary (`a>0`) +a is upper and -a is lower, by default None
-        t : float or None
-            nondecision time (`t>=0`) +t is time in seconds, by default None
+        t0 : float or None
+            nondecision time (`t0>=0`) +t0 is time in seconds, by default None
         v : float or None
             drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default None
         z : float or None
             starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default None
-        cov_estimator : {"sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust", "all"}, optional
-            covariance estimator, by default "sample-hessian"
+        cov_estimator : {"sample-hessian", "outer-product", "misspecification-robust",
+                         "autocorrelation-robust", "all"}, by default "sample-hessian"
 
         Attributes
         ----------
@@ -42,24 +43,31 @@ class DriftDiffusionModel(BaseEstimator):
         """
         super().__init__()
         self.a = a
-        self.t = t
+        self.t0 = t0
         self.v = v
         self.z = z
         self.cov_estimator = cov_estimator
 
+    def __sklearn_tags__(self):
+        tags = super().__sklearn_tags__()
+        tags.estimator_type = None  # no type for MLE
+        tags.target_tags.required = True  # y to be passed to fit
+        tags.target_tags.one_d_labels = True  # y must be 1d
+        return tags
+
     def _get_params(self, params_):
         iter_params = iter(params_)
         params = []
-        for name, free in zip(["a", "t", "v", "z"], self.free_params):
+        for name, free in zip(["a", "t0", "v", "z"], self.free_params_):
             if free:
                 params.append(next(iter_params))
             else:
                 params.append(getattr(self, name))
         return params
 
-    def _loglikelihood(self, params_, X, y, epsilon=1e-10):
+    def _loglikelihood(self, params_, X, y):
         all_params = self._get_params(params_)
-        return np.log(pdf(X, y, *all_params) + epsilon)
+        return np.log(pdf(y, *all_params))
 
     def _lossloglikelihood(self, params_, X, y):
         loglikelihood_ = self._loglikelihood(params_, X, y)
@@ -115,27 +123,36 @@ class DriftDiffusionModel(BaseEstimator):
             return cov_estimators[self.cov_estimator]()
 
     def fit(self, X, y):
+        """Fit DDM.
 
-        x = X if X.ndim == 1 else X[:, 0]
+        Parameters
+        ----------
+        X : np.ndarray of shape (n_samples, n_features)
+            sample-by-sample covariates
+        y : np.ndarray of shape (n_samples, )
+            reaction times (`abs(y)>0`) decision + nondecision time\\
+            responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
+        """
+        X, y = validate_data(self, X, y, y_numeric=True)  # n_features_in_
 
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
 
         # mask of free parameters
-        self.free_params = np.array([param is None for param in [self.a, self.t, self.v, self.z]])
+        self.free_params_ = np.array([param is None for param in [self.a, self.t0, self.v, self.z]])
 
         # estimate parameters, covariance matrix
         fit_ = minimize(
             fun=self._lossloglikelihood,
-            x0=np.array([1, 0, 0, 0])[self.free_params],  # initial guess
-            args=(x, y),
+            x0=np.array([1, 0, 0, 0])[self.free_params_],  # initial guess
+            args=(X, y),
             method="Newton-CG",
             jac=lll_jacobian,
             hess=lll_hessian,
         )
         self.params_ = fit_.x
-        self.covariance_ = self._fit_covariance(x, y)
+        self.covariance_ = self._fit_covariance(X, y)
 
         self.is_fitted_ = True
         return self

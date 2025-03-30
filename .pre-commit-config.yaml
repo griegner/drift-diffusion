@@ -2,9 +2,14 @@ repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
-    -   id: check-yaml
-    -   id: end-of-file-fixer
-    -   id: trailing-whitespace
+    - id: check-docstring-first
+    - id: check-toml
+    - id: check-yaml
+    - id: debug-statements
+    - id: end-of-file-fixer
+    - id: name-tests-test
+      args: ["--pytest-test-first"]
+    - id: trailing-whitespace
 -   repo: https://github.com/psf/black
     rev: 24.10.0
     hooks:
@@ -14,3 +19,8 @@ repos:
     hooks:
     -   id: ruff
         args: ["--fix", "--show-files"]
+-   repo: https://github.com/asottile/pyupgrade
+    rev: v3.19.1
+    hooks:
+      - id: pyupgrade
+        args: [ "--py39-plus" ]

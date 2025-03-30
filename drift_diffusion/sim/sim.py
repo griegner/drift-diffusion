@@ -6,15 +6,15 @@ from sklearn.utils.validation import check_random_state
 from drift_diffusion.model import pdf
 
 
-def sample_from_pdf(a=1, t=0, v=0, z=0, n_samples=1000, random_state=None):
+def sample_from_pdf(a=1, t0=0, v=0, z=0, n_samples=1000, random_state=None):
     """Sample from probability density function (PDF).
 
     Parameters
     ----------
     a : float, optional
         decision boundary (`a>0`) +a is upper and -a is lower, by default 1
-    t : float, optional
-        nondecision time (`t>=0`) +t is time in seconds, by default 0
+    t0 : float, optional
+        nondecision time (`t0>=0`) +t0 is time in seconds, by default 0
     v : float, optional
         drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default 0
     z : float, optional
@@ -26,21 +26,20 @@ def sample_from_pdf(a=1, t=0, v=0, z=0, n_samples=1000, random_state=None):
 
     Returns
     -------
-    X, y : tuple of ndarray of shape (n_samples, )
-        reaction times, responses
+    y : ndarray of shape (n_samples, )
+        reaction times (`abs(y)>0`) decision + nondecision time\\
+        responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
     """
 
     random_state = check_random_state(random_state)
 
     num = 1000  # discretize pdf
-    x_range = (1e-5 + t, 4 + t)
-    X = np.r_[np.linspace(*x_range, num), np.linspace(*x_range, num)]
-    y = np.r_[-np.ones(num), np.ones(num)]
+    rt_range = (1e-5 + t0, 4 + t0)
+    y = np.r_[-np.linspace(*rt_range, num), np.linspace(*rt_range, num)]
 
-    pdfs = pdf(X, y, a, t, v, z)
-    probs_ = pdfs / np.sum(pdfs)
-    samples = random_state.choice(X * y, size=n_samples, p=probs_)
-    return np.abs(samples), np.sign(samples)
+    pdfs = pdf(y, a, t0, v, z)
+    ps = pdfs / np.sum(pdfs)
+    return random_state.choice(y, size=n_samples, p=ps)
 
 
 def sim_ddm(dt, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, error_dist="gaussian", seed=0):
