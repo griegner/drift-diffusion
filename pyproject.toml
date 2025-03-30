@@ -9,27 +9,29 @@ authors = [{name = "Gabriel Riegner", email = "gariegner@ucsd.edu"}]
 description = "drift diffusion models of decision making"
 readme = "README.md"
 requires-python = ">=3.9"
-# scikit-learn: numpy, scipy, joblib
-dependencies = ["scikit-learn>=1.5.2", "statsmodels>=0.14.4"]
 
 [tool.pixi.project]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 
 [tool.pixi.dependencies]
-python = ">=3.9"
-scikit-learn = ">=1.5.2"
-statsmodels = ">=0.14.4"
-autograd = ">=1.7.0"
+# conda dependencies
 
 [tool.pixi.pypi-dependencies]
+# pypi dependencies
 drift_diffusion = { path=".", editable=true }
-pyddm = ">=0.8.1"
+autograd = "*"
+formulaic = "*"
+pyddm = "*"
+scikit-learn = "*"
+statsmodels = "*"
 
 [tool.pixi.feature.lint.dependencies]
-pre-commit = "4.0.1"
+# matches version in .pre-commit-config.yaml
+pre-commit = "4.2.0"
 black = "24.10.0"
 ruff = "0.7.0"
+pyupgrade = "3.19.1"
 
 [tool.pixi.feature.lint.tasks]
 black = { cmd = "black --check --diff drift_diffusion && black --check --diff examples" }
