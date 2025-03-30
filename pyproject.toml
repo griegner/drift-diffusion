@@ -79,6 +79,7 @@ exclude=[
     "__pycache__",
     "dist",
     "build",
+    "*ipynb" # ignore example notebook (for now)
 ]
 
 [tool.ruff.lint]
