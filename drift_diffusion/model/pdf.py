@@ -29,7 +29,8 @@ def pdf(y, a, t0, v, z, err=1e-3):
 
     References
     ----------
-    .. [1] Navarro & Fuss. Fast and accurate calculations for first-passage times in Wiener diffusion models. Journal of Mathematical Psychology 53, 222–230 (2009)
+    .. [1] Navarro & Fuss. Fast and accurate calculations for first-passage times
+       in Wiener diffusion models. Journal of Mathematical Psychology 53, 222–230 (2009)
     """
 
     # decision time = reaction time - nondecision time

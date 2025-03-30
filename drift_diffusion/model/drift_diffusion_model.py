@@ -30,8 +30,8 @@ class DriftDiffusionModel(BaseEstimator):
             drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default None
         z : float or None
             starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default None
-        cov_estimator : {"sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust", "all"}, optional
-            covariance estimator, by default "sample-hessian"
+        cov_estimator : {"sample-hessian", "outer-product", "misspecification-robust",
+                         "autocorrelation-robust", "all"}, by default "sample-hessian"
 
         Attributes
         ----------
