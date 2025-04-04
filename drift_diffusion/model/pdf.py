@@ -77,7 +77,7 @@ def pdf(y, a, t0, v, z, err=1e-3):
     p = np.where(mask, p_s, p_l)
 
     # f(t|a,v,w)
-    p *= np.exp(resp * a * v * w - dt * (v**2) / 2) / (a**2)
+    p = p * np.exp(resp * a * v * w - dt * (v**2) / 2) / (a**2)
 
     return p
 
