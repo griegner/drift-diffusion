@@ -11,13 +11,13 @@ def pdf(y, a, t0, v, z, err=1e-3):
     y : ndarray of shape (n_samples, )
         reaction times (`abs(y)>0`) decision + nondecision time\\
         responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
-    a : float
+    a : float or ndarray of shape (n_samples, )
         decision boundary (`a>0`) +a is upper and -a is lower
-    t0 : float
+    t0 : float or ndarray of shape (n_samples, )
         nondecision time (`t0>=0`) +t0 is time in seconds
-    v : float
+    v : float or ndarray of shape (n_samples, )
         drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a
-    z : float
+    z : float or ndarray of shape (n_samples, )
         starting point (`-1<z<+1`), +1 is +a and -1 is -a
     err : float, optional
         error tolerance, by default 1e-3
@@ -77,6 +77,33 @@ def pdf(y, a, t0, v, z, err=1e-3):
     p = np.where(mask, p_s, p_l)
 
     # f(t|a,v,w)
-    p *= np.exp(resp * a * v * w - dt * (v**2) / 2) / (a**2)
+    p = p * np.exp(resp * a * v * w - dt * (v**2) / 2) / (a**2)
 
     return p
+
+
+def mdf(y, a, t0, v, z, err=1e-3):
+    """Mixture density function (MDF).
+
+    Parameters
+    ----------
+    y : ndarray of shape (n_samples, )
+        reaction times (`abs(y)>0`) decision + nondecision time\\
+        responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
+    a : float or ndarray of shape (n_mixtures, )
+        decision boundary (`a>0`) +a is upper and -a is lower
+    t0 : float or ndarray of shape (n_mixtures, )
+        nondecision time (`t0>=0`) +t0 is time in seconds
+    v : float or ndarray of shape (n_mixtures, )
+        drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a
+    z : float or ndarray of shape (n_mixtures, )
+        starting point (`-1<z<+1`), +1 is +a and -1 is -a
+    err : float, optional
+        error tolerance, by default 1e-3
+
+    Returns
+    -------
+    p : ndarray of shape (n_samples, )
+        mixture probability densities
+    """
+    return np.mean([pdf(yi, a, t0, v, z, err) for yi in y], axis=1)
