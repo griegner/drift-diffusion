@@ -7,7 +7,7 @@ from numpy import testing
 from pyddm import gddm
 from sklearn.utils.estimator_checks import parametrize_with_checks
 
-from drift_diffusion.model import DriftDiffusionModel, pdf
+from drift_diffusion.model import DriftDiffusionModel, mdf, pdf
 from drift_diffusion.sim import sample_from_pdf
 
 
@@ -40,6 +40,24 @@ def test_pdf_vs_pyddm(a, t0, v, z):
     testing.assert_allclose(pdf_lwr, and_sol.pdf(choice="lower")[1:], atol=0.08)
     testing.assert_allclose(pdf_upr, cn_sol.pdf(choice="upper")[1:], atol=0.08)
     testing.assert_allclose(pdf_lwr, cn_sol.pdf(choice="lower")[1:], atol=0.08)
+
+
+def test_mdf():
+    """test mixture of identical distributions is the same as the individual densities"""
+    n_samples = 1000
+    rt = np.linspace(0.01, 5, n_samples // 2)
+    y = np.r_[-rt, rt]
+
+    pdfs = pdf(y, 2, 0, 1, 0)
+    mdfs_same = mdf(y, np.array([2, 2, 2]), 0, np.array([1, 1, 1]), 0)
+    mdfs_diff = mdf(y, np.array([1, 2, 3]), 0, np.array([-2, 0, +2]), 0)
+
+    assert mdfs_same.shape == y.shape
+    # test the densities are close elementwise
+    testing.assert_allclose(mdfs_same, pdfs, atol=7e-7)
+    # test the densities are different elementwise
+    with pytest.raises(AssertionError):
+        testing.assert_allclose(mdfs_diff, pdfs, atol=7e-7)
 
 
 @pytest.mark.skip(reason="5min runtime")
