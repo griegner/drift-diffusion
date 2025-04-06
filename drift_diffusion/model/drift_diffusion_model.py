@@ -1,16 +1,18 @@
 """Three parameter drift diffusion model."""
 
 import autograd.numpy as np
+import pandas as pd
 from autograd import hessian, jacobian
+from formulaic import model_matrix
 from scipy.optimize import minimize
 from sklearn.base import BaseEstimator
-from sklearn.utils.validation import validate_data
+from sklearn.utils.validation import check_array
 
 from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a=None, t0=None, v=None, z=None, cov_estimator="sample-hessian"):
+    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian"):
         """Drift diffusion model (DDM) of binary decision making.
 
         DriftDiffusionModel fits up to four parameters (`a, t0, v, z`) of the DDM by maximum likelihood estimation.
@@ -55,18 +57,19 @@ class DriftDiffusionModel(BaseEstimator):
         tags.target_tags.one_d_labels = True  # y must be 1d
         return tags
 
-    def _get_params(self, params_):
-        iter_params = iter(params_)
-        params = []
-        for name, free in zip(["a", "t0", "v", "z"], self.free_params_):
-            if free:
-                params.append(next(iter_params))
-            else:
-                params.append(getattr(self, name))
+    def _get_params(self, params_, X):
+        params, idx = [], 0
+        for param, x in zip(["a", "t0", "v", "z"], X):
+            if x is not None:  # free parameter
+                n_features = x.shape[1]
+                params.append(x @ np.array(params_[idx : idx + n_features]))
+                idx += n_features
+            else:  # fixed params
+                params.append(getattr(self, param))
         return params
 
     def _loglikelihood(self, params_, X, y):
-        all_params = self._get_params(params_)
+        all_params = self._get_params(params_, X)
         return np.log(pdf(y, *all_params))
 
     def _lossloglikelihood(self, params_, X, y):
@@ -74,7 +77,6 @@ class DriftDiffusionModel(BaseEstimator):
         return -np.sum(loglikelihood_)
 
     def _fit_covariance(self, X, y):
-
         # autograd derivatives
         ll_jacobian = jacobian(self._loglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
@@ -127,32 +129,45 @@ class DriftDiffusionModel(BaseEstimator):
 
         Parameters
         ----------
-        X : np.ndarray of shape (n_samples, n_features)
+        X : pd.DataFrame of shape (n_samples, n_features)
             sample-by-sample covariates
-        y : np.ndarray of shape (n_samples, )
+        y : np.Series of shape (n_samples, )
             reaction times (`abs(y)>0`) decision + nondecision time\\
             responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
         """
-        X, y = validate_data(self, X, y, y_numeric=True)  # n_features_in_
+
+        # validate y
+        y = check_array(y, dtype="numeric", ensure_all_finite=True, ensure_2d=False, estimator=DriftDiffusionModel)
+
+        # validate X by model_matrix() + initialize parameters
+        X = pd.DataFrame(X) if isinstance(X, np.ndarray) else X
+        X_mm, params0 = [], []
+        for param in ["a", "t0", "v", "z"]:
+            val = getattr(self, param)
+            if isinstance(val, str):  # free parameter
+                x_mm = model_matrix(val, X, output="numpy", na_action="raise")
+                X_mm.append(x_mm)
+                params0.append(np.r_[1, np.zeros(x_mm.shape[1] - 1)] if param == "a" else np.zeros(x_mm.shape[1]))
+            else:  # fixed parameter
+                X_mm.append(None)
 
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
 
-        # mask of free parameters
-        self.free_params_ = np.array([param is None for param in [self.a, self.t0, self.v, self.z]])
-
         # estimate parameters, covariance matrix
         fit_ = minimize(
             fun=self._lossloglikelihood,
-            x0=np.array([1, 0, 0, 0])[self.free_params_],  # initial guess
-            args=(X, y),
+            x0=np.hstack(params0),
+            args=(X_mm, y),
             method="Newton-CG",
             jac=lll_jacobian,
             hess=lll_hessian,
         )
+        self.fit_ = fit_
         self.params_ = fit_.x
-        self.covariance_ = self._fit_covariance(X, y)
+        self.covariance_ = self._fit_covariance(X_mm, y)
 
         self.is_fitted_ = True
+        self.n_features_in_ = len(self.params_)
         return self
