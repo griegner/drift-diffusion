@@ -1,4 +1,4 @@
-"""Four parameter probability density function."""
+"""Probability and mixture density functions."""
 
 import autograd.numpy as np
 
