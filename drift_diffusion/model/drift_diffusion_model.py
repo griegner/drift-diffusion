@@ -1,4 +1,4 @@
-"""Three parameter drift diffusion model."""
+"""Drift diffusion model."""
 
 import autograd.numpy as np
 import pandas as pd
@@ -15,23 +15,26 @@ class DriftDiffusionModel(BaseEstimator):
     def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian"):
         """Drift diffusion model (DDM) of binary decision making.
 
-        DriftDiffusionModel fits up to four parameters (`a, t0, v, z`) of the DDM by maximum likelihood estimation.
-        Each parameter can either be free (by default) or fixed, with free parameters estimated during `fit`
-        and fixed parameters set at initialization by passing a float.
+        DriftDiffusionModel fits decision making parameters by maximum likelihood estimation.
+        The four decision making parameters (`a, t0, v, z`) can each be linear functions of
+        sample-by-sample covariate columns in `X`. Each parameter can either be free (by default) or fixed.
+        Free parameters are estimated during `fit` and defined with Wilkinson notation to specify linear
+        relationships with covariates (e.g. `v = "+1 + coherence"`; see https://matthewwardrop.github.io/formulaic).
+        Fixed parameters are set at initialization by passing a float.
 
         The covariance matrix of the estimator can be computed by one of four methods (see `cov_estimator`),
-        each designed to be valid under increasingly general conditions on the data (`X,y`).
+        each designed to be valid under increasingly general conditions on the outcome `y`.
 
         Parameters
         ----------
-        a : float or None
-            decision boundary (`a>0`) +a is upper and -a is lower, by default None
-        t0 : float or None
-            nondecision time (`t0>=0`) +t0 is time in seconds, by default None
-        v : float or None
-            drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default None
-        z : float or None
-            starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default None
+        a : float or str
+            decision boundary (`a>0`) +a is upper and -a is lower, by default "+1"
+        t0 : float or str
+            nondecision time (`t0>=0`) +t0 is time in seconds, by default "+1"
+        v : float or str
+            drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default "+1"
+        z : float or str
+            starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default "+1"
         cov_estimator : {"sample-hessian", "outer-product", "misspecification-robust",
                          "autocorrelation-robust", "all"}, by default "sample-hessian"
 
