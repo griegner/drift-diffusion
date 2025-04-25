@@ -117,3 +117,23 @@ def test_cov_estimator():
     for cov in covariances_:
         assert cov.shape == (4, 4)
         testing.assert_allclose(covariances_[0], cov, atol=0.001)
+
+
+def test_mle_covariates():
+    """test estimation of DDM parameters as linear functions of coherence"""
+
+    n_samples = 10000
+    coherence = np.array([0.1, 0.3, 0.5, 0.7])
+    X = pd.DataFrame({"coherence": np.repeat(coherence, n_samples // 4)})
+
+    # v as linear function of coherence
+    v_s = -0.2 + 0.6 * coherence
+    y = np.concat([sample_from_pdf(a=1, v=v, n_samples=n_samples // 4, random_state=0) for v in v_s])
+    ddm = DriftDiffusionModel(a="+1", t0=0, v="+1 + coherence", z=0).fit(X, y)
+    testing.assert_allclose(ddm.params_, [1, -0.2, 0.6], atol=0.01)
+
+    # a as linear function of coherence
+    a_s = 0.6 + 1.0 * coherence
+    y = np.concat([sample_from_pdf(a=a, v=0, n_samples=n_samples // 4, random_state=0) for a in a_s])
+    ddm = DriftDiffusionModel(a="+1 + coherence", t0=0, v="+1", z=0).fit(X, y)
+    testing.assert_allclose(ddm.params_, [0.6, 1.0, 0], atol=0.12)
