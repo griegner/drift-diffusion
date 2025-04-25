@@ -28,15 +28,15 @@ statsmodels = "*"
 
 [tool.pixi.feature.lint.dependencies]
 # matches version in .pre-commit-config.yaml
-pre-commit = "4.2.0"
-black = "24.10.0"
-ruff = "0.7.0"
-pyupgrade = "3.19.1"
+pre-commit = "==4.2.0"
+black = "==24.10.0"
+ruff = "==0.7.0"
+pyupgrade = "==3.19.1"
 
 [tool.pixi.feature.lint.tasks]
 black = { cmd = "black --check --diff drift_diffusion && black --check --diff examples" }
 ruff = { cmd = "ruff check --output-format=full drift_diffusion && ruff check --output-format=full examples" }
-lint = { depends_on = ["black", "ruff"]}
+lint = { depends-on = ["black", "ruff"]}
 
 [tool.pixi.feature.test.dependencies]
 pytest = "*"
