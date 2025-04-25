@@ -5,8 +5,9 @@ import pandas as pd
 from autograd import hessian, jacobian
 from formulaic import model_matrix
 from scipy.optimize import minimize
+from scipy.stats import norm
 from sklearn.base import BaseEstimator
-from sklearn.utils.validation import check_array
+from sklearn.utils.validation import check_array, check_is_fitted
 
 from .pdf import pdf
 
@@ -60,6 +61,19 @@ class DriftDiffusionModel(BaseEstimator):
         tags.target_tags.one_d_labels = True  # y must be 1d
         return tags
 
+    def _get_model_matrix(self, X):
+        X = pd.DataFrame(X) if isinstance(X, np.ndarray) else X
+        X_mm, params0 = [], []
+        for param in ["a", "t0", "v", "z"]:
+            val = getattr(self, param)
+            if isinstance(val, str):  # free parameter
+                x_mm = model_matrix(val, X, output="numpy", na_action="raise")
+                X_mm.append(x_mm)
+                params0.append(np.r_[1, np.zeros(x_mm.shape[1] - 1)] if param == "a" else np.zeros(x_mm.shape[1]))
+            else:  # fixed parameter
+                X_mm.append(None)
+        return X_mm, params0
+
     def _get_params(self, params_, X):
         params, idx = [], 0
         for param, x in zip(["a", "t0", "v", "z"], X):
@@ -80,7 +94,6 @@ class DriftDiffusionModel(BaseEstimator):
         return -np.sum(loglikelihood_)
 
     def _fit_covariance(self, X, y):
-        # autograd derivatives
         ll_jacobian = jacobian(self._loglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
 
@@ -134,25 +147,15 @@ class DriftDiffusionModel(BaseEstimator):
         ----------
         X : pd.DataFrame of shape (n_samples, n_features)
             sample-by-sample covariates
-        y : np.Series of shape (n_samples, )
+        y : pd.Series of shape (n_samples, )
             reaction times (`abs(y)>0`) decision + nondecision time\\
             responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
         """
 
         # validate y
-        y = check_array(y, dtype="numeric", ensure_all_finite=True, ensure_2d=False, estimator=DriftDiffusionModel)
-
-        # validate X by model_matrix() + initialize parameters
-        X = pd.DataFrame(X) if isinstance(X, np.ndarray) else X
-        X_mm, params0 = [], []
-        for param in ["a", "t0", "v", "z"]:
-            val = getattr(self, param)
-            if isinstance(val, str):  # free parameter
-                x_mm = model_matrix(val, X, output="numpy", na_action="raise")
-                X_mm.append(x_mm)
-                params0.append(np.r_[1, np.zeros(x_mm.shape[1] - 1)] if param == "a" else np.zeros(x_mm.shape[1]))
-            else:  # fixed parameter
-                X_mm.append(None)
+        y = check_array(y, dtype="numeric", ensure_all_finite=True, ensure_2d=False)
+        # validate X + initialize parameters
+        X_mm, params0 = self._get_model_matrix(X)
 
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
@@ -174,3 +177,38 @@ class DriftDiffusionModel(BaseEstimator):
         self.is_fitted_ = True
         self.n_features_in_ = len(self.params_)
         return self
+
+    def pdf(self, X, y, alpha=0.05):
+        """
+        Compute the PDF confidence bands under the fitted DDM using the delta method.
+
+        Parameters
+        ----------
+        X : pd.DataFrame of shape (n_samples, n_features)
+            sample-by-sample covariates
+        y : pd.Series of shape (n_samples, )
+            reaction times (`abs(y)>0`) decision + nondecision time\\
+            responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
+        alpha : float
+            two-sided significance level for the confidence bands, by default 0.05
+
+        Returns
+        -------
+        lower : ndarray of shape (n_samples, )
+            `alpha/2` confidence band
+        upper : ndarray of shape (n_samples, )
+            `1-alpha/2` confidence band
+        """
+        check_is_fitted(self)
+        X_mm, _ = self._get_model_matrix(X)
+
+        def _pdf(params_):
+            all_params = self._get_params(params_, X_mm)
+            return pdf(y, *all_params)
+
+        pdf_ = _pdf(self.params_)
+        pdf_jacobian_ = jacobian(_pdf)(self.params_)
+
+        se = np.sqrt(np.einsum("ij,jk,ik->i", pdf_jacobian_, self.covariance_, pdf_jacobian_))
+        z = norm.ppf(1 - alpha / 2)
+        return (pdf_ - z * se), (pdf_ + z * se)
