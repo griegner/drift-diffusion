@@ -199,6 +199,8 @@ class DriftDiffusionModel(BaseEstimator):
         upper : ndarray of shape (n_samples, )
             `1-alpha/2` confidence band
         """
+        if self.cov_estimator == "all":
+            raise ValueError("pdf() cannot be used when cov_estimator='all', set cov_estimator to a single estimator.")
         check_is_fitted(self)
         X_mm, _ = self._get_model_matrix(X)
 

@@ -6,6 +6,7 @@ import pytest
 from joblib import Parallel, delayed
 from numpy import testing
 from pyddm import gddm
+from sklearn.exceptions import NotFittedError
 from sklearn.utils.estimator_checks import parametrize_with_checks
 
 from drift_diffusion.model import DriftDiffusionModel, mdf, pdf
@@ -106,8 +107,7 @@ def test_cov_estimator():
     a, t0, v, z = 1, 0, 0.1, 0
     y = sample_from_pdf(a, t0, v, z)
     X = pd.DataFrame(np.ones(len(y)))
-    ddm = DriftDiffusionModel(cov_estimator="all")
-    ddm.fit(X, y)
+    ddm = DriftDiffusionModel(cov_estimator="all").fit(X, y)
     covariances_ = list(ddm.covariance_.values())
 
     # test cov_estimator="all" returns four matrices
@@ -117,6 +117,26 @@ def test_cov_estimator():
     for cov in covariances_:
         assert cov.shape == (4, 4)
         testing.assert_allclose(covariances_[0], cov, atol=0.001)
+
+
+def test_fitted_pdf():
+    """test true density within fitted confidence bands"""
+    a, t0, v, z = 1.0, 0, 0.372, 0
+    y = sample_from_pdf(a, t0, v, z, random_state=0)
+    y_range = np.linspace(y.min(), y.max(), len(y))
+    X = pd.DataFrame(np.ones(len(y)))
+    ddm = DriftDiffusionModel(t0=t0, z=z)
+
+    # test raises expected error
+    with pytest.raises(NotFittedError):
+        ddm.pdf(X, y_range)
+
+    # test fitted density within 95% confidence bands
+    ddm.fit(X, y)
+    f = pdf(y_range, a, t0, v, z)
+    f_lwr_, f_upr_ = ddm.pdf(X, y_range)
+    testing.assert_array_less(f_lwr_, f + 1e-6)
+    testing.assert_array_less(f, f_upr_ + 1e-6)
 
 
 def test_mle_covariates():
