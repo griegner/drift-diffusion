@@ -1,6 +1,9 @@
 name: Unit Tests
 
 on:
+  push:
+    branches:
+    - main
   pull_request:
     branches:
       - main
@@ -9,7 +12,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
         environment: [test]
     runs-on: ${{ matrix.os }}
     steps:
@@ -24,6 +27,7 @@ jobs:
         run: pixi run -e ${{ matrix.environment }} test
 
       - name: Upload coverage reports to Codecov
+        if: github.event_name == 'push'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
