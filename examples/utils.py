@@ -3,11 +3,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.colors import LinearSegmentedColormap
 from scipy.io import loadmat
-from statsmodels.tsa.stattools import acf
+from statsmodels.tsa.stattools import acf, pacf
 
 from drift_diffusion.model import DriftDiffusionModel
+
+plt.rcParams.update({"font.size": 9})
 
 
 def mat_to_pd(mat):
@@ -40,84 +41,96 @@ def fit_ddm(df, groupby_col):
     return df.groupby(groupby_col)[["coherence", "y"]].apply(_fit_ddm)
 
 
-def plot_heatmap_and_fits(df_heatmap, fit_df, x, y, figsize=(14, 4)):
+def plot_heatmap_and_fits(df_heatmap, fit_df, x, y):
     """plot heatmap of coherences and parameter estimates"""
-    fig, axs = plt.subplots(nrows=3, figsize=figsize, layout="constrained", sharex=True)
 
-    # cmap = LinearSegmentedColormap.from_list("cmap", ["#CBCBCB", "#000000"])
+    mosaic = """
+    a.b
+    cde
+    fgh
+    """
+
+    fig, axs = plt.subplot_mosaic(mosaic, figsize=(9, 5), width_ratios=[10, 0.8, 3], layout="constrained")
+
+    # plotting arguments
     cmap = "YlOrRd"
     vline_kwargs = dict(color="k", lw=1.5)
     hist_kwargs = dict(color="gray", bins=25, orientation="horizontal")
     text_kwargs = dict(fontsize=9, alpha=0.75)
 
-    # heatmap
-    sc = axs[0].scatter(
+    # share x,y
+    axs["a"].sharex(axs["f"])
+    axs["c"].sharex(axs["f"])
+    axs["e"].sharex(axs["h"])
+    axs["c"].sharey(axs["d"])
+    axs["f"].sharey(axs["g"])
+    [axs[key].tick_params(labelbottom=False) for key in ["a", "c"]]
+
+    # limit x,y (between panels)
+    a_lim, beta_v_lim = [0.62, 1.66], [-1.34, 3.48]
+    axs["b"].set_xlim(a_lim)
+    axs["b"].set_ylim(beta_v_lim)
+    axs["c"].set_ylim(a_lim)
+    axs["f"].set_ylim(beta_v_lim)
+
+    # (a) heatmap
+    sc = axs["a"].scatter(
         df_heatmap[x], df_heatmap[y], c=df_heatmap["coherence"], marker="s", cmap=cmap, s=4, vmin=0, vmax=1
     )
+    axs["a"].set_ylabel(y)
     if y == "hour":
-        axs[0].set_yticks([1, 6, 12, 18, 24])
-    axs[0].set_ylabel(y)
+        axs["a"].set_yticks([1, 6, 12, 18, 24])
 
-    cbar = fig.colorbar(sc, ax=axs[0], location="top", ticks=(0, 1), anchor=(1, 1), fraction=0.06, aspect=15)
+    # (a) colorbar
+    cbar = fig.colorbar(sc, ax=axs["a"], location="top", ticks=(0, 1), anchor=(1, 1), fraction=0.06, aspect=15, pad=0)
     cbar.set_label("coherence", fontsize=9)
     cbar.ax.tick_params(labelsize=9)
 
-    # scatterplot
-    ax_sc = axs[0].inset_axes([1.24, 0, 0.3, 1])
-    ax_sc.scatter(fit_df["a"], fit_df["beta_v"], s=1, color="k")
-    ax_sc.set_xlabel(r"$\hat{a}$")
-    ax_sc.set_ylabel(r"$\hat{\beta}_v$")
-    ax_sc.set_xlim([0.62, 1.66])  # a
-    ax_sc.set_ylim([-1.34, 3.48])  # beta_v
-    fit_df_scatter = fit_df[["a", "beta_v"]].dropna()
-    corr = np.corrcoef(fit_df_scatter["a"], fit_df_scatter["beta_v"])[0, 1]
-    ax_sc.text(
-        0.98,
-        0.02,
-        rf"$\text{{corr}}(\hat{{a}},\hat{{\beta}}_v)={corr:.2f}$",
-        ha="right",
-        va="bottom",
-        transform=ax_sc.transAxes,
-        fontsize=9,
-        alpha=0.75,
-    )
+    # (b) scatterplot
+    corr_ = fit_df["a"].corr(fit_df["beta_v"])
+    label = rf"$\text{{corr}}(\hat{{a}},\hat{{\beta}}_v)={corr_:.2f}$"
+    # axs["b"].set_title(rf"$\text{{corr}}(\hat{{a}},\hat{{\beta}}_v)={corr_:.2f}$", loc="right", **text_kwargs)
+    axs["b"].scatter(fit_df["a"], fit_df["beta_v"], s=1, color="k")
+    axs["b"].set_title(r"$\hat{a}$", fontsize=9)  # xlabel
+    axs["b"].set_ylabel(r"$\hat{\beta}_v$")
+    axs["b"].text(0.98, 0.02, label, ha="right", va="bottom", transform=axs["b"].transAxes, **text_kwargs)
 
-    # a
-    axs[1].vlines(fit_df.index, fit_df["a-"], fit_df["a+"], **vline_kwargs)
-    axs[1].set_ylabel(r"$\hat{a}$")
-    axs[1].set_ylim([0.62, 1.66])
+    # (c) a by day
+    axs["c"].vlines(fit_df.index, fit_df["a-"], fit_df["a+"], **vline_kwargs)
+    axs["c"].set_ylabel(r"$\hat{a}$")
 
-    # a hist
-    ax_inset = axs[1].inset_axes([1, 0, 0.06, 1])
-    ax_inset.hist(fit_df["a"], **hist_kwargs)
-    ax_inset.set_ylim(axs[1].get_ylim())
-    ax_inset.axis("off")
+    # (d) a hist
     label = rf"$\bar{{a}}$={fit_df["a"].mean():.2f}" "\n  " rf"$\pm${fit_df["a"].std():.2f}"
-    ax_inset.text(0.2, 0.95, label, va="top", transform=ax_inset.transAxes, **text_kwargs)
+    axs["d"].hist(fit_df["a"], **hist_kwargs)
+    axs["d"].text(0.1, 0.95, label, va="top", transform=axs["d"].transAxes, **text_kwargs)
+    axs["d"].axis("off")
 
-    ax_acf_a = ax_inset.inset_axes([4, 0, 5, 1])
-    ax_acf_a.plot(acf(fit_df["a"], nlags=50, fft=True, bartlett_confint=False, missing="conservative"), c="k", lw=1)
-    ax_acf_a.set_ylabel(r"$\text{corr}(\hat{a})$")
+    # (e) a acf
+    n_lags = len(fit_df) // 3
+    acf_ = acf(fit_df["a"], nlags=n_lags, fft=True, bartlett_confint=False, missing="conservative")
+    pacf_ = pacf(fit_df["a"].dropna(), nlags=n_lags)
+    axs["e"].plot(acf_, c="k", lw=1, label="acf")
+    axs["e"].plot(pacf_, c="gray", lw=1, label="pacf")
+    axs["e"].legend()
+    axs["e"].set_ylabel(r"$\text{corr}(\hat{a})$")
 
-    # beta_v
-    axs[2].vlines(fit_df.index, fit_df["beta_v-"], fit_df["beta_v+"], **vline_kwargs)
-    axs[2].set_ylabel(r"$\hat{\beta}_v$")
-    axs[2].set_xlabel(x)
-    axs[2].set_ylim([-1.34, 3.48])
+    # (f) beta_v by day
+    axs["f"].vlines(fit_df.index, fit_df["beta_v-"], fit_df["beta_v+"], **vline_kwargs)
+    axs["f"].set_ylabel(r"$\hat{\beta}_v$")
+    axs["f"].set_xlabel(x)
     if x == "hour":
-        axs[2].set_xticks([1, 6, 12, 18, 24])
+        axs["f"].set_xticks([1, 6, 12, 18, 24])
 
-    # beta_v hist
-    ax_inset = axs[2].inset_axes([1, 0, 0.06, 1])
-    ax_inset.hist(fit_df["beta_v"], **hist_kwargs)
-    ax_inset.set_ylim(axs[2].get_ylim())
-    ax_inset.axis("off")
+    # (g) beta_v hist
     label = rf"$\bar{{\beta}}_v$={fit_df["beta_v"].mean():.2f}" "\n   " rf"$\pm${fit_df["beta_v"].std():.2f}"
-    ax_inset.text(0.2, 0.05, label, va="bottom", transform=ax_inset.transAxes, **text_kwargs)
+    axs["g"].hist(fit_df["beta_v"], **hist_kwargs)
+    axs["g"].text(0.1, 0.05, label, va="bottom", transform=axs["g"].transAxes, **text_kwargs)
+    axs["g"].axis("off")
 
-    ax_acf_beta_v = ax_inset.inset_axes([4, 0, 5, 1])
-    ax_acf_beta_v.plot(
-        acf(fit_df["beta_v"], nlags=50, fft=True, bartlett_confint=False, missing="conservative"), c="k", lw=1
-    )
-    ax_acf_beta_v.set_xlabel(f"lag ({x})")
-    ax_acf_beta_v.set_ylabel(r"$\text{corr}(\hat{\beta}_v)$")
+    # (h) beta_v acf
+    acf_ = acf(fit_df["beta_v"], nlags=n_lags, fft=True, bartlett_confint=False, missing="conservative")
+    pacf_ = pacf(fit_df["beta_v"].dropna(), nlags=n_lags)
+    axs["h"].plot(acf_, c="k", lw=1)
+    axs["h"].plot(pacf_, c="gray", lw=1)
+    axs["h"].set_ylabel(r"$\text{corr}(\hat{\beta}_v)$")
+    axs["h"].set_xlabel("lag (days)")
