@@ -18,6 +18,18 @@ def mat_to_pd(mat):
     return pd.DataFrame(mat)
 
 
+def plot_coherence(df_coh, vlines):
+    """plot heatmap of coherence ranges"""
+    fig, ax = plt.subplots(figsize=(8, 1.6))
+    ax.scatter(
+        df_coh.index, df_coh["coherence"], c=df_coh["coherence"], s=1, marker="_", lw=0.5, cmap="YlOrRd", vmin=0, vmax=1
+    )
+    ax.set_ylim([-0.1, 1.1])
+    ax.set_xlabel("day")
+    ax.set_ylabel("coherence")
+    [ax.axvline(pd.to_datetime(vline), c="k", lw=0.75) for vline in vlines]
+
+
 def fit_ddm(df, groupby_col):
     """fit DDM by grouing column"""
     ddm = DriftDiffusionModel(a="+1", t0=0, v="-1 + coherence", z=0, cov_estimator="sample-hessian")
@@ -41,7 +53,7 @@ def fit_ddm(df, groupby_col):
     return df.groupby(groupby_col)[["coherence", "y"]].apply(_fit_ddm)
 
 
-def plot_heatmap_and_fits(df_heatmap, fit_df, x, y):
+def plot_heatmap_and_fits(df_heatmap, fit_df, x, y, a_lim, beta_v_lim):
     """plot heatmap of coherences and parameter estimates"""
 
     mosaic = """
@@ -67,7 +79,6 @@ def plot_heatmap_and_fits(df_heatmap, fit_df, x, y):
     [axs[key].tick_params(labelbottom=False) for key in ["a", "c"]]
 
     # limit x,y (between panels)
-    a_lim, beta_v_lim = [0.62, 1.66], [-1.34, 3.48]
     axs["b"].set_xlim(a_lim)
     axs["b"].set_ylim(beta_v_lim)
     axs["c"].set_ylim(a_lim)
@@ -89,7 +100,6 @@ def plot_heatmap_and_fits(df_heatmap, fit_df, x, y):
     # (b) scatterplot
     corr_ = fit_df["a"].corr(fit_df["beta_v"])
     label = rf"$\text{{corr}}(\hat{{a}},\hat{{\beta}}_v)={corr_:.2f}$"
-    # axs["b"].set_title(rf"$\text{{corr}}(\hat{{a}},\hat{{\beta}}_v)={corr_:.2f}$", loc="right", **text_kwargs)
     axs["b"].scatter(fit_df["a"], fit_df["beta_v"], s=1, color="k")
     axs["b"].set_title(r"$\hat{a}$", fontsize=9)  # xlabel
     axs["b"].set_ylabel(r"$\hat{\beta}_v$")
@@ -124,7 +134,7 @@ def plot_heatmap_and_fits(df_heatmap, fit_df, x, y):
     # (g) beta_v hist
     label = rf"$\bar{{\beta}}_v$={fit_df["beta_v"].mean():.2f}" "\n   " rf"$\pm${fit_df["beta_v"].std():.2f}"
     axs["g"].hist(fit_df["beta_v"], **hist_kwargs)
-    axs["g"].text(0.1, 0.05, label, va="bottom", transform=axs["g"].transAxes, **text_kwargs)
+    axs["g"].text(0.1, 0.95, label, va="top", transform=axs["g"].transAxes, **text_kwargs)
     axs["g"].axis("off")
 
     # (h) beta_v acf
