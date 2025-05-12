@@ -30,8 +30,29 @@ def plot_coherence(df_coh, vlines):
     [ax.axvline(pd.to_datetime(vline), c="k", lw=0.75) for vline in vlines]
 
 
+def fit_rt_acc(df, groupby_col):
+    """fit mean reaction time and accuracy by grouping column"""
+
+    def _fit_rt_acc(grp):
+        if len(grp) <= 50:  # for CLT
+            return pd.Series({k: np.nan for k in ["rt", "acc", "rt+", "rt-", "acc+", "acc-"]})
+        mean_sem = grp.agg(["mean", "sem"])
+        return pd.Series(
+            {
+                "rt": mean_sem.loc["mean", "RT"],
+                "acc": mean_sem.loc["mean", "correct"],
+                "rt+": mean_sem.loc["mean", "RT"] + 1.96 * mean_sem.loc["sem", "RT"],
+                "rt-": mean_sem.loc["mean", "RT"] - 1.96 * mean_sem.loc["sem", "RT"],
+                "acc+": mean_sem.loc["mean", "correct"] + 1.96 * mean_sem.loc["sem", "correct"],
+                "acc-": mean_sem.loc["mean", "correct"] - 1.96 * mean_sem.loc["sem", "correct"],
+            }
+        )
+
+    return df.groupby(groupby_col)[["RT", "correct"]].apply(_fit_rt_acc)
+
+
 def fit_ddm(df, groupby_col):
-    """fit DDM by grouing column"""
+    """fit DDM by grouping column"""
     ddm = DriftDiffusionModel(a="+1", t0=0, v="-1 + coherence", z=0, cov_estimator="sample-hessian")
 
     def _fit_ddm(grp):
@@ -53,15 +74,21 @@ def fit_ddm(df, groupby_col):
     return df.groupby(groupby_col)[["coherence", "y"]].apply(_fit_ddm)
 
 
-def plot_heatmap_and_fits(df_heatmap, fit_df, x, y, a_lim, beta_v_lim):
-    """plot heatmap of coherences and parameter estimates"""
+def plot_fits(df_heatmap, fit_df, x, y, config):
+    """
+    plot for heatmap and two estimated variables (e.g., DDM params or RT/ACC).
+    `config` is a dict with keys:
+        - var1, var2: column names in fit_df
+        - var1_lim, var2_lim: axis limits
+        - var1_label, var2_label: axis labels
+        - corr_label, acf_label1, acf_label2: label templates (use {} for variable names)
+    """
 
     mosaic = """
     a.b
     cde
     fgh
     """
-
     fig, axs = plt.subplot_mosaic(mosaic, figsize=(9, 5), width_ratios=[10, 0.8, 3], layout="constrained")
 
     # plotting arguments
@@ -79,10 +106,10 @@ def plot_heatmap_and_fits(df_heatmap, fit_df, x, y, a_lim, beta_v_lim):
     [axs[key].tick_params(labelbottom=False) for key in ["a", "c"]]
 
     # limit x,y (between panels)
-    axs["b"].set_xlim(a_lim)
-    axs["b"].set_ylim(beta_v_lim)
-    axs["c"].set_ylim(a_lim)
-    axs["f"].set_ylim(beta_v_lim)
+    axs["b"].set_xlim(config["var1_lim"])
+    axs["b"].set_ylim(config["var2_lim"])
+    axs["c"].set_ylim(config["var1_lim"])
+    axs["f"].set_ylim(config["var2_lim"])
 
     # (a) heatmap
     sc = axs["a"].scatter(
@@ -98,49 +125,57 @@ def plot_heatmap_and_fits(df_heatmap, fit_df, x, y, a_lim, beta_v_lim):
     cbar.ax.tick_params(labelsize=9)
 
     # (b) scatterplot
-    corr_ = fit_df["a"].corr(fit_df["beta_v"])
-    label = rf"$\text{{corr}}(\hat{{a}},\hat{{\beta}}_v)={corr_:.2f}$"
-    axs["b"].scatter(fit_df["a"], fit_df["beta_v"], s=1, color="k")
-    axs["b"].set_title(r"$\hat{a}$", fontsize=9)  # xlabel
-    axs["b"].set_ylabel(r"$\hat{\beta}_v$")
+    corr_ = fit_df[config["var1"]].corr(fit_df[config["var2"]])
+    label = config["corr_label"].format(corr=corr_)
+    axs["b"].scatter(fit_df[config["var1"]], fit_df[config["var2"]], s=1, color="k")
+    axs["b"].set_title(config["var1_label"], fontsize=9)
+    axs["b"].set_ylabel(config["var2_label"])
     axs["b"].text(0.98, 0.02, label, ha="right", va="bottom", transform=axs["b"].transAxes, **text_kwargs)
 
-    # (c) a by day
-    axs["c"].vlines(fit_df.index, fit_df["a-"], fit_df["a+"], **vline_kwargs)
-    axs["c"].set_ylabel(r"$\hat{a}$")
+    # (c) var1 by day
+    axs["c"].vlines(fit_df.index, fit_df[f"{config['var1']}-"], fit_df[f"{config['var1']}+"], **vline_kwargs)
+    axs["c"].set_ylabel(config["var1_label"])
 
-    # (d) a hist
-    label = rf"$\bar{{a}}$={fit_df["a"].mean():.2f}" "\n  " rf"$\pm${fit_df["a"].std():.2f}"
-    axs["d"].hist(fit_df["a"], **hist_kwargs)
+    # (d) var1 hist
+    label = (
+        rf"$\bar{{{config['var1']}}}$={fit_df[config['var1']].mean():.2f}"
+        "\n  "
+        rf"$\pm${fit_df[config['var1']].std():.2f}"
+    )
+    axs["d"].hist(fit_df[config["var1"]], **hist_kwargs)
     axs["d"].text(0.1, 0.95, label, va="top", transform=axs["d"].transAxes, **text_kwargs)
     axs["d"].axis("off")
 
-    # (e) a acf
+    # (e) var1 acf
     n_lags = len(fit_df) // 3
-    acf_ = acf(fit_df["a"], nlags=n_lags, fft=True, bartlett_confint=False, missing="conservative")
-    pacf_ = pacf(fit_df["a"].dropna(), nlags=n_lags)
+    acf_ = acf(fit_df[config["var1"]], nlags=n_lags, fft=True, bartlett_confint=False, missing="conservative")
+    pacf_ = pacf(fit_df[config["var1"]].dropna(), nlags=n_lags)
     axs["e"].plot(acf_, c="k", lw=1, label="acf")
     axs["e"].plot(pacf_, c="gray", lw=1, label="pacf")
     axs["e"].legend()
-    axs["e"].set_ylabel(r"$\text{corr}(\hat{a})$")
+    axs["e"].set_ylabel(config["acf_label1"])
 
-    # (f) beta_v by day
-    axs["f"].vlines(fit_df.index, fit_df["beta_v-"], fit_df["beta_v+"], **vline_kwargs)
-    axs["f"].set_ylabel(r"$\hat{\beta}_v$")
+    # (f) var2 by day
+    axs["f"].vlines(fit_df.index, fit_df[f"{config['var2']}-"], fit_df[f"{config['var2']}+"], **vline_kwargs)
+    axs["f"].set_ylabel(config["var2_label"])
     axs["f"].set_xlabel(x)
     if x == "hour":
         axs["f"].set_xticks([1, 6, 12, 18, 24])
 
-    # (g) beta_v hist
-    label = rf"$\bar{{\beta}}_v$={fit_df["beta_v"].mean():.2f}" "\n   " rf"$\pm${fit_df["beta_v"].std():.2f}"
-    axs["g"].hist(fit_df["beta_v"], **hist_kwargs)
+    # (g) var2 hist
+    label = (
+        rf"$\bar{{{config['var2']}}}$={fit_df[config['var2']].mean():.2f}"
+        "\n   "
+        rf"$\pm${fit_df[config['var2']].std():.2f}"
+    )
+    axs["g"].hist(fit_df[config["var2"]], **hist_kwargs)
     axs["g"].text(0.1, 0.95, label, va="top", transform=axs["g"].transAxes, **text_kwargs)
     axs["g"].axis("off")
 
-    # (h) beta_v acf
-    acf_ = acf(fit_df["beta_v"], nlags=n_lags, fft=True, bartlett_confint=False, missing="conservative")
-    pacf_ = pacf(fit_df["beta_v"].dropna(), nlags=n_lags)
+    # (h) var2 acf
+    acf_ = acf(fit_df[config["var2"]], nlags=n_lags, fft=True, bartlett_confint=False, missing="conservative")
+    pacf_ = pacf(fit_df[config["var2"]].dropna(), nlags=n_lags)
     axs["h"].plot(acf_, c="k", lw=1)
     axs["h"].plot(pacf_, c="gray", lw=1)
-    axs["h"].set_ylabel(r"$\text{corr}(\hat{\beta}_v)$")
+    axs["h"].set_ylabel(config["acf_label2"])
     axs["h"].set_xlabel("lag (days)")
