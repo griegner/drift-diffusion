@@ -82,7 +82,7 @@ def pdf(y, a, t0, v, z, err=1e-3):
     return p
 
 
-def mdf(y, a, t0, v, z, err=1e-3):
+def mdf(y, a, t0, v, z, weights=None, err=1e-3):
     """Mixture density function (MDF).
 
     Parameters
@@ -98,6 +98,8 @@ def mdf(y, a, t0, v, z, err=1e-3):
         drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a
     z : float or ndarray of shape (n_mixtures, )
         starting point (`-1<z<+1`), +1 is +a and -1 is -a
+    weights : None or ndarray of shape (n_mixtures, ), optional
+        mixture weights where None weights all mixtures equally, by default None
     err : float, optional
         error tolerance, by default 1e-3
 
@@ -106,4 +108,12 @@ def mdf(y, a, t0, v, z, err=1e-3):
     p : ndarray of shape (n_samples, )
         mixture probability densities
     """
-    return np.mean([pdf(yi, a, t0, v, z, err) for yi in y], axis=1)
+    pdfs = np.stack([pdf(yi, a, t0, v, z, err) for yi in y], axis=1)  # shape (n_mixtures, n_samples)
+
+    if weights is None:
+        weights = np.ones(pdfs.shape[0]) / pdfs.shape[0]
+    else:
+        weights = weights / np.sum(weights)
+
+    p = np.dot(weights, pdfs)  # shape (n_samples,)
+    return p
