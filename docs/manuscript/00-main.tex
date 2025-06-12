@@ -2,7 +2,7 @@
 
 \usepackage{subfiles} % include subfiles
 \usepackage{fullpage} % 1-in margins
-\usepackage{amsmath, amsfonts, amssymb} % equations
+\usepackage{amsmath, amsfonts, amssymb, mathrsfs} % equations
 \usepackage{graphicx} % figures
 \usepackage{subcaption} % subcaptions
 \usepackage{float} % figures
@@ -12,11 +12,28 @@
 \renewcommand{\familydefault}{\sfdefault} % font: CMU sans serif
 
 % title + authors%
-
+\title{\Large Quantifying uncertainty in drift diffusion models of decision making}
+\author{Gabriel Riegner $^{1}$, Armin Schwartzman $^{1,2}$, Pamela Reinagel $^{2}$\\
+{\small $^{1}$Halicio\u{g}lu Data Science Institute, University of California San Diego}\\
+{\small $^{2}$Division of Biostatistics, University of California San Diego}\\
+{\small $^{3}$Department of Neurobiology, University of California San Diego}\\
+}
+\date{}
 
 
 \begin{document}
+\maketitle
 
+\section*{Abstract}
 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+\vfill
+\noindent\textit{Keywords:} ...
+\thispagestyle{empty}
+\newpage
+\setcounter{page}{1}
+
+\subfile{01-introduction}
+\subfile{02-methods}
 
 \end{document}
