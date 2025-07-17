@@ -10,7 +10,10 @@
     Z_\tau = Z_{\tau-1} + e_\tau, \quad e_\tau \sim \mathcal{N}(v\Delta \tau, \sigma^2 \Delta \tau)
 \end{align}
 $v \in \mathbb{R}$ is the drift rate\\
-$\Delta \tau \to 0$ is a continuous \textit{drift diffusion} process\\
+discrete-time random walk, $\tau$ indexes time on a temporal grid with resolution $\Delta \tau$, $\Delta \tau \to 0$ is a continuous \textit{drift diffusion} process (Wiener diffusion process if the errors are Gaussian)\\
+$Z_t$ is a decision variable that captures stochastic evidence accumulation in favor of a given option in a binary choice set\\
+Gaussian diffusion\\
+
 
 \textbf{RT + Response for} $\{Z_\tau: \tau=0, .., RT\}$
 \begin{align}
@@ -21,22 +24,37 @@ $\Delta \tau \to 0$ is a continuous \textit{drift diffusion} process\\
 \end{align}
 $a>0$ is the decision boundary\\
 $|RT|> 0$ is the reaction time\\
-$\text{sign}(RT) \in \{-1, +1\}$ is the response
+$\text{sign}(RT) \in \{-1, +1\}$ is the binary response (change to choice?)\\
+a decision is made at the first time $\tau$ for which $Z_\tau$ hits either decision boundary\\
+(add non-decision time $t_0$, the portion of the reaction time that occurs independently of decision-making - after some physiological delay $t_0$ the action is executed)\\
+single process explains both which choice is made and how long it takes to make it\\
+the four DDM parameters, namely the drift rate $v$, decision boundary $a$, relative starting point $z$, and non-decision time $t_0$ will be grouped under a single vector $\boldsymbol{\theta}$
 
 \textbf{RTs + Responses for} $\{Z_\tau: \tau=0, .., RT\}_t^T$
 \begin{align}
     RT_t = \{RT_1, ..., RT_T\} \sim \mathcal{D}(a, v)
 \end{align}
 
+$\tau \in 1:RT$ is the diffusion time index, $t \in 1:T$ is the trial time index\\
 $t > 0$ is the trial time index\\
 $\Delta t$ is nonconstant (unequally sampling)\\
-$\mathcal{D}$ is probability distribution determined by parameters $a$ and $v$
+$\mathcal{D}$ is probability distribution determined by parameters $a$ and $v$ (choice-conditional distribution of RTs)\\
+joint reaction time/response distributions\\
+certain parameter settings will produce faster but more entropic response distributions, whereas others will produce slower, more direct responses
 
 \subsection{Definitions and Estimation}
 \textbf{Probability Density Function}
+
 \begin{align}
     f(RT \mid a, v) = \frac{\pi}{a^2}\exp\left(-\frac{va}{2}-\frac{v^2t}{2}\right) \times\sum_{k=1}^\infty k\exp\left(-\frac{k^2\pi^2 RT}{2a^2}\right)\sin(\frac{k\pi}{2})
 \end{align}
+
+probability of $Z_\tau$ crossing either of the decision boundaries ($\pm a$) at any specified time $RT$.\\
+the probability of the reaction time and choice pair $\{|RT|, \text{sign}(RT)\}$ is the probability of the stochastic diffusion processing reaching a boundary $\pm a$ at time $|RT|$\\
+conditional probability induced by equations (1, 2)\\
+unimodal and right-skewed\\
+analytic expression derived by Feller (1968m ch. 14, Eq, 6.15) and a finite approximation of the infinite series expansion provided by Navarro\\
+involves an infinite sum, and must therefore be implemented through approximations
 
 \textbf{Likelihood Function}
 \begin{align}
@@ -76,5 +94,8 @@ $\mathcal{D}$ is probability distribution determined by parameters $a$ and $v$
 \begin{align}
     \widehat V_4 = \widehat{\mathcal{H}}_\theta^{-1} \left(\frac{1}{T} \sum_{i,j=1}^T w_{|i-j|} \hat{S_i} \hat{S_j}^\prime\right) \widehat{\mathcal{H}}_\theta^{-1}
 \end{align}
+
+\subsection{Theoretical Properties}
+the validity of the MLE is based on asymptotic properties
 
 \end{document}
