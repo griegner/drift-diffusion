@@ -14,6 +14,7 @@
 \usepackage[colorlinks=true, linkcolor=gray, citecolor=gray, urlcolor=gray]{hyperref} % links
 
 % title + authors%
+% \title{\Large Quantifying uncertainty of parameter estimates when applying drift diffusion models to temporally-dependent decision data}
 \title{\Large Quantifying uncertainty in drift diffusion models of decision making}
 \author{Gabriel Riegner $^{1}$, Armin Schwartzman $^{1,2}$, Pamela Reinagel $^{3}$\\
 {\small $^{1}$Halicio\u{g}lu Data Science Institute, University of California San Diego}\\
@@ -27,10 +28,14 @@
 \maketitle
 
 \section*{Abstract}
-...
+Brain and behavior are in constant flux based on changing internal and external states; consequently, decision behavior is also likely to fluctuate, exhibiting temporal correlations on multiple timescales and/or temporal non-stationarity. The drift diﬀusion model (DDM) is a ubiquitous parametric model of decision making that describes two-alternative forced-choice (2AFC) decisions as noisy evidence accumulation toward one of two choice boundaries. However, existing methods for fitting the DDM typically assume that: (1) decisions are independent; and (2) parameters are either fixed from decision to decision or drawn i.i.d. from fixed distributions. Moreover, fits to behavioral data commonly report only point estimates. When standard errors are reported, the methods used are subject to these same restrictive assumptions.
+
+To address these limitations, we propose (1) a method to estimate robust standard errors of DDM parameters fit with maximum likelihood, and (2) an application of this method to detect parameter non-stationarity in empirical data using time-windowed estimates. We show that both the parameter and standard error estimators maintain important statistical properties, including consistency and asymptotic normality, even under misspecified conditions, confirming known theory. This enables valid inference of DDM parameters despite misspecification, such as unmodeled parameter variability or temporal correlations between decisions within each estimation time window. In addition, the standard errors are analytic and computationally eﬃcient, unlike resampling or Bayesian methods.
+
+Through parameter recovery simulations, we determine the minimal number of decision trials needed to achieve desired levels of precision under these general conditions. We then applied the method to analyze data from rats in a self-paced 2AFC visual decision task, with hundreds of trials per day collected over many months. Our method allowed us to resolve non-stationary shifts in decision-making parameters across multiple timescales. This work establishes a method for studying dynamic decision processes in naturalistic experiments while relaxing assumptions of correct specification and trial independence, thereby enabling robust statistical inference on decision-making parameters.
 
 \vfill
-\noindent\textit{Keywords:} ...
+\noindent\textit{Keywords:} Sequential sampling models, Time-series analysis, Perceptual decisions, Psychophysics, DDM, 2AFC
 \thispagestyle{empty}
 \newpage
 \setcounter{page}{1}

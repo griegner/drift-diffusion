@@ -27,8 +27,8 @@ $|RT|> 0$ is the reaction time\\
 $\text{sign}(RT) \in \{-1, +1\}$ is the binary response (change to choice?)\\
 a decision is made at the first time $\tau$ for which $Z_\tau$ hits either decision boundary\\
 (add non-decision time $t_0$, the portion of the reaction time that occurs independently of decision-making - after some physiological delay $t_0$ the action is executed)\\
-single process explains both which choice is made and how long it takes to make it\\
-the four DDM parameters, namely the drift rate $v$, decision boundary $a$, relative starting point $z$, and non-decision time $t_0$ will be grouped under a single vector $\boldsymbol{\theta}$
+single process explains both which choice is made ($\text{sign}(RT)$) and how long it takes to make it ($|RT|$)\\
+the four DDM parameters, namely the drift rate $v$, decision boundary $a$, relative starting point $z$, and non-decision time $t_0$ will be grouped under a single vector $\theta = (v, a, z, t_0)$
 
 \textbf{RTs + Responses for} $\{Z_\tau: \tau=0, .., RT\}_t^T$
 \begin{align}

@@ -3,6 +3,34 @@
 \begin{document}
 \section{Introduction}
 
+\subsection{Overview of the Drift Diffusion Model}
+
+The drift diffusion model (DDM) has emerged as a prominent theoretical framework for understanding two-alternative forced-choice (2AFC) decisions, modeling binary decisions made upon the sequential accumulation of evidence \citep{ratcliff_parameter_2013, myers_practical_2022, shadlen_speed_2006, brown_simplest_2008, feltgen_overcomplete_2021}. The DDM incorporates four main parameters: the drift rate (information processing speed), boundary separation (response caution), starting point (response bias), and non-decision time (sensory and motor delays) \citep{shinn_flexible_2020, myers_practical_2022, ratcliff_individual_2015}.
+
+The model's ubiquity stems from its parsimony and neurobiological plausibility. The DDM provides a unified account that simultaneously explains decision speed and accuracy through a single mechanism \citep{shadlen_speed_2006, brown_simplest_2008, shinn_flexible_2020}, with extensive neurobiological evidence from measuring the activity of neurons supporting its core assumptions about noisy evidence accumulation \citep{shadlen_speed_2006, myers_practical_2022, wiecki_hddm_2013}.
+
+\subsection{Current Methods for DDM Parameter Estimation}
+
+DDM parameters are generally estimated using three main methods: (1) Maximum likelihood estimation (MLE) provides analytical solutions for first-passage time distributions but exhibits high sensitivity to outliers and typically provides only point estimates without principled uncertainty quantification \citep{feltgen_overcomplete_2021, navarro_fast_2009, feller_introduction_1968, myers_practical_2022, boehm_estimating_2018, wiecki_hddm_2013}. When standard errors are reported, they rely on asymptotic approximations assuming ideal conditions rarely met in practice \citep{vandekerckhove_diffusion_2008, vincent_recurrent_2017, hansen_probability_2022}. (2) Bayesian approaches provide posterior distributions capturing uncertainty measures and enable hierarchical modeling, but require substantial computational resources and specialized interpretation \citep{wiecki_hddm_2013, myers_practical_2022, vincent_recurrent_2017, fengler_likelihood_2021}. (3) Chi-square minimization and other fitting approaches share similar limitations regarding uncertainty quantification and model assumptions \citep{myers_practical_2022}.
+
+All current approaches assume decisions represent independent and identically distributed observations, an assumption frequently violated in real experimental contexts where temporal correlations and non-stationarity characterize natural decision-making behavior \citep{vincent_recurrent_2017, shevinsky_interaction_2019, boehm_estimating_2018}.
+
+\subsection{Problem Statement and Proposed Solution}
+
+\subsubsection{Limitations of Current Uncertainty Quantification}
+
+Current DDM parameter estimation methods are limited in providing robust uncertainty quantification for temporally-structured data. The most significant limitation concerns the pervasive assumption of independence between successive decisions, which fails to account for temporal correlations that characterize naturalistic behavior \citep{vincent_recurrent_2017, myers_practical_2022, shevinsky_interaction_2019}. When uncertainty estimates are provided, they rely on standard asymptotic approximations that assume correct model specification and independent observations \citep{hansen_probability_2022, vincent_recurrent_2017, vandekerckhove_diffusion_2008}. Under model misspecification or temporal dependence, these standard errors underestimate true parameter uncertainty, leading to overconfident and invalid inferences \citep{boehm_estimating_2018, hansen_probability_2022}.
+
+This inadequacy constrains hypothesis testing to compare parameters across conditions, or detect meaningful temporal changes in decision-making processes, particularly limiting studies of dynamic decision processes in naturalistic settings where brain and behavior are in constant flux.
+
+\subsubsection{Proposed Methodological Solution}
+
+We propose a novel approach providing robust standard error estimates for DDM parameters that remain statistically valid under model misspecification and temporal dependence. Our method implements sandwich-type variance estimators that separate information used to estimate parameters from information used to estimate their uncertainty, developing both misspecification-robust and autocorrelation-robust estimators \citep{hansen_probability_2022}.
+
+A key application involves detecting parameter non-stationarity through time-windowed estimation, enabling identification of significant changes in decision-making processes across multiple timescales while maintaining valid statistical inference. Our approach offers analytically tractable and computationally efficient standard errors that maintain statistical validity under realistic conditions of model misspecification and temporal dependence, establishing a methodological foundation for robust statistical inference in studies of dynamic decision-making processes.
+
+...
+
 binary decisions made upon the sequential accumulation of evidence\\
 two-alternative forced-choice (2-AFC) tasks\\
 
@@ -19,7 +47,7 @@ observed decision speed and accuracy (behavioral observations) can also be expla
     \item ex-Gaussian or shifted Wald distributions (Matzke and Wagenmakers, 2009)
     \item linear ballistic accumulator model (Brown and Heathcote)
     \item Leaky competing accumulator model (Usher and McClelland)
-    \item Levy flight model (Wieschen et al 2020)
+    \item Levy flight model (Wieschen et al 2020, Voss et al 2019)
 \end{itemize}
 
 sequence of behavior:\\
@@ -28,7 +56,8 @@ account for trial-to-trial dependencies
 
 parsimony\\
 models should not only provide a good fit to data, but also be parsimonious in form and represent a clear mechanistic interpretation\\
-interpretation of RTs requires a model that makes explicit how the latent parameters are translated into the observed variable, RT
+interpretation of RTs requires a model that makes explicit how the latent parameters are translated into the observed variable, RT\\
+latent variables are variables that can only be inferred indirectly through a mathematical model from other observable variables that can be directly observed\\
 ...
 
 \end{document}
