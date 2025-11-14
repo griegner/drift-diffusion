@@ -9,6 +9,20 @@ The drift diffusion model (DDM) has emerged as a prominent theoretical framework
 
 The model's ubiquity stems from its parsimony and neurobiological plausibility. The DDM provides a unified account that simultaneously explains decision speed and accuracy through a single mechanism \citep{shadlen_speed_2006, brown_simplest_2008, shinn_flexible_2020}, with extensive neurobiological evidence from measuring the activity of neurons supporting its core assumptions about noisy evidence accumulation \citep{shadlen_speed_2006, myers_practical_2022, wiecki_hddm_2013}.
 
+\subsection{Misspecification of the Decision Making Process}
+DMP $\ne$ DDM\\
+\citet{hato_levy_2025}
+...
+
+\subsection{Decisions as Time Series}
+Are decisions independent and identically distributed over time?
+\subsubsection{Temporal Dependence in Decision Making}
+\citet{danskin_exponential_2023}
+...
+\subsubsection{Non-stationarity in Decision Making}
+\citet{ashwood_mice_2022, vloeberghs_bayesian_2024}
+...
+
 \subsection{Current Methods for DDM Parameter Estimation}
 
 DDM parameters are generally estimated using three main methods: (1) Maximum likelihood estimation (MLE) provides analytical solutions for first-passage time distributions but exhibits high sensitivity to outliers and typically provides only point estimates without principled uncertainty quantification \citep{feltgen_overcomplete_2021, navarro_fast_2009, feller_introduction_1968, myers_practical_2022, boehm_estimating_2018, wiecki_hddm_2013}. When standard errors are reported, they rely on asymptotic approximations assuming ideal conditions rarely met in practice \citep{vandekerckhove_diffusion_2008, vincent_recurrent_2017, hansen_probability_2022}. (2) Bayesian approaches provide posterior distributions capturing uncertainty measures and enable hierarchical modeling, but require substantial computational resources and specialized interpretation \citep{wiecki_hddm_2013, myers_practical_2022, vincent_recurrent_2017, fengler_likelihood_2021}. (3) Chi-square minimization and other fitting approaches share similar limitations regarding uncertainty quantification and model assumptions \citep{myers_practical_2022}.
