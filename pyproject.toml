@@ -25,6 +25,7 @@ formulaic = "*"
 pyddm = "*"
 scikit-learn = "*"
 statsmodels = "*"
+ssm-simulators = "*"
 
 [tool.pixi.feature.lint.dependencies]
 # matches version in .pre-commit-config.yaml

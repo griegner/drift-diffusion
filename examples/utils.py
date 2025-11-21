@@ -3,6 +3,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
+from matplotlib.ticker import FuncFormatter
 from scipy.io import loadmat
 from statsmodels.tsa.stattools import acf, pacf
 
@@ -224,3 +226,99 @@ def plot_mixtures(df, df_fit_by_day, coherence):
     axs[0].legend()
     axs[1].set_ylim([0.5, 1])
     axs[1].set_xlim([0, 4])
+
+
+def cov_to_corr(cov):
+    "ii to standard errors, ij to correlations"
+    stderr = np.sqrt(np.diag(cov))
+    corr = cov / np.outer(stderr, stderr)
+    np.fill_diagonal(corr, stderr)
+    return corr
+
+
+def plot_parameter_distributions(params_df, true_params):
+    """
+    Plot pairwise parameter distributions with KDE and regression lines.
+
+    Parameters
+    ----------
+    params_df : pd.DataFrame
+        DataFrame containing parameter samples
+    true_params : dict
+        Dictionary of true parameter values
+    """
+    zero_formatter = FuncFormatter(
+        lambda v, _: ("0" if np.isclose(v, 0) else (f"{v:.2f}" if f"{v:.3f}".endswith("0") else f"{v:.3f}"))
+    )
+    g = sns.PairGrid(params_df, height=1.8, diag_sharey=False, despine=False)
+    g.map_upper(lambda x, y, **kwargs: plt.gca().axis("off"))
+    g.map_lower(sns.kdeplot, color="k", bw_adjust=1.2, linewidths=0.8, levels=6)
+    g.map_lower(sns.regplot, scatter=False, ci=None, line_kws={"color": "red", "lw": 1.5, "ls": "--"})
+    g.map_diag(sns.kdeplot, color="k", fill=False, bw_adjust=1.2, linewidth=3)
+    if true_params is not None:
+        g.map_diag(lambda x, **kwargs: plt.axvline(true_params[x.name], c="b", lw=2))
+    g.map_diag(lambda x, **kwargs: plt.plot([x.mean() - x.std(), x.mean() + x.std()], [0, 0], c="r", lw=3))
+    for ax in g.axes.flat:
+        ax.xaxis.set_major_formatter(zero_formatter)
+        ax.yaxis.set_major_formatter(zero_formatter)
+    g.tight_layout(pad=0.5)
+    return g
+
+
+def plot_covariance_distributions(covs_df, params_df, param_names):
+    """
+    Plot covariance estimator distributions compared to sample correlations.
+
+    Parameters
+    ----------
+    covs_df : pd.DataFrame
+        DataFrame containing covariance estimates from different estimators
+    params_df : pd.DataFrame
+        DataFrame containing parameter samples (used to compute sample correlations)
+    param_names : list
+        List of parameter names for labeling
+    """
+    zero_formatter = FuncFormatter(
+        lambda v, _: ("0" if np.isclose(v, 0) else (f"{v:.2f}" if f"{v:.3f}".endswith("0") else f"{v:.3f}"))
+    )
+
+    correlations = cov_to_corr(np.cov(params_df.T)).flatten()
+
+    g = sns.FacetGrid(
+        covs_df.melt(id_vars="estimator"),
+        hue="estimator",
+        col="variable",
+        col_wrap=3,
+        sharex=False,
+        sharey=False,
+        height=1.8,
+        aspect=0.9,
+        palette="binary",
+        despine=False,
+    )
+    g.map(sns.kdeplot, "value", fill=False, bw_adjust=1.2, linewidth=3, common_norm=True)
+    g.set_titles("")
+    g.set_xlabels("")
+    g.set_ylabels("")
+    g.add_legend(title="Covariance Estimator", bbox_to_anchor=(0.15, 1.02), loc="lower center")
+
+    n_cols = g._ncol
+    for idx, (ax, correlation) in enumerate(zip(g.axes.flat, correlations)):
+        row, col = divmod(idx, n_cols)
+
+        if row == 0:
+            ax.set_title(param_names[idx], fontsize=12)
+        if col == 3:
+            ax.set_ylabel(param_names[row], fontsize=12)
+            ax.yaxis.set_label_position("right")
+
+        if row > col:
+            ax.set_visible(False)
+        else:
+            ax.set_yticklabels([])
+            linestyle = "-" if row == col else "--"
+            ax.axvline(x=correlation, c="r", lw=2, ls=linestyle)
+            ax.xaxis.set_major_formatter(zero_formatter)
+
+    g.tight_layout(pad=0.1)
+    return g
