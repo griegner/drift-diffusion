@@ -34,12 +34,11 @@ def pdf(y, a, t0, v, z, err=1e-3):
     """
 
     # decision time = reaction time - nondecision time
-    dt, resp = np.abs(y) - t0, np.sign(y)
-    dt = np.where(dt == 0, dt + 1e-10, dt)  # dt = 0 undefined
+    dt, choice = np.abs(y) - t0, np.sign(y)
 
     # to navarro 2009 notation
     a = 2 * a
-    w = 0.5 * (1 - resp * z)
+    w = 0.5 * (1 - choice * z)
     t = dt / (a**2)
 
     # k terms for large t
@@ -77,7 +76,7 @@ def pdf(y, a, t0, v, z, err=1e-3):
     p = np.where(mask, p_s, p_l)
 
     # f(t|a,v,w)
-    p = p * np.exp(resp * a * v * w - dt * (v**2) / 2) / (a**2)
+    p = p * np.exp(choice * a * v * w - dt * (v**2) / 2) / (a**2)
 
     return p
 
