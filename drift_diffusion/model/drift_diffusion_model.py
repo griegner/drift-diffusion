@@ -4,7 +4,7 @@ import autograd.numpy as np
 import pandas as pd
 from autograd import hessian, jacobian
 from formulaic import model_matrix
-from scipy.optimize import minimize
+from scipy.optimize import Bounds, minimize
 from scipy.stats import norm
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
@@ -161,14 +161,31 @@ class DriftDiffusionModel(BaseEstimator):
         lll_jacobian = jacobian(self._lossloglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
 
+        # apply bounds (t0 < |y|)
+        lb, ub = [], []
+        min_rt = np.min(np.abs(y))
+        epsilon = 1e-6
+        for param, x_mm in zip(["a", "t0", "v", "z"], X_mm):
+            if x_mm is not None:
+                n = x_mm.shape[1]
+                if param == "t0" and self.t0 == "+1":
+                    lb.extend([-epsilon])
+                    ub.extend([min_rt - epsilon])
+                else:
+                    lb.extend([-np.inf] * n)
+                    ub.extend([np.inf] * n)
+
+        bounds = Bounds(lb, ub, keep_feasible=True)
+
         # estimate parameters, covariance matrix
         fit_ = minimize(
             fun=self._lossloglikelihood,
             x0=np.hstack(params0),
             args=(X_mm, y),
-            method="Newton-CG",
+            method="trust-constr",
             jac=lll_jacobian,
             hess=lll_hessian,
+            bounds=bounds,
         )
         self.fit_ = fit_
         self.params_ = fit_.x
