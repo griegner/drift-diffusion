@@ -41,6 +41,10 @@ def pdf(y, a, t0, v, z, err=1e-3):
     w = 0.5 * (1 - choice * z)
     t = dt / (a**2)
 
+    # mask outlier trials where t0 > rt
+    outlier_mask = t <= 0
+    t = np.where(outlier_mask, 100.0, t)
+
     # k terms for large t
     k_l = np.where(
         np.pi * t * err < 1,
@@ -77,6 +81,9 @@ def pdf(y, a, t0, v, z, err=1e-3):
 
     # f(t|a,v,w)
     p = p * np.exp(choice * a * v * w - dt * (v**2) / 2) / (a**2)
+
+    # set density to 0 for outlier trials
+    p = np.where(outlier_mask, 0, p)
 
     return p
 
