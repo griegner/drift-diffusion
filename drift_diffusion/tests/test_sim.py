@@ -2,7 +2,21 @@ import numpy as np
 import pytest
 from numpy import testing
 
-from drift_diffusion.sim import sim_ddm
+from drift_diffusion.sim import sample_from_pdf, sample_from_ssm, sim_ddm
+
+
+def test_sample_from_ssm():
+    """test histograms sample_from_ssm vs sample_from_pdf"""
+    n_samples = 10_000
+    params = {"a": 1, "t0": 0.1, "v": 0.5, "z": -0.1}
+    y_ssm = sample_from_ssm(**params, n_samples=n_samples, random_state=0)
+    y_pdf = sample_from_pdf(**params, n_samples=n_samples, random_state=0)
+
+    bin_edges = np.linspace(-4, +4, 100)
+    hist_ssm, _ = np.histogram(y_ssm, bins=bin_edges, density=True)
+    hist_pdf, _ = np.histogram(y_pdf, bins=bin_edges, density=True)
+
+    testing.assert_allclose(hist_ssm, hist_pdf, atol=0.07)
 
 
 def test_sim_ddm():
