@@ -2,8 +2,59 @@
 
 import numpy as np
 from sklearn.utils.validation import check_random_state
+from ssms.basic_simulators.simulator import simulator
 
 from drift_diffusion.model import pdf
+
+
+def sample_from_ssm(a=1, t0=0, v=0, z=0, n_samples=1000, n_repeats=1, random_state=None):
+    """Sample from sequential sampling model simulators.
+
+    https://github.com/lnccbrown/ssm-simulators
+
+    Parameters
+    ----------
+    a : float or ndarray of shape (n_samples,), optional
+        decision boundary (`a>0`) +a is upper and -a is lower, by default 1
+    t0 : float or ndarray of shape (n_samples,), optional
+        nondecision time (`t0>=0`) +t0 is time in seconds, by default 0
+    v : float or ndarray of shape (n_samples,), optional
+        drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default 0
+    z : float or ndarray of shape (n_samples,), optional
+        starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default 0
+    n_samples : int, optional
+        number of samples to return, by default 1000
+    n_repeats : int, optional
+        _description_, by default 1
+    random_state : int or None
+        integer passed to random state generator, by default None
+
+    Returns
+    -------
+    ys : ndarray of shape (n_samples, n_repeats)
+        reaction times (`|ys|>0`) decision + nondecision time\\
+        choices (`sign(ys) = {+1, -1}`) +1 is upper and -1 is lower
+    """
+
+    params = {
+        name: np.repeat(param, n_samples) if not isinstance(param, np.ndarray) else param
+        for name, param in {"a": a, "t0": t0, "v": v, "z": z}.items()
+    }
+
+    for name, param in params.items():
+        if param.size != n_samples:
+            raise ValueError(f"'{name}' must be a ndarray of shape (n_samples,)")
+
+    sim_params = {
+        "a": params["a"],
+        "t": params["t0"],
+        "v": params["v"],
+        "z": (params["z"] + 1) / 2,  # z in (-1, +1) to (0, +1)
+    }
+    sims = simulator(
+        model="ddm", theta=sim_params, n_samples=n_repeats, smooth_unif=False, sigma_noise=1, random_state=random_state
+    )
+    return np.squeeze(sims["rts"] * sims["choices"]).T
 
 
 def sample_from_pdf(a=1, t0=0, v=0, z=0, n_samples=1000, random_state=None):
