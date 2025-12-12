@@ -4,7 +4,7 @@ import autograd.numpy as np
 import pandas as pd
 from autograd import hessian, jacobian
 from formulaic import model_matrix
-from scipy.optimize import Bounds, minimize
+from scipy.optimize import minimize
 from scipy.stats import norm
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
@@ -13,7 +13,7 @@ from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian"):
+    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian", p_outlier=0.05):
         """Drift diffusion model (DDM) of binary decision making.
 
         DriftDiffusionModel fits decision making parameters by maximum likelihood estimation.
@@ -36,8 +36,13 @@ class DriftDiffusionModel(BaseEstimator):
             drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default "+1"
         z : float or str
             starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default "+1"
-        cov_estimator : {"sample-hessian", "outer-product", "misspecification-robust",
-                         "autocorrelation-robust", "all"}, by default "sample-hessian"
+        cov_estimator : str
+            {"sample-hessian", "outer-product", "misspecification-robust",
+             "autocorrelation-robust", "all"}, by default "sample-hessian"
+        p_outlier : float
+            mixture probability (`0-1`) that a trial is drawn from a uniform outlier
+            distribution rather than the DDM, by default 0.05
+
 
         Attributes
         ----------
@@ -53,6 +58,7 @@ class DriftDiffusionModel(BaseEstimator):
         self.v = v
         self.z = z
         self.cov_estimator = cov_estimator
+        self.p_outlier = p_outlier
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
@@ -87,7 +93,14 @@ class DriftDiffusionModel(BaseEstimator):
 
     def _loglikelihood(self, params_, X, y):
         all_params = self._get_params(params_, X)
-        return np.log(pdf(y, *all_params))
+        p_ddm = pdf(y, *all_params)  # ddm
+
+        rt = np.abs(y)
+        rt_min, rt_max = np.min(rt), np.max(rt)
+        p_outlier = np.ones_like(y) / (rt_max - rt_min)  # uniform
+
+        p_mix = (1.0 - self.p_outlier) * p_ddm + self.p_outlier * p_outlier  # mixture
+        return np.log(p_mix)
 
     def _lossloglikelihood(self, params_, X, y):
         loglikelihood_ = self._loglikelihood(params_, X, y)
@@ -161,31 +174,14 @@ class DriftDiffusionModel(BaseEstimator):
         lll_jacobian = jacobian(self._lossloglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
 
-        # apply bounds (t0 < |y|)
-        lb, ub = [], []
-        min_rt = np.min(np.abs(y))
-        epsilon = 1e-6
-        for param, x_mm in zip(["a", "t0", "v", "z"], X_mm):
-            if x_mm is not None:
-                n = x_mm.shape[1]
-                if param == "t0" and self.t0 == "+1":
-                    lb.extend([-epsilon])
-                    ub.extend([min_rt - epsilon])
-                else:
-                    lb.extend([-np.inf] * n)
-                    ub.extend([np.inf] * n)
-
-        bounds = Bounds(lb, ub, keep_feasible=True)
-
         # estimate parameters, covariance matrix
         fit_ = minimize(
             fun=self._lossloglikelihood,
             x0=np.hstack(params0),
             args=(X_mm, y),
-            method="trust-constr",
+            method="Newton-CG",
             jac=lll_jacobian,
             hess=lll_hessian,
-            bounds=bounds,
         )
         self.fit_ = fit_
         self.params_ = fit_.x
