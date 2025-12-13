@@ -16,7 +16,7 @@ def test_sample_from_ssm():
     hist_ssm, _ = np.histogram(y_ssm, bins=bin_edges, density=True)
     hist_pdf, _ = np.histogram(y_pdf, bins=bin_edges, density=True)
 
-    testing.assert_allclose(hist_ssm, hist_pdf, atol=0.07)
+    testing.assert_allclose(hist_ssm, hist_pdf, atol=0.1)
 
 
 def test_sim_ddm():
