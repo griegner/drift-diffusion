@@ -13,7 +13,7 @@ from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian"):
+    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian", p_outlier=0.01):
         """Drift diffusion model (DDM) of binary decision making.
 
         DriftDiffusionModel fits decision making parameters by maximum likelihood estimation.
@@ -36,8 +36,12 @@ class DriftDiffusionModel(BaseEstimator):
             drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default "+1"
         z : float or str
             starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default "+1"
-        cov_estimator : {"sample-hessian", "outer-product", "misspecification-robust",
-                         "autocorrelation-robust", "all"}, by default "sample-hessian"
+        cov_estimator : str
+            {"sample-hessian", "outer-product", "misspecification-robust",
+             "autocorrelation-robust", "all"}, by default "sample-hessian"
+        p_outlier : float
+            mixture probability (`0-1`) that a trial is drawn from a uniform outlier
+            distribution rather than the DDM, by default 0.01
 
         Attributes
         ----------
@@ -53,6 +57,7 @@ class DriftDiffusionModel(BaseEstimator):
         self.v = v
         self.z = z
         self.cov_estimator = cov_estimator
+        self.p_outlier = p_outlier
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
@@ -86,8 +91,13 @@ class DriftDiffusionModel(BaseEstimator):
         return params
 
     def _loglikelihood(self, params_, X, y):
+        rt = np.abs(y)
         all_params = self._get_params(params_, X)
-        return np.log(pdf(y, *all_params))
+
+        p_ddm = pdf(y, *all_params)  # ddm
+        p_outlier = np.ones_like(y) / (rt.max() - rt.min())  # uniform
+        p_mix = (1.0 - self.p_outlier) * p_ddm + self.p_outlier * p_outlier  # mixture
+        return np.log(p_mix)
 
     def _lossloglikelihood(self, params_, X, y):
         loglikelihood_ = self._loglikelihood(params_, X, y)
@@ -166,7 +176,7 @@ class DriftDiffusionModel(BaseEstimator):
             fun=self._lossloglikelihood,
             x0=np.hstack(params0),
             args=(X_mm, y),
-            method="Newton-CG",
+            method="trust-constr",
             jac=lll_jacobian,
             hess=lll_hessian,
         )

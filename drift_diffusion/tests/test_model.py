@@ -150,7 +150,7 @@ def test_mle_covariates():
     v_s = -0.2 + 0.6 * coherence
     y = np.concat([sample_from_pdf(a=1, v=v, n_samples=n_samples // 4, random_state=0) for v in v_s])
     ddm = DriftDiffusionModel(a="+1", t0=0, v="+1 + coherence", z=0).fit(X, y)
-    testing.assert_allclose(ddm.params_, [1, -0.2, 0.6], atol=0.01)
+    testing.assert_allclose(ddm.params_, [1, -0.2, 0.6], atol=0.018)
 
     # a as linear function of coherence
     a_s = 0.6 + 1.0 * coherence
