@@ -176,7 +176,7 @@ class DriftDiffusionModel(BaseEstimator):
             fun=self._lossloglikelihood,
             x0=np.hstack(params0),
             args=(X_mm, y),
-            method="trust-constr",
+            method="trust-ncg",
             jac=lll_jacobian,
             hess=lll_hessian,
         )
