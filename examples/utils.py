@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from joblib import Parallel, delayed
 from matplotlib.ticker import FuncFormatter
 from scipy.io import loadmat
 from statsmodels.tsa.stattools import acf, pacf
@@ -54,27 +55,56 @@ def fit_rt_acc(df, groupby_col):
     return df.groupby(groupby_col)[["RT", "correct"]].apply(_fit_rt_acc)
 
 
-def fit_ddm(df, groupby_col):
-    """fit DDM by grouping column"""
-    ddm = DriftDiffusionModel(a="+1", t0=0, v="-1 + coherence", z=0, cov_estimator="sample-hessian")
+def fit_ddm(df, groupby_col, n_jobs=-1):
+    """fit DDM by grouping column with parallel processing
 
-    def _fit_ddm(grp):
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe
+    groupby_col : str
+        Column to group by
+    n_jobs : int, default=-1
+        Number of parallel jobs (-1 uses all available cores)
+    """
+    ddm = DriftDiffusionModel(a="+1", t0="+1", v="-1 + coherence", z="+1", cov_estimator="sample-hessian")
+
+    def _fit_ddm(group_key, grp):
         if len(grp) <= 50:
-            return pd.Series({k: np.nan for k in ["a", "beta_v", "a+", "a-", "beta_v+", "beta_v-"]})
+            return group_key, pd.Series(
+                {
+                    k: np.nan
+                    for k in ["a", "t0", "beta_v", "z", "a+", "a-", "t0+", "t0-", "beta_v+", "beta_v-", "z+", "z-"]
+                }
+            )
         ddm.fit(grp, grp["y"])
-        (a, beta_v), (se_a, se_beta_v) = ddm.params_, np.sqrt(np.diag(ddm.covariance_))
-        return pd.Series(
+        params = ddm.params_
+        se = np.sqrt(np.diag(ddm.covariance_))
+        a, t0, beta_v, z = params[0], params[1], params[2], params[3]
+        se_a, se_t0, se_beta_v, se_z = se[0], se[1], se[2], se[3]
+        return group_key, pd.Series(
             {
                 "a": a,
+                "t0": t0,
                 "beta_v": beta_v,
+                "z": z,
                 "a+": a + 1.96 * se_a,
                 "a-": a - 1.96 * se_a,
+                "t0+": t0 + 1.96 * se_t0,
+                "t0-": t0 - 1.96 * se_t0,
                 "beta_v+": beta_v + 1.96 * se_beta_v,
                 "beta_v-": beta_v - 1.96 * se_beta_v,
+                "z+": z + 1.96 * se_z,
+                "z-": z - 1.96 * se_z,
             }
         )
 
-    return df.groupby(groupby_col)[["coherence", "y"]].apply(_fit_ddm)
+    # Process groups in parallel
+    groups = df.groupby(groupby_col)[["coherence", "y"]]
+    results = Parallel(n_jobs=n_jobs)(delayed(_fit_ddm)(name, group) for name, group in groups)
+
+    # Combine results into DataFrame
+    return pd.DataFrame({key: series for key, series in results}).T
 
 
 def plot_fits(df_heatmap, df_fit, x, y, config):
@@ -288,7 +318,7 @@ def plot_covariance_distributions(covs_df, params_df, param_names):
         covs_df.melt(id_vars="estimator"),
         hue="estimator",
         col="variable",
-        col_wrap=3,
+        col_wrap=4,
         sharex=False,
         sharey=False,
         height=1.8,
