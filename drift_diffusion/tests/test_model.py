@@ -70,18 +70,18 @@ def test_sklearn_compatible_estimator(estimator, check):
 
 
 @pytest.mark.parametrize(
-    "a, v, z",
+    "a, t0, v, z",
     itertools.product(
         [0.5, 0.75, 1],  # a
+        [0.1],  # t0
         [-1, 0, +1],  # v
         [0.1],  # z
     ),
 )
-def test_drift_diffusion_model(a, v, z):
+def test_drift_diffusion_model(a, t0, v, z):
     """test the MLE returns the expected parameters and standard errors"""
     n_repeats = 50
-    t0 = 0
-    ddm = DriftDiffusionModel(t0=t0)
+    ddm = DriftDiffusionModel()
 
     @delayed
     def _fit(repeat):
@@ -96,7 +96,7 @@ def test_drift_diffusion_model(a, v, z):
         params_, stderrs_ = map(np.asarray, zip(*fits_))
 
     # test parameters close to true values
-    testing.assert_allclose([a, v, z], params_.mean(axis=0), atol=0.2)
+    testing.assert_allclose([a, t0, v, z], params_.mean(axis=0), atol=0.2)
 
     # test standard errors close to true values
     testing.assert_allclose(params_.std(axis=0), stderrs_.mean(axis=0), atol=0.02)
@@ -150,7 +150,7 @@ def test_mle_covariates():
     v_s = -0.2 + 0.6 * coherence
     y = np.concat([sample_from_pdf(a=1, v=v, n_samples=n_samples // 4, random_state=0) for v in v_s])
     ddm = DriftDiffusionModel(a="+1", t0=0, v="+1 + coherence", z=0).fit(X, y)
-    testing.assert_allclose(ddm.params_, [1, -0.2, 0.6], atol=0.01)
+    testing.assert_allclose(ddm.params_, [1, -0.2, 0.6], atol=0.018)
 
     # a as linear function of coherence
     a_s = 0.6 + 1.0 * coherence

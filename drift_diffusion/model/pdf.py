@@ -35,7 +35,8 @@ def pdf(y, a, t0, v, z, err=1e-3):
 
     # decision time = reaction time - nondecision time
     dt, resp = np.abs(y) - t0, np.sign(y)
-    dt = np.where(dt == 0, dt + 1e-10, dt)  # dt = 0 undefined
+    outlier_mask = dt < 0
+    dt = np.where(outlier_mask, 1e-6, dt)
 
     # to navarro 2009 notation
     a = 2 * a
@@ -78,6 +79,9 @@ def pdf(y, a, t0, v, z, err=1e-3):
 
     # f(t|a,v,w)
     p = p * np.exp(resp * a * v * w - dt * (v**2) / 2) / (a**2)
+
+    # set density to 0 for outlier trials
+    p = np.where(outlier_mask, 0, p)
 
     return p
 
