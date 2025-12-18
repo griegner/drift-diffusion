@@ -15,12 +15,14 @@ $v\in \mathbb{R}$ is the \emph{drift rate}
 
 \textbf{Drift Diffusion Process}
 \begin{align}
-    Z_\tau = Z_0 + \sum_{t=1}^\tau e_t, \quad e_t \overset{\text{iid}}{\sim} \mathcal{N}(v\Delta\tau, \sigma^2\Delta\tau)
+    Z_\tau = Z_0 + \sum_{k=1}^\tau e_k, \quad e_k \overset{\text{iid}}{\sim} \mathcal{N}(v\Delta\tau, \sigma^2\Delta\tau)
 \end{align}
 
-$Z_\tau$ is the decision variable that captures stochastic evidence accumulation between the upper ($+a$) and lower ($-a$) decision boundaries at the time step $\tau$. Evidence accumulation begins at $Z_0 = az$ and proceeds as a random walk with drift. Each proceeding step sums together \text{iid} Gaussian noise with mean $v$ and variance $\sigma^2$ such that noisy evidence drifts toward either the upper (if $v>0$) or lower (if $v<0$) decision boundary. 
+$Z_\tau$ is the decision variable that captures stochastic evidence accumulation between the upper ($+a$) and lower ($-a$) decision boundaries at discrete step $\tau$. Evidence accumulation begins at $Z_0 = az$ and proceeds as a random walk with drift. Each subsequent step adds an \text{iid} Gaussian increment $e_k$ with mean $v\Delta\tau$ and variance $\sigma^2\Delta\tau$, so evidence drifts on average toward the upper (if $v>0$) or lower (if $v<0$) boundary. Here, $\Delta\tau$ is the step size (in seconds) needed to convert the drift rate $v$ (per second) and diffusion 
 
-When $\Delta \tau \to 0$ it is a continuous drift (or Wiener) diffusion process. 
+
+
+$\Delta\tau$ is the duration in seconds between time steps needed to scale the drift and diffusion terms (defined per unit time). When $\Delta\tau \to 0$, this random walk approach a continuous-time drift diffusion process.
 
 \textbf{RT + Response for} $\{Z_\tau: \tau=0, .., RT\}$
 \begin{align}
