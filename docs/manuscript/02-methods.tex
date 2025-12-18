@@ -7,8 +7,11 @@
 
 \textbf{Drift Diffusion Model}
 \begin{align}
-    Z_\tau = Z_{\tau-1} + e_\tau, \quad e_\tau \sim \mathcal{N}(v\Delta \tau, \sigma^2 \Delta \tau)
+    Z_\tau = az + \sum_{t=1}^\tau e_t, \quad e_t \sim \mathcal{N}(v\Delta\tau, \sigma^2\Delta\tau)
 \end{align}
+$a > 0$ is the decision boundary\\
+$z$
+
 $v \in \mathbb{R}$ is the drift rate\\
 discrete-time random walk, $\tau$ indexes time on a temporal grid with resolution $\Delta \tau$, $\Delta \tau \to 0$ is a continuous \textit{drift diffusion} process (Wiener diffusion process if the errors are Gaussian)\\
 $Z_t$ is a decision variable that captures stochastic evidence accumulation in favor of a given option in a binary choice set\\
@@ -22,7 +25,6 @@ Gaussian diffusion\\
         - \text{min}\{\tau>0: Z_\tau \le -a\}
         \end{cases}
 \end{align}
-$a>0$ is the decision boundary\\
 $|RT|> 0$ is the reaction time\\
 $\text{sign}(RT) \in \{-1, +1\}$ is the binary response (change to choice?)\\
 a decision is made at the first time $\tau$ for which $Z_\tau$ hits either decision boundary\\
