@@ -5,18 +5,22 @@
 
 \subsection{Notation}
 
-\textbf{Drift Diffusion Model}
+\textbf{Decision Making Parameters}
+
+$a > 0$ is the \emph{decision boundary}, the amount of evidence required to commit to either choice
+
+$z \in (-1, +1)$ is the \emph{relative starting point}, the initial bias toward either choice
+
+$v\in \mathbb{R}$ is the \emph{drift rate}
+
+\textbf{Drift Diffusion Process}
 \begin{align}
-    Z_\tau = az + \sum_{t=1}^\tau e_t, \quad e_t \sim \mathcal{N}(v\Delta\tau, \sigma^2\Delta\tau)
+    Z_\tau = Z_0 + \sum_{t=1}^\tau e_t, \quad e_t \overset{\text{iid}}{\sim} \mathcal{N}(v\Delta\tau, \sigma^2\Delta\tau)
 \end{align}
-$a > 0$ is the decision boundary\\
-$z \in []$
 
-$v \in \mathbb{R}$ is the drift rate\\
-discrete-time random walk, $\tau$ indexes time on a temporal grid with resolution $\Delta \tau$, $\Delta \tau \to 0$ is a continuous \textit{drift diffusion} process (Wiener diffusion process if the errors are Gaussian)\\
-$Z_t$ is a decision variable that captures stochastic evidence accumulation in favor of a given option in a binary choice set\\
-Gaussian diffusion\\
+$Z_\tau$ is the decision variable that captures stochastic evidence accumulation between the upper ($+a$) and lower ($-a$) decision boundaries at the time step $\tau$. Evidence accumulation begins at $Z_0 = az$ and proceeds as a random walk with drift. Each proceeding step sums together \text{iid} Gaussian noise with mean $v$ and variance $\sigma^2$ such that noisy evidence drifts toward either the upper (if $v>0$) or lower (if $v<0$) decision boundary. 
 
+When $\Delta \tau \to 0$ it is a continuous drift (or Wiener) diffusion process. 
 
 \textbf{RT + Response for} $\{Z_\tau: \tau=0, .., RT\}$
 \begin{align}
