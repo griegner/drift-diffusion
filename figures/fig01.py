@@ -24,7 +24,7 @@ def preproc_df(path="./datasets/Rat195Vectors_241025.mat"):
             LR=lambda x: x["dotDirection"].map({R: +1, L: -1}) * x["correct"].map({1: 1, 0: -1}),  # +1 R, -1 L choice
             y=lambda x: x["RT"] * x["LR"],  # signed RT
             coherence=lambda x: x["dotDirection"].map({R: +1, L: -1}) * x["coherence"],  # +coh R, -coh L dot movement
-            day=lambda x: ((x.index - pd.Timedelta(hours=18)).floor("D") + pd.Timedelta(hours=18)),  # 6pm to 6pm
+            day=lambda x: pd.factorize((x.index - pd.Timedelta(hours=18)).floor("D"), sort=True)[0],  # 6pm-to-6pm
             hour=lambda x: x.index.hour + 1,  # 1 to 24
             trial=lambda x: ((x.groupby("day").cumcount() + 1) // 20) * 20,  # trials in day
         )
