@@ -1,10 +1,11 @@
 """figure 03: data analysis results"""
 
-import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
+from formulaic import model_matrix
 from joblib import Parallel, delayed
 from sklearn.base import clone
+from statsmodels.api import OLS
 from statsmodels.tsa.stattools import acf
 
 from drift_diffusion.model import DriftDiffusionModel
@@ -34,7 +35,7 @@ def fit_ddm(df, fitby, refit=False):
     """estimates DDM parameters + 95% CI under the CLT"""
 
     if not refit:  # load pre estimated params + 95% CI
-        return pd.read_csv(f"results/ddm-fit-by-{fitby}.csv", index_col=0, parse_dates=[0], date_format="%Y-%m-%d")
+        return pd.read_csv(f"results/ddm-fit-by-{fitby}.csv", index_col=0)
 
     ddm = DriftDiffusionModel(a="+1", t0="+1", v="-1 + coherence", z="+1", cov_estimator="autocorrelation-robust")
     param_names = ["a", "t0", "beta_v", "z"]
@@ -65,31 +66,28 @@ def plot_heatmap(ax, df, fitby):
     """plot heatmap of trial counts"""
     if fitby == "trial":
         x, y = df["trial"], df["day"]
-        ax.yaxis.set_major_locator(mdates.MonthLocator())
-        ax.yaxis.set_major_formatter(mdates.DateFormatter("%b"))
-        ax.set(ylabel="Day")
+        ax.set(yticks=[0, 50, 100], ylabel="Day")
     else:  # fitby == "day"
         x, y = df["day"], (df["hour"] - 18) % 24  # start at 18:00
         ax.set(yticks=[0, 6, 12, 18, 24], yticklabels=["18", "24", "6", "12", "18"], ylabel="Hour")
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%b-%d"))
     ax.scatter(x, y, c=df["RT"], marker="s", s=10, cmap="YlOrRd", vmin=-400)
+    ax.invert_yaxis()
 
 
-def plot_estimates(axs, df, fitby, col):
+def plot_estimates(axs, df, fitby, col, formula=None):
     """plot estimates with CI, histogram, and ACF"""
-    if fitby == "day":
-        axs[0].xaxis.set_major_formatter(mdates.DateFormatter("%b-%d"))
 
     axs[0].sharey(axs[1])
 
     axs[0].vlines(df.index, df[f"{col}-"], df[f"{col}+"], color="k", alpha=0.5, lw=2)
     axs[0].scatter(df.index, df[col], color="k", s=2)
-    mean_val = df[col].mean()
-    std_val = df[col].std()
-    axs[0].axhline(mean_val, ls="--", color="k", lw=0.2)
-    axs[0].axhspan(mean_val - std_val, mean_val + std_val, alpha=0.1, color="gray")
 
-    axs[0].text(0.02, 0.8, f"{mean_val:.2f} ± {std_val:.2f}", transform=axs[0].transAxes, fontsize=10)
+    if fitby == "trial":
+        df_valid = df.query("index > 0")[[col]].dropna()
+        y, X = model_matrix(f"{col} ~ {formula}", df_valid.reset_index(names="x"), output="numpy")
+        coeffs = OLS(y[:, 0], X).fit().params
+        axs[0].plot(df_valid.index, X @ coeffs, color="k", lw=0.5)
+
     axs[0].set_ylabel(col)
 
     axs[1].hist(df[col], color="gray", bins=25, orientation="horizontal")
