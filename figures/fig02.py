@@ -31,10 +31,13 @@ def _zero_formatter():
 def plot_parameter_distributions(params_df, true_params):
     """plot pairwise parameter distributions"""
 
+    # clip +/- 3 sd
+    params_df = params_df.apply(lambda x: x.where((x >= x.mean() - 3 * x.std()) & (x <= x.mean() + 3 * x.std())))
+
     def _diag_plot(x, **kwargs):
         kd_kwargs = dict(color="k", fill=False, bw_adjust=1.2, linewidth=2.5)
         ax = plt.gca()
-        sns.kdeplot(x, ax=ax, clip=(x.mean() - 3 * x.std(), x.mean() + 3 * x.std()), **kd_kwargs)
+        sns.kdeplot(x, ax=ax, **kd_kwargs)
         ax.axvline(true_params[x.name], c="b", lw=2)
         ax.plot([x.mean() - x.std(), x.mean() + x.std()], [np.mean(ax.get_ylim())] * 2, c="r", lw=2)
 
@@ -60,9 +63,9 @@ def plot_parameter_distributions(params_df, true_params):
 def plot_covariance_distributions(covs_df, params_df):
     """plot pairwise covariance distributions"""
 
-    def _kde_plot(data, **kwargs):
+    def _kde_plot(x, **kwargs):
         kd_kwargs = dict(fill=False, bw_adjust=1.2, linewidth=2.5, common_norm=True)
-        sns.kdeplot(data, clip=(data.mean() - 3 * data.std(), data.mean() + 3 * data.std()), **kd_kwargs, **kwargs)
+        sns.kdeplot(x, clip=(x.mean() - 3 * x.std(), x.mean() + 3 * x.std()), **kd_kwargs, **kwargs)
 
     fg_kwargs = dict(sharex=False, sharey=False, height=1.8, palette="binary", despine=False)
     g = sns.FacetGrid(covs_df.melt(id_vars="estimator"), hue="estimator", col="variable", col_wrap=4, **fg_kwargs)
