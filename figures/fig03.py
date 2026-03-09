@@ -83,9 +83,12 @@ def plot_estimates(axs, df, fitby, col, formula=None):
     axs[0].scatter(df.index, df[col], color="k", s=2)
 
     if fitby == "trial":
+        axs[0].set(xlim=[-50, 950], xticks=[0, 200, 400, 600, 800])
         df_valid = df.query("index > 0")[[col]].dropna()
         y, X = model_matrix(f"{col} ~ {formula}", df_valid.reset_index(names="x"), output="numpy")
-        coeffs = OLS(y[:, 0], X).fit().params
+        model = OLS(y[:, 0], X).fit()
+        coeffs = model.params
+        residuals = model.resid
         axs[0].plot(df_valid.index, X @ coeffs, color="k", lw=0.5)
 
     axs[0].set_ylabel(col)
@@ -94,6 +97,9 @@ def plot_estimates(axs, df, fitby, col, formula=None):
     axs[1].axis("off")
 
     n_lags = len(df) // 3
-    acf_ = acf(df[col], nlags=n_lags, fft=True, bartlett_confint=False, missing="conservative")
-    axs[2].plot(-np.arange(n_lags + 1)[::-1], acf_[::-1], c="k", lw=1, label="acf")
+    acf_input = residuals if fitby == "trial" else df.iloc[17:][col]
+    acf_, confint = acf(acf_input, nlags=n_lags, fft=True, bartlett_confint=True, missing="conservative", alpha=0.05)
+    lags = -np.arange(n_lags + 1)[::-1]
+    axs[2].plot(lags, acf_[::-1], c="k", lw=1)
+    axs[2].fill_between(lags, confint[:, 0][::-1], confint[:, 1][::-1], color="gray", alpha=0.3)
     axs[2].set_yticks([0, 1])
