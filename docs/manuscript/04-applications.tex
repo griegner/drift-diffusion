@@ -1,0 +1,94 @@
+\documentclass[00-main.tex]{subfiles}
+
+\begin{document}
+
+\section{Application to Rat Decision Making}
+
+\subsection{Dataset Description}
+
+To illustrate application to empirical data, we applied this method to behavioral data from a self-paced, two-alternative forced-choice (2AFC) reaction time task performed by rats, as detailed in \citet{reinagel_speed_2013}. In this experimental paradigm, rats had continuous, 24-hour access to the task from their home cages. Trials were self-initiated via a central start port, triggering a visual stimulus of 100 white dots. A subset of these dots moved coherently toward the left or right (signal), while the remainder moved randomly (noise). Rats viewed the stimulus freely until licking a left or right response port to register their choice, which immediately terminated the stimulus. Correct responses yielded a water reward, while errors resulted in no reward.
+
+To isolate intrinsic temporal variability of decision-making parameters from experimentally-induced variability, a contiguous sequence of $n=$42,754 trials was selected from a single rat (ID 195) over a 100-day period, starting after that rat had reached the criterion of 85\% correct performance on the task. Throughout this sequence, task difficulty was held constant at 85\% motion coherence, with the direction of motion chosen randomly leftward and rightward each trial. Consequently, observed fluctuations in decision behavior are attributable solely to the passage of time and internal state changes rather than external manipulations. For the $i^{th}$ trial, stimulus coherence is encoded as the signed covariate $X_i \in \{-0.85, +0.85\}$ (negative for leftward, positive for rightward motion), and the decision outcome as the signed reaction time $Y_i$ (negative for leftward, positive for rightward choice). The drift rate is modeled as a linear function of coherence $v_i = \beta_v X_i$, where $\beta_v$ estimates are reported throughout. 
+
+\subsection{Descriptive Data Analysis}
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=1\textwidth]{docs/manuscript/figures/fig03a-rat195.pdf}
+    \caption{\textit{Temporal Structure in Choices and Reaction Times.}}
+    \subcaption*{
+    Choice and reaction times are displayed for $n$=42,754 trials (100 days) from
+    a single rat. Left column (A, C) shows between-day temporal structure; right
+    column (B, D) shows within-day temporal structure. A ``day'' is defined as
+    the 24-hour period beginning at 18:00, which was around the time this rat
+    usually chose to start trials.
+    (A; top) The trial heatmap shows trial counts per hour indicated by the
+    colormap. (A; bottom) Points show trial counts per day ($n = 491 \pm 172$),
+    where red dots mark the first 35 days, defined as the ``practice effect'' ---
+    a period where the rat showed continued improvement before stabilizing
+    thereafter.
+    (B; top) Consecutive bins of 20 trials within a day were pooled across days,
+    and points mark the average cumulative water reward received per trial bin.
+    (B; bottom) Points show trial counts per trial bin ($n = 710 \pm 401$), where
+    the red dot marks the first 20 trials of each day, defined as the ``first
+    trials of day effect'' --- a period where rat behavior is markedly different
+    from the remaining trials of the day.
+    (C, D) Estimated accuracies and reaction times, with error bars denoting 95\%
+    confidence intervals, assuming $iid$ trials and a normal approximation to
+    their sampling distributions. Insets to the right display autocorrelation
+    functions (ACFs) with 95\% pointwise confidence intervals, assuming
+    stationarity. Points marked in red show the ``practice effect'' in (C) and
+    ``first trials of day effect'' in (D), and are excluded from the ACFs as they
+    appear non-stationary. Within-day trends in (D) are further removed by
+    fitting piecewise quadratic splines and ACFs are then computed on the
+    residuals. Figure~\ref{fig:rat-ddm} shows the corresponding DDM parameter
+    estimates following the same between- and within-day structure.
+    }
+    \label{fig:rat-beh}
+\end{figure}
+
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=1\textwidth]{docs/manuscript/figures/fig03b-rat195.pdf}
+    \caption{\textit{Temporal Structure in DDM Parameters.}}
+    \subcaption*{
+    Estimated DDM parameters and coefficient $\beta_v$ of motion coherence,
+    corresponding to Figure~\ref{fig:rat-beh}. Left column (A, C) shows
+    between-day temporal structure; right column (B, D) shows within-day
+    temporal structure.
+    (A) Parameter/coefficient estimates per day in the study with 95\%
+    confidence intervals \eqref{eq:V_ar} robust to misspecification and
+    autocorrelation, excluding ``practice effect'' days marked in red; inset
+    shows the between-day ACFs.
+    (B) Parameter/coefficient estimates per trial within a day with 95\%
+    confidence intervals \eqref{eq:V_ar}, excluding the ``first trials of day
+    effect'' marked in red; inset shows the within-day ACF. However, neither
+    (A) nor (B) explicitly accounts for within-day non-stationarities visible
+    as trends over trial-in-day, violating stationarity assumptions.
+    (C, D) Extended analyses addressing within-day non-stationarity. (D) fits
+    a single model to all $n$=42,754 trials (100 days) with piecewise quadratic
+    splines for the trial-in-day covariate; simultaneous 95\% confidence bands
+    are obtained via the delta method applied to \eqref{eq:V_ar}, with a
+    Bonferroni correction over the number of unique trial bins per day. (C)
+    extends the between-day analysis of (A) by holding all spline coefficients
+    fixed at their values estimated in (D) and refitting only the intercept per
+    day, thereby accounting for within-day non-stationary trends not modeled
+    in (A).
+    }
+    \label{fig:rat-ddm}
+\end{figure}
+
+
+\subsubsection{Temporal Structure in Choices and Reaction Times}
+\emph{Between-day} temporal structure shows this rat typically started performing trials at 18:00, continuing vigorously for a few hours followed by additional bouts over the course of the night (Figure~\ref{fig:rat-beh}A). Vertical breaks in the heatmap are self-initiated by the rat, while horizontal breaks are experimentally initiated, i.e., the rat was temporarily removed from the study. Over the 100 days of the study, this rat gradually performed fewer and fewer trials per day, a trend only explained by calendar day and no other measured covariates that we checked. Accuracies fluctuated during the first 35 days, showing a gradual increase before plateauing, indicative of improvement with practice; likewise, reaction times were highly variable during these days. From day 36 onward, accuracies continued to fluctuate day-to-day but less so and reaction times gradually decreased (Figure~\ref{fig:rat-beh}C). Nonzero autocorrelations persist for many days, suggesting day-to-day dependencies in choice and reaction times.
+
+\emph{Within-day} temporal structure shows this rat would start each day performing many trials and steadily accumulating its water reward for correct choices, before trial counts declined (and thus estimation uncertainty increases) as the rat became satiated (Figure~\ref{fig:rat-beh}B). The extreme thirst at the start of the day is particularly apparent in the first 20 trials, during which the rat is less accurate and responds more quickly; thereafter, accuracies stabilize but reaction times continue to increase (Figure~\ref{fig:rat-beh}D). 
+
+Taken together, these results illustrate that naturalistic choice and reaction time behavior can contain non-stationarities and temporal fluctuations that are typically present but not modeled. This interesting temporal structure further motivates the estimation of DDM parameters at these timescales to better understand the changing decision states of this rat over time. 
+
+
+\subsubsection{Temporal Structure in DDM Parameters}
+\emph{Between-day} temporal structure in DDM parameters estimated by day parallels the behavior, in which parameters fluctuate widely during the initial ``practice effect'' days before stabilizing (Figure~\ref{fig:rat-ddm}A, C). The general increases in accuracy and decreases in reaction times over the study track with increases in the decision boundary ($a$) and drift rate coefficient ($\beta_v$), suggesting the rat became more cautious and attentive to the motion stimulus with practice. Panels (A) and (C), the latter explicitly modeling within-day trends with spline covariates and the former not, yield broadly similar between-day estimates and confidence intervals, suggesting that within-day non-stationarities, while present, have negligible practical effect on between-day inference. Lastly, nonzero autocorrelations persist for several days, suggesting day-to-day dependencies in decision states.
+
+\emph{Within-day} temporal structure in DDM parameters estimated by trial-in-day likewise parallels the behavior, where the initial ``first trials of day effect'' of low accuracy and fast reaction times is explained by a low decision boundary ($a$) and drift rate coefficient ($\beta_v$; Figure~\ref{fig:rat-ddm}B, D). Thereafter, reaction times continue to increase monotonically throughout the day, mirrored by increases in the decision boundary ($a$) and non-decision time ($t_0$), most apparent in (D). This suggests the rat becomes more cautious and less eager as the day progresses and its need for water is satiated. While the drift rate coefficient ($\beta_v$) and relative starting point ($z$) in (D) appear to oscillate, these oscillations are not distinguishable from a constant at this confidence level. Collectively, the observed drifts in DDM parameters reflect shifts in latent decision states, especially increasing decision boundaries and non-decision times within a day.
+
+\end{document}

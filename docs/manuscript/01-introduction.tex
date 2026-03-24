@@ -1,77 +1,43 @@
 \documentclass[00-main.tex]{subfiles}
 
 \begin{document}
+
 \section{Introduction}
 
-\subsection{Overview of the Drift Diffusion Model}
+\subsection{Perceptual Decision Making in Naturalistic Settings}
 
-The drift diffusion model (DDM) has emerged as a prominent theoretical framework for understanding two-alternative forced-choice (2AFC) decisions, modeling binary decisions made upon the sequential accumulation of evidence \citep{ratcliff_parameter_2013, myers_practical_2022, shadlen_speed_2006, brown_simplest_2008, feltgen_overcomplete_2021}. The DDM incorporates four main parameters: the drift rate (information processing speed), boundary separation (response caution), starting point (response bias), and non-decision time (sensory and motor delays) \citep{shinn_flexible_2020, myers_practical_2022, ratcliff_individual_2015}.
+Perceptual decision making is the fundamental process of making choices based on sensory information. While often studied in static contexts, in naturalistic settings this behavior is rarely stable; rather, choice behavior relies on an interplay between multiple interleaved strategies \citep{ashwood_mice_2022} and is richly structured in time \citep{urai_structure_2025, danskin_exponential_2023}. The dominant theoretical framework for understanding these two-alternative forced-choice (2AFC) decisions is the sequential sampling model, which postulates that decisions are made upon the sequential analysis of evidence \citep{shadlen_speed_2006, asadpour_rodents_2024}. This framework is supported by substantial neural evidence \citep{shadlen_speed_2006, steinemann_direct_2024} and underlying computational principles \citep{bogacz_physics_2006} that describe the noisy temporal accumulation of evidence leading to a commitment to a choice \citep{asadpour_rodents_2024, deakin_support_2024}.
 
-The model's ubiquity stems from its parsimony and neurobiological plausibility. The DDM provides a unified account that simultaneously explains decision speed and accuracy through a single mechanism \citep{shadlen_speed_2006, brown_simplest_2008, shinn_flexible_2020}, with extensive neurobiological evidence from measuring the activity of neurons supporting its core assumptions about noisy evidence accumulation \citep{shadlen_speed_2006, myers_practical_2022, wiecki_hddm_2013}.
+\subsection{The Drift Diffusion Model (DDM)}
 
-\subsection{Misspecification of the Decision Making Process}
-DMP $\ne$ DDM\\
-\citet{hato_levy_2025}
-...
+The Drift Diffusion Model (DDM) parameterizes this unobserved, latent decision-making process. It posits that noisy sensory evidence is integrated over time until it reaches a decision threshold \citep{ratcliff_theory_1978, shevinsky_interaction_2019}, providing a single mechanism that simultaneously explains which choice is made and how long it takes to make it. The model translates latent cognitive variables into observed behavior via four main parameters: the rate of evidence accumulation (drift rate $v$), the speed-accuracy tradeoff determined by decision thresholds (decision bound $a$), the initial bias (starting point $z$), and the non-decision time ($t_0$) required for sensory and motor processing \citep{ratcliff_individual_2015, myers_practical_2022, deakin_support_2024}.
 
-\subsection{Decisions as Time Series}
-Are decisions independent and identically distributed over time?
-\subsubsection{Temporal Dependence in Decision Making}
-\citet{danskin_exponential_2023}
-...
-\subsubsection{Non-stationarity in Decision Making}
-\citet{ashwood_mice_2022, vloeberghs_bayesian_2024}
-...
+\subsection{Decision Making Over Time}
+Experimental data typically consists of a sequence of choice and reaction time trials collected over time. While standard analyses often treat these as independent, decisions are not isolated events, but are embedded in a sequence of choices \citep{urai_structure_2025}.
 
-\subsection{Current Methods for DDM Parameter Estimation}
+First, the decision state/strategy is not constant; it changes over time with changing internal and external states across multiple timescales. Standard measures of decision making mask the presence of dramatic changes in decision strategies across trials \citep{ashwood_mice_2022}. For example, subjects may alternate between ``engaged'' states and ``biased or weakly stimulus-dependent strategies'' \citep{ashwood_mice_2022, mohammadi_identifying_2025}. As noted by \citet{urai_structure_2025}, ``there is probably no such thing as stable behavior.'' Furthermore, distinct forms of behavioral variability may distinguish decision-making processes between species, such as humans and rats \citep{nguyen_different_2022, shevinsky_interaction_2019}.
 
-DDM parameters are generally estimated using three main methods: (1) Maximum likelihood estimation (MLE) provides analytical solutions for first-passage time distributions but exhibits high sensitivity to outliers and typically provides only point estimates without principled uncertainty quantification \citep{feltgen_overcomplete_2021, navarro_fast_2009, feller_introduction_1968, myers_practical_2022, boehm_estimating_2018, wiecki_hddm_2013}. When standard errors are reported, they rely on asymptotic approximations assuming ideal conditions rarely met in practice \citep{vandekerckhove_diffusion_2008, vincent_recurrent_2017, hansen_probability_2022}. (2) Bayesian approaches provide posterior distributions capturing uncertainty measures and enable hierarchical modeling, but require substantial computational resources and specialized interpretation \citep{wiecki_hddm_2013, myers_practical_2022, vincent_recurrent_2017, fengler_likelihood_2021}. (3) Chi-square minimization and other fitting approaches share similar limitations regarding uncertainty quantification and model assumptions \citep{myers_practical_2022}.
+Second, decisions are influenced by the outcomes of previous choices (sequential effects). Animals use past experience to guide future choices, often integrating history information across multiple timescales \citep{danskin_exponential_2023, nguyen_optimizing_2019, busse_detection_2011}. These history biases are prevalent in human, monkey, and rodent perceptual decision-making \citep{urai_choice_2019, busse_detection_2011, trevino_response_2022}. Taken together, decision making adapts over time, using the past to guide the present, resulting in trial-to-trial variability that is richly structured in time \citep{urai_structure_2025}.
 
-All current approaches assume decisions represent independent and identically distributed observations, an assumption frequently violated in real experimental contexts where temporal correlations and non-stationarity characterize natural decision-making behavior \citep{vincent_recurrent_2017, shevinsky_interaction_2019, boehm_estimating_2018}.
+Much of this non-stationarity is structured rather than random. Parameters may trend within a session as fatigue accumulates, or shift between sessions as animals learn. When such trends can be linked to observable quantities (trial number, time of day, stimulus or reward history), they can be explicitly modeled as functions of covariates. By absorbing structured non-stationarity into the covariate model, the residual variability is plausibly stable over time, enabling principled inference even in naturalistic experiments.
 
-\subsection{Problem Statement and Proposed Solution}
+\subsection{Current Estimation Methods and Their Limitations}
 
-\subsubsection{Limitations of Current Uncertainty Quantification}
+For DDM fitting, there is usually the implicit assumption that, in the absence of experimental manipulations, the decision making process remains constant over time with fixed parameters $a, z, t_0, v$. Trial order is ignored, treating decision outcomes as independent and identically distributed ($iid$), a condition often violated in real data \citep{vincent_recurrent_2017, urai_structure_2025}. If parameters are allowed to vary (e.g., the 7-parameter DDM), they do so as unstructured random variability, ignoring trial order and the possibility that systematic trends, such as learning curves or circadian rhythms, may be linked to observable covariates \citep{ratcliff_parameter_2013}. This discounts the rich temporal structure from which decision-making occurs and ignores the possibility that an animal makes abrupt changes in decision-making strategy \citep{urai_structure_2025, ashwood_mice_2022}. Furthermore, these across-trial variability parameters are inherently hard to estimate and often show poor recovery because of this unidentifiability \citep{boehm_estimating_2018, lerche_model_2016, nguyen_different_2022}.
 
-Current DDM parameter estimation methods are limited in providing robust uncertainty quantification for temporally-structured data. The most significant limitation concerns the pervasive assumption of independence between successive decisions, which fails to account for temporal correlations that characterize naturalistic behavior \citep{vincent_recurrent_2017, myers_practical_2022, shevinsky_interaction_2019}. When uncertainty estimates are provided, they rely on standard asymptotic approximations that assume correct model specification and independent observations \citep{hansen_probability_2022, vincent_recurrent_2017, vandekerckhove_diffusion_2008}. Under model misspecification or temporal dependence, these standard errors underestimate true parameter uncertainty, leading to overconfident and invalid inferences \citep{boehm_estimating_2018, hansen_probability_2022}.
-
-This inadequacy constrains hypothesis testing to compare parameters across conditions, or detect meaningful temporal changes in decision-making processes, particularly limiting studies of dynamic decision processes in naturalistic settings where brain and behavior are in constant flux.
-
-\subsubsection{Proposed Methodological Solution}
-
-We propose a novel approach providing robust standard error estimates for DDM parameters that remain statistically valid under model misspecification and temporal dependence. Our method implements sandwich-type variance estimators that separate information used to estimate parameters from information used to estimate their uncertainty, developing both misspecification-robust and autocorrelation-robust estimators \citep{hansen_probability_2022}.
-
-A key application involves detecting parameter non-stationarity through time-windowed estimation, enabling identification of significant changes in decision-making processes across multiple timescales while maintaining valid statistical inference. Our approach offers analytically tractable and computationally efficient standard errors that maintain statistical validity under realistic conditions of model misspecification and temporal dependence, establishing a methodological foundation for robust statistical inference in studies of dynamic decision-making processes.
-
-...
-
-binary decisions made upon the sequential accumulation of evidence\\
-two-alternative forced-choice (2-AFC) tasks\\
-
-observed decision speed and accuracy\\
-unobserved decision making process (DMP) - latent in the sense that we do not observe it directly - underlying process that generates the observed data\\
-approximated by drift diffusion model (DDM)\\
-DMP $\ne$ DDM, to equate them requires many layers of approximation\\
-
-DDM for describing how simple decisions are made in the brain - supported by arguments of neuro-plausibility from measuring the activity of ensembles of neurons - neural mechanisms underlying the decision process\\
-
-
-observed decision speed and accuracy (behavioral observations) can also be explained by:
+Current inference methods are limited in the following ways:
 \begin{itemize}
-    \item ex-Gaussian or shifted Wald distributions (Matzke and Wagenmakers, 2009)
-    \item linear ballistic accumulator model (Brown and Heathcote)
-    \item Leaky competing accumulator model (Usher and McClelland)
-    \item Levy flight model (Wieschen et al 2020, Voss et al 2019)
+    \item Point estimates of DDM parameters rarely include their corresponding uncertainties (standard errors) \citep{wiecki_hddm_2013, boehm_estimating_2018}.
+    \item If uncertainties are estimated, they depend on asymptotic approximations assuming ideal conditions ($iid$) that are rarely met in practice \citep{vincent_recurrent_2017}.
+    \item Robust estimation often relies on computationally expensive methods like Bayesian MCMC or resampling \citep{boehm_estimating_2018, vincent_recurrent_2017}.
+    \item The robustness of inference to simplifying assumptions (misspecifications such as unmodeled parameter variability and temporal correlations) is rarely addressed. Under model misspecification, standard errors underestimate true parameter uncertainty, leading to overconfident and invalid inferences \citep{boehm_estimating_2018, urai_structure_2025, hato_levy_2025}.
 \end{itemize}
 
-sequence of behavior:\\
-iid assumption of consecutive decisions, a condition often violated in real data\\
-account for trial-to-trial dependencies
+These limitations constrain hypothesis testing to compare parameters across conditions or detect meaningful temporal changes in decision states, particularly limiting studies of dynamic decision processes in naturalistic settings where brain and behavior are in constant flux \citep{shevinsky_interaction_2019}.
 
-parsimony\\
-models should not only provide a good fit to data, but also be parsimonious in form and represent a clear mechanistic interpretation\\
-interpretation of RTs requires a model that makes explicit how the latent parameters are translated into the observed variable, RT\\
-latent variables are variables that can only be inferred indirectly through a mathematical model from other observable variables that can be directly observed\\
-...
+\subsection{Proposed Solutions}
 
+To address these issues, we consider how to explicitly allow for model misspecification and time dependence in order to conduct valid inference. We propose modeling DDM parameters as functions of observed covariates (such as stimulus strength, trial number, or time of day) via a link function. This serves two purposes: it captures how external factors influence each decision, and it provides a principled mechanism for non-stationary behavior. Systematic parameter trends that would otherwise violate stationarity are absorbed into the covariate model, leaving residual variability that is plausibly stable over time. Stationarity is therefore a requirement on the joint process of covariates and outcomes, not on the raw decision outcomes alone. This distinction substantially broadens the scope of experiments to which the framework applies.
+
+We introduce a computationally efficient pseudo-Maximum Likelihood Estimation (pseudo-MLE) approach to estimate DDM parameters and covariate effects, and quantify their uncertainties without requiring correct specification or trial independence. We show that the proposed method is consistent and asymptotically normal, and provide parameter recovery simulations for both point estimates and their uncertainties. In applications to rat decision making, we demonstrate that, even under constant experimental conditions, decision states change over time, DDM parameters change over many timescales in ways that are larger than their uncertainty.
 \end{document}
