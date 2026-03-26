@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from numpy import testing
 
-from drift_diffusion.sim import sample_from_pdf, sim_ddm
+from drift_diffusion.sim import sim_ddm
 
 
 def test_sim_ddm():
