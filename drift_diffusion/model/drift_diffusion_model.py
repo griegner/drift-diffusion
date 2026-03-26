@@ -13,7 +13,7 @@ from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian", p_outlier=0.01):
+    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian", p_outlier=1e-12):
         """Drift diffusion model (DDM) of binary decision making.
 
         DriftDiffusionModel fits decision making parameters by maximum likelihood estimation.
@@ -41,7 +41,7 @@ class DriftDiffusionModel(BaseEstimator):
              "autocorrelation-robust", "all"}, by default "sample-hessian"
         p_outlier : float
             mixture probability (`0-1`) that a trial is drawn from a uniform outlier
-            distribution rather than the DDM, by default 0.01
+            distribution rather than the DDM, by default 1e-12
 
         Attributes
         ----------
