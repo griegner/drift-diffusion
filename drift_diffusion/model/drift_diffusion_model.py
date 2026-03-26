@@ -215,8 +215,7 @@ class DriftDiffusionModel(BaseEstimator):
         X_mm, _ = self._get_model_matrix(X)
 
         def _pdf(params_):
-            all_params = self._get_params(params_, X_mm)
-            return pdf(y, *all_params)
+            return pdf(y, *self._get_params(params_, X_mm))
 
         pdf_ = _pdf(self.params_)
         pdf_jacobian_ = jacobian(_pdf)(self.params_)
@@ -224,3 +223,47 @@ class DriftDiffusionModel(BaseEstimator):
         se = np.sqrt(np.einsum("ij,jk,ik->i", pdf_jacobian_, self.covariance_, pdf_jacobian_))
         z = norm.ppf(1 - alpha / 2)
         return (pdf_ - z * se), (pdf_ + z * se)
+
+    def g(self, X, alpha=0.05):
+        """Compute the confidence bands for the g link function under the fitted DDM.
+
+        Parameters
+        ----------
+        X : pd.DataFrame of shape (n_samples, n_features)
+            sample-by-sample covariates
+        alpha : float
+            two-sided significance level for the confidence bands, by default 0.05
+
+        Returns
+        -------
+        bands : dict
+            keys are {"a","t0","v","z"} and values are dicts with "g", "lower", "upper"
+        """
+        if self.cov_estimator == "all":
+            raise ValueError("g() cannot be used when cov_estimator='all', set cov_estimator to a single estimator.")
+        check_is_fitted(self)
+
+        X_mm, _ = self._get_model_matrix(X)
+        n = len(X)
+        z = norm.ppf(1 - alpha / 2)
+
+        all_params = self._get_params(self.params_, X_mm)
+        param_names = ("a", "t0", "v", "z")
+
+        bands = {}
+        idx = 0
+        for name, X_p, param_val in zip(param_names, X_mm, all_params):
+            g_hat = np.full(n, param_val) if np.isscalar(param_val) else np.asarray(param_val)
+
+            if X_p is None:
+                lower, upper = g_hat, g_hat
+            else:
+                n_features = X_p.shape[1]
+                cov_p = self.covariance_[idx : idx + n_features, idx : idx + n_features]
+                se = np.sqrt(np.einsum("ij,jk,ik->i", X_p, cov_p, X_p))
+                lower, upper = g_hat - z * se, g_hat + z * se
+                idx += n_features
+
+            bands[name] = {"g": g_hat, "lower": lower, "upper": upper}
+
+        return bands
