@@ -10,6 +10,3 @@ __pycache__/
 # pixi
 .pixi
 pixi.lock
-
-# datasets
-examples/datasets

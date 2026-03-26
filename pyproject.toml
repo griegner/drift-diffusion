@@ -10,6 +10,9 @@ description = "drift diffusion models of decision making"
 readme = "README.md"
 requires-python = ">=3.9"
 
+[tool.setuptools]
+packages = {find = {where = ["."], include = ["drift_diffusion*"]}}
+
 [tool.pixi.project]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
@@ -25,7 +28,6 @@ formulaic = "*"
 pyddm = "*"
 scikit-learn = "*"
 statsmodels = "*"
-ssm-simulators = "*"
 
 [tool.pixi.feature.lint.dependencies]
 # matches version in .pre-commit-config.yaml
