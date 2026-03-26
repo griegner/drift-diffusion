@@ -25,7 +25,7 @@ def sample_from_ssm(a=1, t0=0, v=0, z=0, n_samples=1000, n_repeats=1, random_sta
     n_samples : int, optional
         number of samples to return, by default 1000
     n_repeats : int, optional
-        _description_, by default 1
+        number of repeats to return, by default 1
     random_state : int or None
         integer passed to random state generator, by default None
 
@@ -57,40 +57,54 @@ def sample_from_ssm(a=1, t0=0, v=0, z=0, n_samples=1000, n_repeats=1, random_sta
     return np.squeeze(sims["rts"] * sims["choices"]).T
 
 
-def sample_from_pdf(a=1, t0=0, v=0, z=0, n_samples=1000, random_state=None):
+def sample_from_pdf(a=1, t0=0, v=0, z=0, n_samples=1000, n_repeats=1, random_state=None):
     """Sample from probability density function (PDF).
 
     Parameters
     ----------
-    a : float, optional
-        decision boundary (`a>0`) +a is upper and -a is lower, by default 1
-    t0 : float, optional
-        nondecision time (`t0>=0`) +t0 is time in seconds, by default 0
-    v : float, optional
-        drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default 0
-    z : float, optional
+    a : float or ndarray of shape (n_samples,), optional
+        decision boundary ([a>0]) +a is upper and -a is lower, by default 1
+    t0 : float or ndarray of shape (n_samples,), optional
+        nondecision time ([t0>=0]) +t0 is time in seconds, by default 0
+    v : float or ndarray of shape (n_samples,), optional
+        drift rate ([-∞<v<+∞] +v towards +a and -v towards -a, by default 0
+    z : float or ndarray of shape (n_samples,), optional
         starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default 0
     n_samples : int, optional
         number of samples to return, by default 1000
+    n_repeats : int, optional
+        number of repeats to return, by default 1
     random_state : int, RandomState instance, or None
         random number generator, by default None
 
     Returns
     -------
-    y : ndarray of shape (n_samples, )
-        reaction times (`abs(y)>0`) decision + nondecision time\\
-        responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
+    ys : ndarray of shape (n_samples, n_repeats)
+        reaction times (`|ys|>0`) decision + nondecision time\\
+        choices (`sign(ys) = {+1, -1}`) +1 is upper and -1 is lower
     """
 
     random_state = check_random_state(random_state)
 
-    num = 1000  # discretize pdf
-    rt_range = (1e-5 + t0, 4 + t0)
-    y = np.r_[-np.linspace(*rt_range, num), np.linspace(*rt_range, num)]
+    params = {
+        name: np.repeat(param, n_samples) if not isinstance(param, np.ndarray) else param
+        for name, param in {"a": a, "t0": t0, "v": v, "z": z}.items()
+    }
 
-    pdfs = pdf(y, a, t0, v, z)
-    ps = pdfs / np.sum(pdfs)
-    return random_state.choice(y, size=n_samples, p=ps)
+    for name, param in params.items():
+        if param.size != n_samples:
+            raise ValueError(f"'{name}' must be a ndarray of shape (n_samples,)")
+
+    num = 1000
+    rt_lo, rt_hi = 1e-5 + params["t0"].min(), 5 + params["t0"].max()
+    grid = np.linspace(rt_lo, rt_hi, num)
+    y = np.concatenate([-grid, grid])
+
+    pdfs = np.column_stack([pdf(yi, params["a"], params["t0"], params["v"], params["z"]) for yi in y])
+    ps = pdfs / pdfs.sum(axis=1, keepdims=True)
+
+    ys = np.vstack([random_state.choice(y, size=n_repeats, p=p_i) for p_i in ps])
+    return ys.squeeze()
 
 
 def sim_ddm(dt, t=0.1, st=0, z=0, sz=0, v=0, sv=0, a=2, error_dist="gaussian", seed=0):
