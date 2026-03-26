@@ -33,6 +33,7 @@ def preproc_df(path="./datasets/Rat195Vectors_241025.mat"):
         day=shifted_index.map(day_map),  # 6pm-to-6pm day
         hour=lambda x: x.index.hour + 1,  # 1 to 24
         trial=lambda x: ((x.groupby("day").cumcount() + 1) // 20) * 20,  # trials in day
-    ).query("trial < trial.max()-40")
+        reward=lambda x: x["correct"] * x["proposedReward"],
+    )
 
     return df

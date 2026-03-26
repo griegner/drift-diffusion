@@ -41,9 +41,6 @@ def fit_ddm(df, fitby, refit=False):
     param_names = ["a", "t0", "beta_v", "z"]
 
     def _fit_ddm(group_key, grp):
-        if len(grp) <= 50:
-            return group_key, pd.Series({k: np.nan for k in param_names})
-
         ddm_clone = clone(ddm)
         ddm_clone.fit(grp, grp["y"])
         params = ddm_clone.params_
@@ -83,7 +80,7 @@ def plot_estimates(axs, df, fitby, col, formula=None):
     axs[0].scatter(df.index, df[col], color="k", s=2)
 
     if fitby == "trial":
-        axs[0].set(xlim=[-50, 950], xticks=[0, 200, 400, 600, 800])
+        axs[0].set(xlim=[-50, 850], xticks=[0, 200, 400, 600, 800])
         df_valid = df.query("index > 0")[[col]].dropna()
         y, X = model_matrix(f"{col} ~ {formula}", df_valid.reset_index(names="x"), output="numpy")
         model = OLS(y[:, 0], X).fit()
@@ -100,6 +97,7 @@ def plot_estimates(axs, df, fitby, col, formula=None):
     acf_input = residuals if fitby == "trial" else df.iloc[17:][col]
     acf_, confint = acf(acf_input, nlags=n_lags, fft=True, bartlett_confint=True, missing="conservative", alpha=0.05)
     lags = -np.arange(n_lags + 1)[::-1]
+    axs[2].axhline(y=0, color="k", linestyle="--", lw=1)
     axs[2].plot(lags, acf_[::-1], c="k", lw=1)
     axs[2].fill_between(lags, confint[:, 0][::-1], confint[:, 1][::-1], color="gray", alpha=0.3)
     axs[2].set_yticks([0, 1])
