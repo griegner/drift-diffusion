@@ -131,12 +131,12 @@ def test_fitted_pdf():
     with pytest.raises(NotFittedError):
         ddm.pdf(X, y_range)
 
-    # test fitted density within 95% confidence bands
+    # test true density within 95% confidence bands
     ddm.fit(X, y)
     f = pdf(y_range, a, t0, v, z)
-    f_lwr_, f_upr_ = ddm.pdf(X, y_range)
-    testing.assert_array_less(f_lwr_, f + 1e-6)
-    testing.assert_array_less(f, f_upr_ + 1e-6)
+    f_ = ddm.pdf(X, y_range)
+    testing.assert_array_less(f_["-"], f + 1e-6)
+    testing.assert_array_less(f, f_["+"] + 1e-6)
 
 
 def test_mle_covariates():
@@ -157,3 +157,26 @@ def test_mle_covariates():
     y = np.concat([sample_from_pdf(a=a, v=0, n_samples=n_samples // 4, random_state=0) for a in a_s])
     ddm = DriftDiffusionModel(a="+1 + coherence", t0=0, v="+1", z=0).fit(X, y)
     testing.assert_allclose(ddm.params_, [0.6, 1.0, 0], atol=0.12)
+
+
+def test_fitted_g():
+    """test true linear function of covariate within fitted confidence bands"""
+    a, t0, z = 1.0, 0, 0
+
+    # v as linear function of coherence
+    coherence = np.linspace(-1, +1, 1000)
+    X = pd.DataFrame({"coherence": coherence})
+    v = 2 * coherence
+    y = sample_from_pdf(a, t0, v, z, random_state=0)
+
+    ddm = DriftDiffusionModel(a="+1", t0="+1", v="-1 + coherence", z="+1")
+
+    # test raises expected error
+    with pytest.raises(NotFittedError):
+        ddm.g(X)
+
+    # test true v within 95% confidence bands
+    ddm.fit(X, y)
+    g = ddm.g(X)
+    testing.assert_array_less(g["v"]["-"], v)
+    testing.assert_array_less(v, g["v"]["+"])

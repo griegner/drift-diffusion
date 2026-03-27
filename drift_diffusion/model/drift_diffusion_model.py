@@ -190,7 +190,7 @@ class DriftDiffusionModel(BaseEstimator):
 
     def pdf(self, X, y, alpha=0.05):
         """
-        Compute the PDF confidence bands under the fitted DDM using the delta method.
+        Compute the confidence bands for the PDF function under the fitted DDM.
 
         Parameters
         ----------
@@ -204,6 +204,8 @@ class DriftDiffusionModel(BaseEstimator):
 
         Returns
         -------
+        band : dict
+            keys are {"pdf", "+", "-"}
         lower : ndarray of shape (n_samples, )
             `alpha/2` confidence band
         upper : ndarray of shape (n_samples, )
@@ -222,7 +224,7 @@ class DriftDiffusionModel(BaseEstimator):
 
         se = np.sqrt(np.einsum("ij,jk,ik->i", pdf_jacobian_, self.covariance_, pdf_jacobian_))
         z = norm.ppf(1 - alpha / 2)
-        return (pdf_ - z * se), (pdf_ + z * se)
+        return {"pdf": pdf_, "-": pdf_ - z * se, "+": pdf_ + z * se}
 
     def g(self, X, alpha=0.05):
         """Compute the confidence bands for the g link function under the fitted DDM.
@@ -237,7 +239,7 @@ class DriftDiffusionModel(BaseEstimator):
         Returns
         -------
         bands : dict
-            keys are {"a","t0","v","z"} and values are dicts with "g", "lower", "upper"
+            keys are {"a","t0","v","z"} and values are dicts with "g", "-", "+"
         """
         if self.cov_estimator == "all":
             raise ValueError("g() cannot be used when cov_estimator='all', set cov_estimator to a single estimator.")
@@ -264,6 +266,6 @@ class DriftDiffusionModel(BaseEstimator):
                 lower, upper = g_hat - z * se, g_hat + z * se
                 idx += n_features
 
-            bands[name] = {"g": g_hat, "lower": lower, "upper": upper}
+            bands[name] = {"g": g_hat, "-": lower, "+": upper}
 
         return bands
