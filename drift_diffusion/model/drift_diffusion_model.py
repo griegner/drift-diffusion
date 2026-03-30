@@ -1,7 +1,6 @@
 """Drift diffusion model."""
 
 import autograd.numpy as np
-import pandas as pd
 from autograd import hessian, jacobian
 from formulaic import model_matrix
 from scipy.optimize import minimize
@@ -17,24 +16,26 @@ class DriftDiffusionModel(BaseEstimator):
         """Drift diffusion model (DDM) of binary decision making.
 
         DriftDiffusionModel fits decision making parameters by maximum likelihood estimation.
-        The four decision making parameters (`a, t0, v, z`) can each be linear functions of
-        sample-by-sample covariate columns in `X`. Each parameter can either be free (by default) or fixed.
-        Free parameters are estimated during `fit` and defined with Wilkinson notation to specify linear
+        The four decision making parameters (`a, t0, v, z`) can each be linear functions of coefficients and
+        sample-by-sample covariate columns in `X`; and each can be fixed, free, or mixed.
+        Free parameters/coefficients are estimated during `fit` and defined with Wilkinson notation to specify linear
         relationships with covariates (e.g. `v = "+1 + coherence"`; see https://matthewwardrop.github.io/formulaic).
-        Fixed parameters are set at initialization by passing a float.
+        Fixed parameters are set at initialization by passing a float. Mixed coefficients can be defined with a dict,
+        for example `v={"formula": "+1 + coherence", "fixed": {"coherence": 1.0}}`, where `fixed` coefficients are
+        excluded from optimization but included in likelihood evaluation.
 
         The covariance matrix of the estimator can be computed by one of four methods (see `cov_estimator`),
         each designed to be valid under increasingly general conditions on the outcome `y`.
 
         Parameters
         ----------
-        a : float or str
+        a : float or str or dict
             decision boundary (`a>0`) +a is upper and -a is lower, by default "+1"
-        t0 : float or str
+        t0 : float or str or dict
             nondecision time (`t0>=0`) +t0 is time in seconds, by default "+1"
-        v : float or str
+        v : float or str or dict
             drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default "+1"
-        z : float or str
+        z : float or str or dict
             starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default "+1"
         cov_estimator : str
             {"sample-hessian", "outer-product", "misspecification-robust",
@@ -46,16 +47,13 @@ class DriftDiffusionModel(BaseEstimator):
         Attributes
         ----------
         params_ : ndarray of shape (n_params, )
-            estimated free parameters
+            estimated free parameters/coefficients
         covariance_ : ndarray of shape (n_params, n_params)
-            estimated covariances of free parameters
-            standard errors are the square roots of the diagonal terms
+            estimated covariances of free parameters/coefficients
+            standard errors are the square roots of the diagonal elements
         """
         super().__init__()
-        self.a = a
-        self.t0 = t0
-        self.v = v
-        self.z = z
+        self.a, self.t0, self.v, self.z = a, t0, v, z
         self.cov_estimator = cov_estimator
         self.p_outlier = p_outlier
 
@@ -67,27 +65,59 @@ class DriftDiffusionModel(BaseEstimator):
         return tags
 
     def _get_model_matrix(self, X):
-        X = pd.DataFrame(X) if isinstance(X, np.ndarray) else X
         X_mm, params0 = [], []
+        self.fixed_ = []
         for param in ["a", "t0", "v", "z"]:
             val = getattr(self, param)
-            if isinstance(val, str):  # free parameter
-                x_mm = model_matrix(val, X, output="numpy", na_action="raise")
-                X_mm.append(x_mm)
-                params0.append(np.r_[1, np.zeros(x_mm.shape[1] - 1)] if param == "a" else np.zeros(x_mm.shape[1]))
-            else:  # fixed parameter
+
+            if not isinstance(val, (str, dict)):  # fixed parameter
                 X_mm.append(None)
+                self.fixed_.append((None, None))
+                continue
+
+            is_mixed = isinstance(val, dict)
+            formula = val if isinstance(val, str) else val.get("formula")
+            fixed = {} if isinstance(val, str) else val.get("fixed", {})
+            if is_mixed and not isinstance(formula, str):
+                raise ValueError(f"{param} dict must include 'formula' as a string.")
+            if is_mixed and not isinstance(fixed, dict):
+                raise ValueError(f"{param} dict 'fixed' must be a dict mapping formula coefficients to fixed values ")
+
+            fixed = dict(fixed)
+            x_mm = model_matrix(formula, X, output="pandas", na_action="raise")
+            if "1" in fixed and "Intercept" in x_mm.columns and "Intercept" not in fixed:
+                fixed["Intercept"] = fixed.pop("1")
+
+            unknown_fixed = sorted(set(fixed) - set(x_mm.columns))
+            if unknown_fixed:
+                raise ValueError(f"{param} fixed coefficients not found in formula: {unknown_fixed}. ")
+
+            free_cols = [c for c in x_mm.columns if c not in fixed]
+            x_free = x_mm[free_cols].to_numpy()
+            X_mm.append(x_free)
+            params0.append(np.r_[1, np.zeros(x_free.shape[1] - 1)] if param == "a" else np.zeros(x_free.shape[1]))
+
+            fixed_cols = [c for c in x_mm.columns if c in fixed]
+            self.fixed_.append(
+                (x_mm[fixed_cols].to_numpy(), np.array([fixed[c] for c in fixed_cols], dtype=float))
+                if fixed_cols
+                else (None, None)
+            )
         return X_mm, params0
 
     def _get_params(self, params_, X):
         params, idx = [], 0
-        for param, x in zip(["a", "t0", "v", "z"], X):
-            if x is not None:  # free parameter
-                n_features = x.shape[1]
-                params.append(x @ np.array(params_[idx : idx + n_features]))
-                idx += n_features
-            else:  # fixed params
+        for param, x, fixed_ in zip(["a", "t0", "v", "z"], X, self.fixed_):
+            if x is None:  # fixed params
                 params.append(getattr(self, param))
+                continue
+            n_features = x.shape[1]
+            param_value = x @ np.array(params_[idx : idx + n_features])
+            x_fixed, b_fixed = fixed_
+            if x_fixed is not None:
+                param_value += x_fixed @ b_fixed
+            params.append(param_value)
+            idx += n_features
         return params
 
     def _loglikelihood(self, params_, X, y):
