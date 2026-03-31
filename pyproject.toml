@@ -46,6 +46,7 @@ lint = { depends-on = ["black", "ruff"]}
 pytest = "*"
 pytest-cov = "*"
 line_profiler = "*"
+tqdm = "*"
 
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest -vsl --cov=drift_diffusion --cov-report=xml drift_diffusion" }

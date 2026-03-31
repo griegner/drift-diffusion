@@ -1,5 +1,7 @@
 """Drift diffusion model."""
 
+from functools import cache
+
 import autograd.numpy as np
 from autograd import hessian, jacobian
 from better_optimize import minimize
@@ -140,17 +142,25 @@ class DriftDiffusionModel(BaseEstimator):
         ll_jacobian = jacobian(self._loglikelihood)
         lll_hessian = hessian(self._lossloglikelihood)
 
+        @cache
+        def get_hessian_inv():
+            return np.linalg.inv(lll_hessian(self.params_, X, y))
+
+        @cache
+        def get_jacobian():
+            return ll_jacobian(self.params_, X, y)
+
         def sample_hessian():
-            hessian_ = lll_hessian(self.params_, X, y)
-            return np.linalg.inv(hessian_)
+            return get_hessian_inv()
 
         def outer_product():
-            jacobian_ = ll_jacobian(self.params_, X, y)
-            return np.linalg.inv(jacobian_.T @ jacobian_)
+            jacobian_ = get_jacobian()
+            fisher_ = jacobian_.T @ jacobian_
+            return np.linalg.inv(fisher_)
 
         def misspecification_robust():
-            hessian_inv_ = sample_hessian()
-            jacobian_ = ll_jacobian(self.params_, X, y)
+            hessian_inv_ = get_hessian_inv()
+            jacobian_ = get_jacobian()
             fisher_ = jacobian_.T @ jacobian_
             return hessian_inv_ @ fisher_ @ hessian_inv_
 
@@ -166,8 +176,8 @@ class DriftDiffusionModel(BaseEstimator):
             return outer_product
 
         def autocorrelation_robust():
-            hessian_inv_ = sample_hessian()
-            jacobian_ = ll_jacobian(self.params_, X, y)
+            hessian_inv_ = get_hessian_inv()
+            jacobian_ = get_jacobian()
             newey_west_ = newey_west(jacobian_)
             return hessian_inv_ @ newey_west_ @ hessian_inv_
 
@@ -202,14 +212,16 @@ class DriftDiffusionModel(BaseEstimator):
 
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
+        lll_hessp = lambda params_, p, X, y: jacobian(lambda w: lll_jacobian(w, X, y) @ p)(params_)
 
         # estimate parameters, covariance matrix
         fit_ = minimize(
             f=self._lossloglikelihood,
             x0=np.hstack(params0),
             args=(X_mm, y),
-            method="L-BFGS-B",
+            method="trust-ncg",
             jac=lll_jacobian,
+            hessp=lll_hessp,
             progressbar=self.verbose,
             verbose=self.verbose,
         )
