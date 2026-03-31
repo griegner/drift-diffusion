@@ -2,8 +2,8 @@
 
 import autograd.numpy as np
 from autograd import hessian, jacobian
+from better_optimize import minimize
 from formulaic import model_matrix
-from scipy.optimize import minimize
 from scipy.stats import norm
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
@@ -12,7 +12,7 @@ from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian", p_outlier=1e-12):
+    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian", p_outlier=1e-12, verbose=False):
         """Drift diffusion model (DDM) of binary decision making.
 
         DriftDiffusionModel fits decision making parameters by maximum likelihood estimation.
@@ -43,6 +43,8 @@ class DriftDiffusionModel(BaseEstimator):
         p_outlier : float
             mixture probability (`0-1`) that a trial is drawn from a uniform outlier
             distribution rather than the DDM, by default 1e-12
+        verbose : bool
+            whether to display a progress bar
 
         Attributes
         ----------
@@ -56,6 +58,7 @@ class DriftDiffusionModel(BaseEstimator):
         self.a, self.t0, self.v, self.z = a, t0, v, z
         self.cov_estimator = cov_estimator
         self.p_outlier = p_outlier
+        self.verbose = verbose
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
@@ -203,12 +206,14 @@ class DriftDiffusionModel(BaseEstimator):
 
         # estimate parameters, covariance matrix
         fit_ = minimize(
-            fun=self._lossloglikelihood,
+            f=self._lossloglikelihood,
             x0=np.hstack(params0),
             args=(X_mm, y),
             method="trust-ncg",
             jac=lll_jacobian,
             hess=lll_hessian,
+            progressbar=self.verbose,
+            verbose=self.verbose,
         )
         self.fit_ = fit_
         self.params_ = fit_.x

@@ -28,6 +28,7 @@ formulaic = "*"
 pyddm = "*"
 scikit-learn = "*"
 statsmodels = "*"
+better_optimize = "*"
 
 [tool.pixi.feature.lint.dependencies]
 # matches version in .pre-commit-config.yaml
