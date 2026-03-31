@@ -193,7 +193,7 @@ class DriftDiffusionModel(BaseEstimator):
         else:
             return cov_estimators[self.cov_estimator]()
 
-    def fit(self, X, y):
+    def fit(self, X, y, params0=None):
         """Fit DDM.
 
         Parameters
@@ -203,12 +203,15 @@ class DriftDiffusionModel(BaseEstimator):
         y : pd.Series of shape (n_samples, )
             reaction times (`abs(y)>0`) decision + nondecision time\\
             responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
+        params0 : ndarray of shape (n_params, ), default None
+            parameters/coefficients to initialize with
         """
 
         # validate y
         y = check_array(y, dtype="numeric", ensure_all_finite=True, ensure_2d=False)
         # validate X + initialize parameters
-        X_mm, params0 = self._get_model_matrix(X)
+        X_mm, x0 = self._get_model_matrix(X)
+        x0 = np.hstack(x0) if params0 is None else params0
 
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
@@ -217,7 +220,7 @@ class DriftDiffusionModel(BaseEstimator):
         # estimate parameters, covariance matrix
         fit_ = minimize(
             f=self._lossloglikelihood,
-            x0=np.hstack(params0),
+            x0=x0,
             args=(X_mm, y),
             method="trust-ncg",
             jac=lll_jacobian,
