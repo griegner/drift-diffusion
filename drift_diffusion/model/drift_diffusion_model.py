@@ -202,16 +202,14 @@ class DriftDiffusionModel(BaseEstimator):
 
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
-        lll_hessian = hessian(self._lossloglikelihood)
 
         # estimate parameters, covariance matrix
         fit_ = minimize(
             f=self._lossloglikelihood,
             x0=np.hstack(params0),
             args=(X_mm, y),
-            method="trust-ncg",
+            method="L-BFGS-B",
             jac=lll_jacobian,
-            hess=lll_hessian,
             progressbar=self.verbose,
             verbose=self.verbose,
         )
