@@ -4,6 +4,7 @@ from functools import cache
 
 import autograd.numpy as np
 from autograd import hessian, jacobian
+from autograd.core import make_jvp
 from better_optimize import minimize
 from formulaic import model_matrix
 from scipy.stats import norm
@@ -139,29 +140,38 @@ class DriftDiffusionModel(BaseEstimator):
         return -np.sum(loglikelihood_)
 
     def _fit_covariance(self, X, y):
-        ll_jacobian = jacobian(self._loglikelihood)
-        lll_hessian = hessian(self._lossloglikelihood)
 
         @cache
         def get_hessian_inv():
+            lll_hessian = hessian(self._lossloglikelihood)
             return np.linalg.inv(lll_hessian(self.params_, X, y))
 
         @cache
-        def get_jacobian():
-            return ll_jacobian(self.params_, X, y)
+        def get_score():
+            n_samples = len(y)
+            n_params = len(self.params_)
+            score_ = np.empty((n_samples, n_params))
+            jvp = make_jvp(lambda w: self._loglikelihood(w, X, y), self.params_)
+            for idx in range(n_params):
+                basis = np.zeros(n_params)
+                basis[idx] = 1.0
+                _, col_ = jvp(basis)
+                score_[:, idx] = col_
+            self.score_ = score_
+            return score_
 
         def sample_hessian():
             return get_hessian_inv()
 
         def outer_product():
-            jacobian_ = get_jacobian()
-            fisher_ = jacobian_.T @ jacobian_
+            score_ = get_score()
+            fisher_ = score_.T @ score_
             return np.linalg.inv(fisher_)
 
         def misspecification_robust():
             hessian_inv_ = get_hessian_inv()
-            jacobian_ = get_jacobian()
-            fisher_ = jacobian_.T @ jacobian_
+            score_ = get_score()
+            fisher_ = score_.T @ score_
             return hessian_inv_ @ fisher_ @ hessian_inv_
 
         def newey_west(jac, n_lags=None):
@@ -177,8 +187,8 @@ class DriftDiffusionModel(BaseEstimator):
 
         def autocorrelation_robust():
             hessian_inv_ = get_hessian_inv()
-            jacobian_ = get_jacobian()
-            newey_west_ = newey_west(jacobian_)
+            score_ = get_score()
+            newey_west_ = newey_west(score_)
             return hessian_inv_ @ newey_west_ @ hessian_inv_
 
         cov_estimators = {

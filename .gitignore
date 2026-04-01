@@ -10,3 +10,6 @@ __pycache__/
 # pixi
 .pixi
 pixi.lock
+
+# profiling
+*pyspy
