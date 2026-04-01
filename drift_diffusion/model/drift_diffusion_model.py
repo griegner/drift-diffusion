@@ -1,10 +1,13 @@
 """Drift diffusion model."""
 
+from functools import cache
+
 import autograd.numpy as np
-import pandas as pd
 from autograd import hessian, jacobian
+from autograd.core import make_jvp
+from autograd.differential_operators import make_hvp
+from better_optimize import minimize
 from formulaic import model_matrix
-from scipy.optimize import minimize
 from scipy.stats import norm
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
@@ -13,28 +16,30 @@ from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian", p_outlier=1e-12):
+    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian", p_outlier=1e-12, verbose=False):
         """Drift diffusion model (DDM) of binary decision making.
 
         DriftDiffusionModel fits decision making parameters by maximum likelihood estimation.
-        The four decision making parameters (`a, t0, v, z`) can each be linear functions of
-        sample-by-sample covariate columns in `X`. Each parameter can either be free (by default) or fixed.
-        Free parameters are estimated during `fit` and defined with Wilkinson notation to specify linear
+        The four decision making parameters (`a, t0, v, z`) can each be linear functions of coefficients and
+        sample-by-sample covariate columns in `X`; and each can be fixed, free, or mixed.
+        Free parameters/coefficients are estimated during `fit` and defined with Wilkinson notation to specify linear
         relationships with covariates (e.g. `v = "+1 + coherence"`; see https://matthewwardrop.github.io/formulaic).
-        Fixed parameters are set at initialization by passing a float.
+        Fixed parameters are set at initialization by passing a float. Mixed coefficients can be defined with a dict,
+        for example `v={"formula": "+1 + coherence", "fixed": {"coherence": 1.0}}`, where `fixed` coefficients are
+        excluded from optimization but included in likelihood evaluation.
 
         The covariance matrix of the estimator can be computed by one of four methods (see `cov_estimator`),
         each designed to be valid under increasingly general conditions on the outcome `y`.
 
         Parameters
         ----------
-        a : float or str
+        a : float or str or dict
             decision boundary (`a>0`) +a is upper and -a is lower, by default "+1"
-        t0 : float or str
+        t0 : float or str or dict
             nondecision time (`t0>=0`) +t0 is time in seconds, by default "+1"
-        v : float or str
+        v : float or str or dict
             drift rate (`-∞<v<+∞`) +v towards +a and -v towards -a, by default "+1"
-        z : float or str
+        z : float or str or dict
             starting point (`-1<z<+1`), +1 is +a and -1 is -a, by default "+1"
         cov_estimator : str
             {"sample-hessian", "outer-product", "misspecification-robust",
@@ -42,22 +47,22 @@ class DriftDiffusionModel(BaseEstimator):
         p_outlier : float
             mixture probability (`0-1`) that a trial is drawn from a uniform outlier
             distribution rather than the DDM, by default 1e-12
+        verbose : bool
+            whether to display a progress bar
 
         Attributes
         ----------
         params_ : ndarray of shape (n_params, )
-            estimated free parameters
+            estimated free parameters/coefficients
         covariance_ : ndarray of shape (n_params, n_params)
-            estimated covariances of free parameters
-            standard errors are the square roots of the diagonal terms
+            estimated covariances of free parameters/coefficients
+            standard errors are the square roots of the diagonal elements
         """
         super().__init__()
-        self.a = a
-        self.t0 = t0
-        self.v = v
-        self.z = z
+        self.a, self.t0, self.v, self.z = a, t0, v, z
         self.cov_estimator = cov_estimator
         self.p_outlier = p_outlier
+        self.verbose = verbose
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
@@ -67,27 +72,59 @@ class DriftDiffusionModel(BaseEstimator):
         return tags
 
     def _get_model_matrix(self, X):
-        X = pd.DataFrame(X) if isinstance(X, np.ndarray) else X
         X_mm, params0 = [], []
+        self.fixed_ = []
         for param in ["a", "t0", "v", "z"]:
             val = getattr(self, param)
-            if isinstance(val, str):  # free parameter
-                x_mm = model_matrix(val, X, output="numpy", na_action="raise")
-                X_mm.append(x_mm)
-                params0.append(np.r_[1, np.zeros(x_mm.shape[1] - 1)] if param == "a" else np.zeros(x_mm.shape[1]))
-            else:  # fixed parameter
+
+            if not isinstance(val, (str, dict)):  # fixed parameter
                 X_mm.append(None)
+                self.fixed_.append((None, None))
+                continue
+
+            is_mixed = isinstance(val, dict)
+            formula = val if isinstance(val, str) else val.get("formula")
+            fixed = {} if isinstance(val, str) else val.get("fixed", {})
+            if is_mixed and not isinstance(formula, str):
+                raise ValueError(f"{param} dict must include 'formula' as a string.")
+            if is_mixed and not isinstance(fixed, dict):
+                raise ValueError(f"{param} dict 'fixed' must be a dict mapping formula coefficients to fixed values ")
+
+            fixed = dict(fixed)
+            x_mm = model_matrix(formula, X, output="pandas", na_action="raise")
+            if "1" in fixed and "Intercept" in x_mm.columns and "Intercept" not in fixed:
+                fixed["Intercept"] = fixed.pop("1")
+
+            unknown_fixed = sorted(set(fixed) - set(x_mm.columns))
+            if unknown_fixed:
+                raise ValueError(f"{param} fixed coefficients not found in formula: {unknown_fixed}. ")
+
+            free_cols = [c for c in x_mm.columns if c not in fixed]
+            x_free = x_mm[free_cols].to_numpy()
+            X_mm.append(x_free)
+            params0.append(np.r_[1, np.zeros(x_free.shape[1] - 1)] if param == "a" else np.zeros(x_free.shape[1]))
+
+            fixed_cols = [c for c in x_mm.columns if c in fixed]
+            self.fixed_.append(
+                (x_mm[fixed_cols].to_numpy(), np.array([fixed[c] for c in fixed_cols], dtype=float))
+                if fixed_cols
+                else (None, None)
+            )
         return X_mm, params0
 
     def _get_params(self, params_, X):
         params, idx = [], 0
-        for param, x in zip(["a", "t0", "v", "z"], X):
-            if x is not None:  # free parameter
-                n_features = x.shape[1]
-                params.append(x @ np.array(params_[idx : idx + n_features]))
-                idx += n_features
-            else:  # fixed params
+        for param, x, fixed_ in zip(["a", "t0", "v", "z"], X, self.fixed_):
+            if x is None:  # fixed params
                 params.append(getattr(self, param))
+                continue
+            n_features = x.shape[1]
+            param_value = x @ np.array(params_[idx : idx + n_features])
+            x_fixed, b_fixed = fixed_
+            if x_fixed is not None:
+                param_value += x_fixed @ b_fixed
+            params.append(param_value)
+            idx += n_features
         return params
 
     def _loglikelihood(self, params_, X, y):
@@ -104,21 +141,38 @@ class DriftDiffusionModel(BaseEstimator):
         return -np.sum(loglikelihood_)
 
     def _fit_covariance(self, X, y):
-        ll_jacobian = jacobian(self._loglikelihood)
-        lll_hessian = hessian(self._lossloglikelihood)
+
+        @cache
+        def get_hessian_inv():
+            lll_hessian = hessian(self._lossloglikelihood)
+            return np.linalg.inv(lll_hessian(self.params_, X, y))
+
+        @cache
+        def get_score():
+            n_samples = len(y)
+            n_params = len(self.params_)
+            score_ = np.empty((n_samples, n_params))
+            jvp = make_jvp(lambda w: self._loglikelihood(w, X, y), self.params_)
+            for idx in range(n_params):
+                basis = np.zeros(n_params)
+                basis[idx] = 1.0
+                _, col_ = jvp(basis)
+                score_[:, idx] = col_
+            self.score_ = score_
+            return score_
 
         def sample_hessian():
-            hessian_ = lll_hessian(self.params_, X, y)
-            return np.linalg.inv(hessian_)
+            return get_hessian_inv()
 
         def outer_product():
-            jacobian_ = ll_jacobian(self.params_, X, y)
-            return np.linalg.inv(jacobian_.T @ jacobian_)
+            score_ = get_score()
+            fisher_ = score_.T @ score_
+            return np.linalg.inv(fisher_)
 
         def misspecification_robust():
-            hessian_inv_ = sample_hessian()
-            jacobian_ = ll_jacobian(self.params_, X, y)
-            fisher_ = jacobian_.T @ jacobian_
+            hessian_inv_ = get_hessian_inv()
+            score_ = get_score()
+            fisher_ = score_.T @ score_
             return hessian_inv_ @ fisher_ @ hessian_inv_
 
         def newey_west(jac, n_lags=None):
@@ -133,9 +187,9 @@ class DriftDiffusionModel(BaseEstimator):
             return outer_product
 
         def autocorrelation_robust():
-            hessian_inv_ = sample_hessian()
-            jacobian_ = ll_jacobian(self.params_, X, y)
-            newey_west_ = newey_west(jacobian_)
+            hessian_inv_ = get_hessian_inv()
+            score_ = get_score()
+            newey_west_ = newey_west(score_)
             return hessian_inv_ @ newey_west_ @ hessian_inv_
 
         cov_estimators = {
@@ -150,7 +204,7 @@ class DriftDiffusionModel(BaseEstimator):
         else:
             return cov_estimators[self.cov_estimator]()
 
-    def fit(self, X, y):
+    def fit(self, X, y, params0=None):
         """Fit DDM.
 
         Parameters
@@ -160,25 +214,30 @@ class DriftDiffusionModel(BaseEstimator):
         y : pd.Series of shape (n_samples, )
             reaction times (`abs(y)>0`) decision + nondecision time\\
             responses (`sign(y) = {+1, -1}`) +1 is upper and -1 is lower
+        params0 : ndarray of shape (n_params, ), default None
+            parameters/coefficients to initialize with
         """
 
         # validate y
         y = check_array(y, dtype="numeric", ensure_all_finite=True, ensure_2d=False)
         # validate X + initialize parameters
-        X_mm, params0 = self._get_model_matrix(X)
+        X_mm, x0 = self._get_model_matrix(X)
+        x0 = np.hstack(x0) if params0 is None else params0
 
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
-        lll_hessian = hessian(self._lossloglikelihood)
+        lll_hessp = lambda params_, p, X, y: make_hvp(lambda w: self._lossloglikelihood(w, X, y))(params_)[0](p)
 
         # estimate parameters, covariance matrix
         fit_ = minimize(
-            fun=self._lossloglikelihood,
-            x0=np.hstack(params0),
+            f=self._lossloglikelihood,
+            x0=x0,
             args=(X_mm, y),
             method="trust-ncg",
             jac=lll_jacobian,
-            hess=lll_hessian,
+            hessp=lll_hessp,
+            progressbar=self.verbose,
+            verbose=self.verbose,
         )
         self.fit_ = fit_
         self.params_ = fit_.x
@@ -190,7 +249,7 @@ class DriftDiffusionModel(BaseEstimator):
 
     def pdf(self, X, y, alpha=0.05):
         """
-        Compute the PDF confidence bands under the fitted DDM using the delta method.
+        Compute the confidence bands for the PDF function under the fitted DDM.
 
         Parameters
         ----------
@@ -204,6 +263,8 @@ class DriftDiffusionModel(BaseEstimator):
 
         Returns
         -------
+        band : dict
+            keys are {"pdf", "+", "-"}
         lower : ndarray of shape (n_samples, )
             `alpha/2` confidence band
         upper : ndarray of shape (n_samples, )
@@ -215,12 +276,55 @@ class DriftDiffusionModel(BaseEstimator):
         X_mm, _ = self._get_model_matrix(X)
 
         def _pdf(params_):
-            all_params = self._get_params(params_, X_mm)
-            return pdf(y, *all_params)
+            return pdf(y, *self._get_params(params_, X_mm))
 
         pdf_ = _pdf(self.params_)
         pdf_jacobian_ = jacobian(_pdf)(self.params_)
 
         se = np.sqrt(np.einsum("ij,jk,ik->i", pdf_jacobian_, self.covariance_, pdf_jacobian_))
         z = norm.ppf(1 - alpha / 2)
-        return (pdf_ - z * se), (pdf_ + z * se)
+        return {"pdf": pdf_, "-": pdf_ - z * se, "+": pdf_ + z * se}
+
+    def g(self, X, alpha=0.05):
+        """Compute the confidence bands for the g link function under the fitted DDM.
+
+        Parameters
+        ----------
+        X : pd.DataFrame of shape (n_samples, n_features)
+            sample-by-sample covariates
+        alpha : float
+            two-sided significance level for the confidence bands, by default 0.05
+
+        Returns
+        -------
+        bands : dict
+            keys are {"a","t0","v","z"} and values are dicts with "g", "-", "+"
+        """
+        if self.cov_estimator == "all":
+            raise ValueError("g() cannot be used when cov_estimator='all', set cov_estimator to a single estimator.")
+        check_is_fitted(self)
+
+        X_mm, _ = self._get_model_matrix(X)
+        n = len(X)
+        z = norm.ppf(1 - alpha / 2)
+
+        all_params = self._get_params(self.params_, X_mm)
+        param_names = ("a", "t0", "v", "z")
+
+        bands = {}
+        idx = 0
+        for name, X_p, param_val in zip(param_names, X_mm, all_params):
+            g_hat = np.full(n, param_val) if np.isscalar(param_val) else np.asarray(param_val)
+
+            if X_p is None:
+                lower, upper = g_hat, g_hat
+            else:
+                n_features = X_p.shape[1]
+                cov_p = self.covariance_[idx : idx + n_features, idx : idx + n_features]
+                se = np.sqrt(np.einsum("ij,jk,ik->i", X_p, cov_p, X_p))
+                lower, upper = g_hat - z * se, g_hat + z * se
+                idx += n_features
+
+            bands[name] = {"g": g_hat, "-": lower, "+": upper}
+
+        return bands

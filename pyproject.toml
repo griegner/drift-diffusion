@@ -28,6 +28,7 @@ formulaic = "*"
 pyddm = "*"
 scikit-learn = "*"
 statsmodels = "*"
+better_optimize = "*"
 
 [tool.pixi.feature.lint.dependencies]
 # matches version in .pre-commit-config.yaml
@@ -44,6 +45,7 @@ lint = { depends-on = ["black", "ruff"]}
 [tool.pixi.feature.test.dependencies]
 pytest = "*"
 pytest-cov = "*"
+py-spy = "*"
 
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest -vsl --cov=drift_diffusion --cov-report=xml drift_diffusion" }
@@ -53,6 +55,7 @@ notebook = "*"
 seaborn = "*"
 ipympl = "*"
 ipywidgets = "*"
+tqdm = "*"
 
 
 [tool.pixi.environments]

@@ -131,12 +131,12 @@ def test_fitted_pdf():
     with pytest.raises(NotFittedError):
         ddm.pdf(X, y_range)
 
-    # test fitted density within 95% confidence bands
+    # test true density within 95% confidence bands
     ddm.fit(X, y)
     f = pdf(y_range, a, t0, v, z)
-    f_lwr_, f_upr_ = ddm.pdf(X, y_range)
-    testing.assert_array_less(f_lwr_, f + 1e-6)
-    testing.assert_array_less(f, f_upr_ + 1e-6)
+    f_ = ddm.pdf(X, y_range)
+    testing.assert_array_less(f_["-"], f + 1e-6)
+    testing.assert_array_less(f, f_["+"] + 1e-6)
 
 
 def test_mle_covariates():
@@ -157,3 +157,61 @@ def test_mle_covariates():
     y = np.concat([sample_from_pdf(a=a, v=0, n_samples=n_samples // 4, random_state=0) for a in a_s])
     ddm = DriftDiffusionModel(a="+1 + coherence", t0=0, v="+1", z=0).fit(X, y)
     testing.assert_allclose(ddm.params_, [0.6, 1.0, 0], atol=0.12)
+
+
+def test_mle_mixed():
+    """test mixed free/fixed term specification excludes fixed terms from optimization"""
+    n_samples = 10000
+    coherence = np.array([0.1, 0.3, 0.5, 0.7])
+    X = pd.DataFrame({"coherence": np.repeat(coherence, n_samples // 4)})
+
+    v_intercept, v_slope = -0.2, 0.35
+    v_s = v_intercept + v_slope * coherence
+    y = np.concat([sample_from_pdf(a=1, v=v, n_samples=n_samples // 4, random_state=0) for v in v_s])
+
+    ddm = DriftDiffusionModel(a="+1", t0=0, v={"formula": "+1 + coherence", "fixed": {"coherence": v_slope}}, z=0)
+    ddm.fit(X, y)
+
+    # a intercept and v intercept should be estimated; v slope is fixed and excluded
+    testing.assert_allclose(ddm.params_, [1, v_intercept], atol=0.03)
+
+
+@pytest.mark.parametrize(
+    "mixed_spec, err_msg",
+    [
+        ({"formula": 1, "fixed": {"coherence": 0.35}}, "dict must include 'formula' as a string"),
+        ({"formula": "+1 + coherence", "fixed": ["coherence"]}, "dict 'fixed' must be a dict"),
+        ({"formula": "+1 + coherence", "fixed": {"bad_name": 0.35}}, "fixed coefficients not found in formula"),
+    ],
+)
+def test_mle_mixed_raises(mixed_spec, err_msg):
+    """test ValueErrors for invalid mixed specifications"""
+    X = pd.DataFrame({"coherence": np.linspace(0.1, 0.9, 10)})
+    y = sample_from_pdf(a=1, v=0.2, n_samples=len(X), random_state=0)
+    ddm = DriftDiffusionModel(a="+1", t0=0, v=mixed_spec, z=0)
+
+    with pytest.raises(ValueError, match=err_msg):
+        ddm.fit(X, y)
+
+
+def test_fitted_g():
+    """test true linear function of covariate within fitted confidence bands"""
+    a, t0, z = 1.0, 0, 0
+
+    # v as linear function of coherence
+    coherence = np.linspace(-1, +1, 1000)
+    X = pd.DataFrame({"coherence": coherence})
+    v = 2 * coherence
+    y = sample_from_pdf(a, t0, v, z, random_state=0)
+
+    ddm = DriftDiffusionModel(a="+1", t0="+1", v="-1 + coherence", z="+1")
+
+    # test raises expected error
+    with pytest.raises(NotFittedError):
+        ddm.g(X)
+
+    # test true v within 95% confidence bands
+    ddm.fit(X, y)
+    g = ddm.g(X)
+    testing.assert_array_less(g["v"]["-"], v)
+    testing.assert_array_less(v, g["v"]["+"])
