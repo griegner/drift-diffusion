@@ -1,5 +1,7 @@
 """figure 03: data analysis results"""
 
+import json
+
 import numpy as np
 import pandas as pd
 from formulaic import model_matrix
@@ -9,6 +11,11 @@ from statsmodels.api import OLS
 from statsmodels.tsa.stattools import acf
 
 from drift_diffusion.model import DriftDiffusionModel
+
+
+def get_y_limits():
+    with open("results/config.json") as f:
+        return json.load(f)
 
 
 def fit_beh(df, fitby):
@@ -63,7 +70,7 @@ def fit_ddm_splines(df, refit=False):
     """estimate DDM parameters as functions of trial by day + 95% CI under the CLT"""
 
     if not refit:
-        return pd.read_csv("results/ddm-fit-by-day.csv", index_col=0)
+        return pd.read_csv("results/ddm-splines-by-day.csv", index_col=0)
 
     param_names = ["a", "t0", "beta_v", "z"]
     splines = np.load("results/ddm-splines-params.npy")
@@ -111,6 +118,10 @@ def plot_estimates(axs, df, fitby, col, formula=None):
     """plot estimates with CI, histogram, and ACF"""
 
     axs[0].sharey(axs[1])
+
+    y_limits = get_y_limits()
+    if col in y_limits:
+        axs[0].set_ylim(y_limits[col])
 
     axs[0].vlines(df.index, df[f"{col}-"], df[f"{col}+"], color="k", alpha=0.5, lw=2)
     axs[0].scatter(df.index, df[col], color="k", s=2)
