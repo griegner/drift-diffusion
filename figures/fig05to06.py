@@ -59,6 +59,42 @@ def fit_ddm(df, fitby, refit=False):
     return pd.DataFrame({key: series for key, series in results}).T
 
 
+def fit_ddm_splines(df, refit=False):
+    """estimate DDM parameters as functions of trial by day + 95% CI under the CLT"""
+
+    if not refit:
+        return pd.read_csv("results/ddm-fit-by-day.csv", index_col=0)
+
+    param_names = ["a", "t0", "beta_v", "z"]
+    splines = np.load("results/ddm-splines-params.npy")
+    param_slices = [splines[:4], splines[4:8], splines[8:13], splines[13:]]
+
+    results = []
+    for day, grp in df.query("trial > 0").groupby("day"):
+        X_mm = model_matrix("bs(trial, df=3, degree=2)", grp, output="pandas", na_action="raise")
+        spline_cols = [col for col in X_mm.columns if col != "Intercept"]
+        fixed = [{col: val for col, val in zip(spline_cols, values[1:])} for values in param_slices]
+
+        ddm = DriftDiffusionModel(
+            a={"formula": "bs(trial, df=3, degree=2)", "fixed": fixed[0]},
+            t0={"formula": "bs(trial, df=3, degree=2)", "fixed": fixed[1]},
+            v={"formula": "-1 + coherence + bs(trial, df=3, degree=2)", "fixed": fixed[2]},
+            z={"formula": "bs(trial, df=3, degree=2)", "fixed": fixed[3]},
+        )
+        ddm.fit(grp, grp["y"])
+        params = ddm.params_
+        se = np.sqrt(np.diag(ddm.covariance_))
+
+        res = {"day": day}
+        for i, name in enumerate(param_names):
+            res[name] = params[i]
+            res[f"{name}+"] = params[i] + 1.96 * se[i]
+            res[f"{name}-"] = params[i] - 1.96 * se[i]
+        results.append(res)
+
+    return pd.DataFrame(results).set_index("day")
+
+
 def plot_heatmap(ax, df, fitby):
     """plot heatmap of trial counts"""
     if fitby == "trial":
