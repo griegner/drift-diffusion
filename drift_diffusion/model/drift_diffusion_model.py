@@ -5,6 +5,7 @@ from functools import cache
 import autograd.numpy as np
 from autograd import hessian, jacobian
 from autograd.core import make_jvp
+from autograd.differential_operators import make_hvp
 from better_optimize import minimize
 from formulaic import model_matrix
 from scipy.stats import norm
@@ -225,7 +226,7 @@ class DriftDiffusionModel(BaseEstimator):
 
         # autograd derivatives
         lll_jacobian = jacobian(self._lossloglikelihood)
-        lll_hessp = lambda params_, p, X, y: jacobian(lambda w: lll_jacobian(w, X, y) @ p)(params_)
+        lll_hessp = lambda params_, p, X, y: make_hvp(lambda w: self._lossloglikelihood(w, X, y))(params_)[0](p)
 
         # estimate parameters, covariance matrix
         fit_ = minimize(
