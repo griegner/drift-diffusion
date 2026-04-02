@@ -21,15 +21,16 @@ class DriftDiffusionModel(BaseEstimator):
 
         DriftDiffusionModel fits decision making parameters by maximum likelihood estimation.
         The four decision making parameters (`a, t0, v, z`) can each be linear functions of coefficients and
-        sample-by-sample covariate columns in `X`; and each can be fixed, free, or mixed.
-        Free parameters/coefficients are estimated during `fit` and defined with Wilkinson notation to specify linear
+        sample-by-sample covariate columns in `X`; and each can be *fixed*, *free*, or *mixed*.
+        *Free* parameters/coefficients are estimated during `fit` and defined with Wilkinson notation to specify linear
         relationships with covariates (e.g. `v = "+1 + coherence"`; see https://matthewwardrop.github.io/formulaic).
-        Fixed parameters are set at initialization by passing a float. Mixed coefficients can be defined with a dict,
-        for example `v={"formula": "+1 + coherence", "fixed": {"coherence": 1.0}}`, where `fixed` coefficients are
+        *Fixed* parameters are set at initialization by passing a float. *Mixed* coefficients can be defined with a
+        dict, for example `v={"formula": "+1 + coherence", "fixed": {"coherence": 1.0}}`, where *fixed* coefficients are
         excluded from optimization but included in likelihood evaluation.
 
         The covariance matrix of the estimator can be computed by one of four methods (see `cov_estimator`),
-        each designed to be valid under increasingly general conditions on the outcome `y`.
+        each designed to be valid under increasingly general conditions on the sequence of
+        choices and reaction times `y`.
 
         Parameters
         ----------
@@ -57,6 +58,44 @@ class DriftDiffusionModel(BaseEstimator):
         covariance_ : ndarray of shape (n_params, n_params)
             estimated covariances of free parameters/coefficients
             standard errors are the square roots of the diagonal elements
+
+        Examples
+        --------
+        >>> import numpy as np, pandas as pd
+        >>> from drift_diffusion.model import DriftDiffusionModel
+        >>> from drift_diffusion.sim import sample_from_pdf
+        >>> n = 1000; stim = np.linspace(-1, +1, n); X = pd.DataFrame({"stim": stim})
+
+        (i) *Fixed*: fix `t0, v, z`; fit `a`
+        >>> y = sample_from_pdf(a=1.0, t0=0.2, v=0.3, z=0, n_samples=n, random_state=0)
+        >>> ddm = DriftDiffusionModel(a="+1", t0=0.2, v=0.3, z=0).fit(X, y)  # intercept/constant a
+        >>> ddm.params_, ddm.covariance_ # parameter/standard error estimates for a
+        (array([0.99537521]), array([[0.0001443]]))
+
+        (ii) *Free*: set `v = beta * stim`; fit `a`, `beta`, `t0`, `z`
+        >>> beta_v = 0.8; v = beta_v * stim # v as linear function of stimulus
+        >>> y = sample_from_pdf(a=1.0, t0=0.2, v=v, z=0, n_samples=n, random_state=1)
+        >>> ddm = DriftDiffusionModel(a="+1", t0="+1", v="-1 + stim", z="+1").fit(X, y)
+        >>> ddm.params_, np.sqrt(np.diag(ddm.covariance_))  # parameter/standard error estimates for a, t0, beta_v, z
+        (array([ 0.98992872,  0.19523826,  0.81235863, -0.00421529]),
+         array([0.01535874, 0.00801454, 0.05959234, 0.0175263 ]))
+
+        (iii) *Mixed*: set `v = beta0 + beta1*stim + beta2*stim^2`; fix `beta1`, `beta2`; fit `beta0`
+        >>> intercept = -0.5; v = intercept + stim + stim**2  # v as quadratic function of stimulus
+        >>> y = sample_from_pdf(a=1.0, t0=0.2, v=v, z=0, n_samples=n, random_state=2)
+        >>> ddm = DriftDiffusionModel(
+        ...     a=1.0, t0=0.2, z=0,
+        ...     v={"formula": "+1 + stim + {stim ** 2}", "fixed": {"stim": 1, "stim ** 2": 1}},
+        ... ).fit(X, y)
+        >>> ddm.params_, np.sqrt(ddm.covariance_)  # parameter/standard error estimates for intercept
+        (array([-0.54279923]), array([[0.03392439]]))
+
+        (iv) *Covariance Estimators*: "sample-hessian" - "autocorrelation-robust"
+        >>> ddm.set_params(cov_estimator="all").fit(X, y).covariance_
+        {'sample-hessian': array([[0.00115086]]),
+        'outer-product': array([[0.00110442]]),
+        'misspecification-robust': array([[0.00119926]]),
+        'autocorrelation-robust': array([[0.00119337]])}
         """
         super().__init__()
         self.a, self.t0, self.v, self.z = a, t0, v, z
@@ -92,8 +131,8 @@ class DriftDiffusionModel(BaseEstimator):
 
             fixed = dict(fixed)
             x_mm = model_matrix(formula, X, output="pandas", na_action="raise")
-            if "1" in fixed and "Intercept" in x_mm.columns and "Intercept" not in fixed:
-                fixed["Intercept"] = fixed.pop("1")
+            if "+1" in fixed and "Intercept" in x_mm.columns and "Intercept" not in fixed:
+                fixed["Intercept"] = fixed.pop("+1")
 
             unknown_fixed = sorted(set(fixed) - set(x_mm.columns))
             if unknown_fixed:

@@ -9,6 +9,24 @@ authors = [{name = "Gabriel Riegner", email = "gariegner@ucsd.edu"}]
 description = "drift diffusion models of decision making"
 readme = "README.md"
 requires-python = ">=3.9"
+dependencies = [
+    "autograd",
+    "better_optimize",
+    "formulaic",
+    "numpy",
+    "scikit-learn",
+    "scipy",
+    "statsmodels",
+]
+
+[project.optional-dependencies]
+notebooks = [
+    "matplotlib",
+    "notebook",
+    "pandas",
+    "seaborn",
+    "tqdm",
+]
 
 [tool.setuptools]
 packages = {find = {where = ["."], include = ["drift_diffusion*"]}}
@@ -23,12 +41,7 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 [tool.pixi.pypi-dependencies]
 # pypi dependencies
 drift_diffusion = { path=".", editable=true }
-autograd = "*"
-formulaic = "*"
 pyddm = "*"
-scikit-learn = "*"
-statsmodels = "*"
-better_optimize = "*"
 
 [tool.pixi.feature.lint.dependencies]
 # matches version in .pre-commit-config.yaml
@@ -38,8 +51,8 @@ ruff = "==0.7.0"
 pyupgrade = "==3.19.1"
 
 [tool.pixi.feature.lint.tasks]
-black = { cmd = "black --check --diff drift_diffusion && black --check --diff examples" }
-ruff = { cmd = "ruff check --output-format=full drift_diffusion && ruff check --output-format=full examples" }
+black = { cmd = "black --check --diff drift_diffusion figures/*.py" }
+ruff = { cmd = "ruff check --output-format=full drift_diffusion figures/*.py" }
 lint = { depends-on = ["black", "ruff"]}
 
 [tool.pixi.feature.test.dependencies]
@@ -50,19 +63,14 @@ py-spy = "*"
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest -vsl --cov=drift_diffusion --cov-report=xml drift_diffusion" }
 
-[tool.pixi.feature.notebook.dependencies]
-notebook = "*"
-seaborn = "*"
-ipympl = "*"
-ipywidgets = "*"
-tqdm = "*"
-
+[tool.pixi.feature.notebook.pypi-dependencies]
+drift_diffusion = { path=".", editable=true, extras=["notebooks"] }
 
 [tool.pixi.environments]
 lint = ["lint"]
 test = ["test"]
-notebook = ["notebook"]
-dev = ["lint", "test", "notebook"]
+notebook = ["notebook", "notebooks"]
+dev = ["lint", "test", "notebook", "notebooks"]
 
 [tool.black]
 line-length = 120
