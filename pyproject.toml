@@ -9,6 +9,25 @@ authors = [{name = "Gabriel Riegner", email = "gariegner@ucsd.edu"}]
 description = "drift diffusion models of decision making"
 readme = "README.md"
 requires-python = ">=3.9"
+dependencies = [
+    "autograd",
+    "better_optimize",
+    "formulaic",
+    "numpy",
+    "scikit-learn",
+    "scipy",
+    "statsmodels",
+]
+
+[project.optional-dependencies]
+notebooks = [
+    "ipympl",
+    "matplotlib",
+    "notebook",
+    "pandas",
+    "seaborn",
+    "tqdm",
+]
 
 [tool.setuptools]
 packages = {find = {where = ["."], include = ["drift_diffusion*"]}}
@@ -23,12 +42,6 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 [tool.pixi.pypi-dependencies]
 # pypi dependencies
 drift_diffusion = { path=".", editable=true }
-autograd = "*"
-formulaic = "*"
-pyddm = "*"
-scikit-learn = "*"
-statsmodels = "*"
-better_optimize = "*"
 
 [tool.pixi.feature.lint.dependencies]
 # matches version in .pre-commit-config.yaml
@@ -50,19 +63,10 @@ py-spy = "*"
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest -vsl --cov=drift_diffusion --cov-report=xml drift_diffusion" }
 
-[tool.pixi.feature.notebook.dependencies]
-notebook = "*"
-seaborn = "*"
-ipympl = "*"
-ipywidgets = "*"
-tqdm = "*"
-
-
 [tool.pixi.environments]
 lint = ["lint"]
 test = ["test"]
-notebook = ["notebook"]
-dev = ["lint", "test", "notebook"]
+dev = ["lint", "test"]
 
 [tool.black]
 line-length = 120
