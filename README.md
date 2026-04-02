@@ -87,8 +87,6 @@ relationships with covariates (e.g. `v = "+1 + coherence"`; see [formulaic](http
 for example `v={"formula": "+1 + coherence", "fixed": {"coherence": 1.0}}`, where *fixed* coefficients are
 excluded from optimization but included in likelihood evaluation.
 
-The covariance matrix of the estimator can be computed by one of four methods (see below), each designed to be valid under increasingly general conditions on the outcome `y`.
-
 ```python
 >>> import numpy as np, pandas as pd
 >>> from drift_diffusion.model import DriftDiffusionModel
@@ -96,7 +94,7 @@ The covariance matrix of the estimator can be computed by one of four methods (s
 >>> n = 1000; stim = np.linspace(-1, +1, n); X = pd.DataFrame({"stim": stim})
 ```
 
-(i) *Fixed*: fix $t_0, v, z$; fit $\hat{a}$
+(i) *Fixed*: fix `t0, v, z`; fit `a`
 ```python
 >>> y = sample_from_pdf(a=1.0, t0=0.2, v=0.3, z=0, n_samples=n, random_state=0)
 >>> ddm = DriftDiffusionModel(a="+1", t0=0.2, v=0.3, z=0).fit(X, y)  # intercept/constant `a`
@@ -104,7 +102,7 @@ The covariance matrix of the estimator can be computed by one of four methods (s
 (array([0.99537521]), array([[0.0001443]]))
 ```
 
-(ii) *Free*: set $v = \beta \; \text{stim}$; fit $\hat{a}$, $\hat{\beta}$, $\hat{t_0}$, $\hat{z}$
+(ii) *Free*: set `v = beta * stim`; fit `a, beta, t0, z`
 ```python
 >>> beta_v = 0.8; v = beta_v * stim # v as linear function of stimulus
 >>> y = sample_from_pdf(a=1.0, t0=0.2, v=v, z=0, n_samples=n, random_state=1)
@@ -114,7 +112,7 @@ The covariance matrix of the estimator can be computed by one of four methods (s
  array([0.01535874, 0.00801454, 0.05959234, 0.0175263 ]))
 ```
 
-(iii) *Mixed*: set $v = \beta_0 + \beta_1 \; \text{stim} + \beta_2 \; \text{stim}^2$; fix $\beta_1$, $\beta_2$; fit $\hat{\beta}_0$
+(iii) *Mixed*: set `v = beta0 + beta1*stim + beta2*stim**2`; fix `beta1, beta2`; fit `beta0`
 ```python
 >>> intercept = -0.5; v = intercept + stim + stim**2  # v as quadratic function of stimulus
 >>> y = sample_from_pdf(a=1.0, t0=0.2, v=v, z=0, n_samples=n, random_state=2)
@@ -123,7 +121,7 @@ The covariance matrix of the estimator can be computed by one of four methods (s
 (array([-0.54279923]), array([[0.03392439]]))
 ```
 
-(iv) *Covariance Estimators*: "sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust", or "all"
+(iv) *Covariance Estimators*: `"sample-hessian"`-`"autocorrelation-robust"` are valid under increasingly general conditions on the sequence of choice and reaction times `y`
 ```python
 >>> ddm.set_params(cov_estimator="all").fit(X, y).covariance_
 {
