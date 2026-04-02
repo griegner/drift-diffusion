@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 notebooks = [
+    "hssm",
     "ipywidgets",
     "matplotlib",
     "notebook",
@@ -34,10 +35,11 @@ packages = {find = {where = ["."], include = ["drift_diffusion*"]}}
 
 [tool.pixi.project]
 channels = ["conda-forge"]
-platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+platforms = ["win-64", "linux-64", "osx-arm64"]
 
 [tool.pixi.dependencies]
 # conda dependencies
+python = "3.12.*"
 
 [tool.pixi.pypi-dependencies]
 # pypi dependencies
