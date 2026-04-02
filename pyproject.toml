@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 notebooks = [
+    "ipywidgets",
     "matplotlib",
     "notebook",
     "pandas",
