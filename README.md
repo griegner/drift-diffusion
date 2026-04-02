@@ -1,7 +1,7 @@
 ### drift-diffusion
 > Quantifying Uncertainty in Drift Diffusion Models of Decision Making under Temporal Dependence and Misspecification
 
-> <img src="./readme.png" width="800"/>
+<img src="./readme.png" width="800"/>
 
 [![project poster](https://img.shields.io/badge/poster-PDF-red?style=flat&logo=google-docs&logoColor=white)](https://griegner.github.io/drift-diffusion/poster/poster-15NOV2025.pdf)
 [![project slides](https://img.shields.io/badge/slides-PDF-red?style=flat&logo=google-slides&logoColor=white)](https://griegner.github.io/drift-diffusion/slides/slides-12NOV2025.pdf)
