@@ -24,12 +24,13 @@ class DriftDiffusionModel(BaseEstimator):
         sample-by-sample covariate columns in `X`; and each can be *fixed*, *free*, or *mixed*.
         *Free* parameters/coefficients are estimated during `fit` and defined with Wilkinson notation to specify linear
         relationships with covariates (e.g. `v = "+1 + coherence"`; see https://matthewwardrop.github.io/formulaic).
-        *Fixed* parameters are set at initialization by passing a float. *Mixed* coefficients can be defined with a dict,
-        for example `v={"formula": "+1 + coherence", "fixed": {"coherence": 1.0}}`, where *fixed* coefficients are
+        *Fixed* parameters are set at initialization by passing a float. *Mixed* coefficients can be defined with a
+        dict, for example `v={"formula": "+1 + coherence", "fixed": {"coherence": 1.0}}`, where *fixed* coefficients are
         excluded from optimization but included in likelihood evaluation.
 
         The covariance matrix of the estimator can be computed by one of four methods (see `cov_estimator`),
-        each designed to be valid under increasingly general conditions on the sequence of choices and reaction times `y`.
+        each designed to be valid under increasingly general conditions on the sequence of
+        choices and reaction times `y`.
 
         Parameters
         ----------
@@ -82,7 +83,10 @@ class DriftDiffusionModel(BaseEstimator):
         (iii) *Mixed*: set `v = beta0 + beta1*stim + beta2*stim^2`; fix `beta1`, `beta2`; fit `beta0`
         >>> intercept = -0.5; v = intercept + stim + stim**2  # v as quadratic function of stimulus
         >>> y = sample_from_pdf(a=1.0, t0=0.2, v=v, z=0, n_samples=n, random_state=2)
-        >>> ddm = DriftDiffusionModel(a=1.0, t0=0.2, v={"formula": "+1 + stim + {stim ** 2}", "fixed": {"stim": 1, "stim ** 2": 1}}, z=0).fit(X, y)
+        >>> ddm = DriftDiffusionModel(
+        ...     a=1.0, t0=0.2, z=0,
+        ...     v={"formula": "+1 + stim + {stim ** 2}", "fixed": {"stim": 1, "stim ** 2": 1}},
+        ... ).fit(X, y)
         >>> ddm.params_, np.sqrt(ddm.covariance_)  # parameter/standard error estimates for intercept
         (array([-0.54279923]), array([[0.03392439]]))
 
