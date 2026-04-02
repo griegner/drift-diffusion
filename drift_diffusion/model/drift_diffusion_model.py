@@ -29,7 +29,7 @@ class DriftDiffusionModel(BaseEstimator):
         excluded from optimization but included in likelihood evaluation.
 
         The covariance matrix of the estimator can be computed by one of four methods (see `cov_estimator`),
-        each designed to be valid under increasingly general conditions on the outcome `y`.
+        each designed to be valid under increasingly general conditions on the sequence of choices and reaction times `y`.
 
         Parameters
         ----------
@@ -86,7 +86,7 @@ class DriftDiffusionModel(BaseEstimator):
         >>> ddm.params_, np.sqrt(ddm.covariance_)  # parameter/standard error estimates for intercept
         (array([-0.54279923]), array([[0.03392439]]))
 
-        (iv) *Covariance Estimators*: "sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust", or "all"
+        (iv) *Covariance Estimators*: "sample-hessian" - "autocorrelation-robust"
         >>> ddm.set_params(cov_estimator="all").fit(X, y).covariance_
         {'sample-hessian': array([[0.00115086]]),
         'outer-product': array([[0.00110442]]),
