@@ -20,14 +20,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-notebooks = [
+code-ocean = [
     "hssm",
-    "ipywidgets",
     "matplotlib",
-    "notebook",
     "pandas",
     "seaborn",
-    "tqdm",
 ]
 
 [tool.setuptools]
@@ -66,14 +63,14 @@ py-spy = "*"
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest -vsl --cov=drift_diffusion --cov-report=xml drift_diffusion" }
 
-[tool.pixi.feature.notebook.pypi-dependencies]
-drift_diffusion = { path=".", editable=true, extras=["notebooks"] }
+[tool.pixi.feature.code-ocean.pypi-dependencies]
+drift_diffusion = { path=".", editable=true, extras=["code-ocean"] }
 
 [tool.pixi.environments]
 lint = ["lint"]
 test = ["test"]
-notebook = ["notebook", "notebooks"]
-dev = ["lint", "test", "notebook", "notebooks"]
+code-ocean = ["code-ocean"]
+dev = ["lint", "test", "code-ocean"]
 
 [tool.black]
 line-length = 120
