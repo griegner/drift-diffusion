@@ -13,3 +13,7 @@ pixi.lock
 
 # profiling
 *pyspy
+
+# code ocean
+code_ocean/results/*
+!code_ocean/results/.gitkeep
