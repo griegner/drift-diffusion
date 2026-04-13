@@ -1,7 +1,18 @@
+#!/usr/bin/env python
+
+import argparse
+import json
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
+from joblib import Parallel, delayed
 from matplotlib.ticker import FuncFormatter
+from tqdm import tqdm
+
+from drift_diffusion.model import DriftDiffusionModel
+from drift_diffusion.sim import sample_from_pdf
 
 
 def iid_params(n_samples, params, params_s, seed=1):
@@ -89,3 +100,119 @@ def plot_covariance_distributions(covs_df, params_df):
 
     g.tight_layout(w_pad=0.1, h_pad=0)
     return g
+
+
+def main(setting, n_samples, n_repeats):
+    "fig02,03,04"
+
+    kwargs = dict(n_samples=n_samples, n_repeats=n_repeats, random_state=0)
+    figure_paths = {
+        "constant": ("./code_ocean/results/fig02a.pdf", "./code_ocean/results/fig02b.pdf"),
+        "coherence": ("./code_ocean/results/fig03a.pdf", "./code_ocean/results/fig03b.pdf"),
+        "iid": ("./code_ocean/results/fig04a.pdf", "./code_ocean/results/fig04b.pdf"),
+    }
+    path_a, path_b = figure_paths[setting]
+
+    # DDM parameters, from Matzke 2009, Table 3 (Mean)
+    params = dict(a=0.63, t0=0.435, v=2.23, z=0.008)
+    params_s = dict(t0=0.018, v=1.33, z=0.37)
+
+    def setup_constant():
+        """setup constant DDM parameters"""
+        param_names = ["a", "t0", "v", "z"]
+        cov_names = [f"{i},{j}" for i in param_names for j in param_names]
+
+        pseudotrue_params = params
+
+        X = pd.DataFrame({"intercept": np.ones(kwargs["n_samples"])})
+        ys = sample_from_pdf(**params, **kwargs)
+        ddm = DriftDiffusionModel(cov_estimator="all")
+        return X, ys, ddm, param_names, cov_names, pseudotrue_params
+
+    def setup_coherence():
+        """setup v as linear function of coherence"""
+        param_names = ["a", "t0", "beta_v", "z"]
+        cov_names = [f"{i},{j}" for i in param_names for j in param_names]
+
+        beta_v = 1
+        coh = np.linspace(
+            params["v"] + params_s["v"] * np.sqrt(3), params["v"] - params_s["v"] * np.sqrt(3), kwargs["n_samples"]
+        )
+        v_coh = beta_v * coh
+        pseudotrue_params = {"a": params["a"], "t0": params["t0"], "beta_v": beta_v, "z": params["z"]}
+
+        X = pd.DataFrame({"intercept": np.ones(kwargs["n_samples"]), "coherence": coh})
+        ys = sample_from_pdf(a=params["a"], t0=params["t0"], v=v_coh, z=params["z"], **kwargs)
+        ddm = DriftDiffusionModel(v="-1+coherence", cov_estimator="all", p_outlier=1e-12)
+        return X, ys, ddm, param_names, cov_names, pseudotrue_params
+
+    def setup_iid():
+        """setup t0, v, z to vary iid"""
+        param_names = ["a", "t0", "v", "z"]
+        cov_names = [f"{i},{j}" for i in param_names for j in param_names]
+
+        n = 10_000
+        X_pt = pd.DataFrame({"intercept": np.ones(n)})
+        t0_iid, v_iid, z_iid = iid_params(n, params, params_s)
+        y_pt = sample_from_pdf(
+            a=params["a"], t0=t0_iid, v=v_iid, z=z_iid, n_samples=n, n_repeats=1, random_state=kwargs["random_state"]
+        )
+        ddm = DriftDiffusionModel()
+        ddm.fit(X_pt, y_pt)
+        pseudotrue_params = dict(zip(param_names, ddm.params_))
+
+        X = pd.DataFrame({"intercept": np.ones(kwargs["n_samples"])})
+        t0_iid, v_iid, z_iid = iid_params(kwargs["n_samples"], params, params_s)
+        ys = sample_from_pdf(a=params["a"], t0=t0_iid, v=v_iid, z=z_iid, **kwargs)
+        ddm = DriftDiffusionModel(cov_estimator="all")
+        return X, ys, ddm, param_names, cov_names, pseudotrue_params
+
+    if setting == "constant":
+        X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_constant()
+    elif setting == "coherence":
+        X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_coherence()
+    elif setting == "iid":
+        X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_iid()
+    else:
+        raise ValueError("choose 'constant', 'coherence', or 'iid'")
+
+    @delayed
+    def run_simulation(rep):
+        ddm.fit(X, ys[:, rep])
+        covs_ = [
+            {"estimator": k, **{cov_names[i]: val for i, val in enumerate(cov_to_corr(v).flatten())}}
+            for k, v in ddm.covariance_.items()
+        ]
+        return ddm.params_, covs_
+
+    with Parallel(n_jobs=-4) as parallel:
+        results = parallel(run_simulation(rep) for rep in tqdm(range(kwargs["n_repeats"])))
+        params_, covs_ = zip(*results)
+        params_df = pd.DataFrame(params_, columns=param_names)
+        covs_df = pd.DataFrame([row for c in covs_ for row in c])
+
+    fig = plot_parameter_distributions(params_df, pseudotrue_params)
+    fig.savefig(path_a)
+
+    fig = plot_covariance_distributions(covs_df, params_df)
+    fig.savefig(path_b)
+
+
+if __name__ == "__main__":
+    """set script defaults"""
+
+    # input arguments
+    parser = argparse.ArgumentParser(description="Figure 02-04")
+    parser.add_argument(
+        "--setting", type=str, default="constant", help="simulation setting: constant, coherence, or iid"
+    )
+    parser.add_argument("--n-samples", type=int, default=1000, help="number of trials to simulate per repeat")
+    parser.add_argument("--n-repeats", type=int, default=900, help="number of simulation repeats")
+    args = parser.parse_args()
+
+    # figure defaults
+    with open("./code_ocean/code/config.json") as f:
+        rc_params = json.load(f)["rc-params"]
+        plt.rcParams.update(rc_params)
+
+    main(args.setting, args.n_samples, args.n_repeats)

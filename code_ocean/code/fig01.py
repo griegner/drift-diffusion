@@ -114,8 +114,8 @@ if __name__ == "__main__":
     """set script defaults"""
 
     # input arguments
-    parser = argparse.ArgumentParser(description="Generate Figure 01 panels.")
-    parser.add_argument("--n-samples", type=int, default=2000, help="number of trials sampled per direction.")
+    parser = argparse.ArgumentParser(description="Figure 01")
+    parser.add_argument("--n-samples", type=int, default=2000, help="number of trials sampled per direction")
     args = parser.parse_args()
 
     # figure defaults
