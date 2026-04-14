@@ -16,3 +16,7 @@ echo "-> fig04"
 # fig05-06
 echo "-> fig05-06"
 ./code_ocean/code/fig05to06.py --subset
+
+# fig 06
+echo "-> fig06"
+./code_ocean/code/fig06.py --subset
