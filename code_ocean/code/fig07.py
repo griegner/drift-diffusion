@@ -1,9 +1,23 @@
+#!/usr/bin/env python
+
+import argparse
+import json
 import time
 
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn.objects as so
 from hssm import HSSM
+from joblib import Parallel, delayed
 
 from drift_diffusion.model import DriftDiffusionModel
+from drift_diffusion.sim import sample_from_pdf
+
+with open("./code_ocean/code/config.json") as f:
+    rc_params = json.load(f)["rc-params"]
+    plt.rcParams.update(rc_params)
+    so.Plot.config.theme.update(plt.rcParams)
 
 
 def fit_mle(X, y):
@@ -58,3 +72,68 @@ def summarize_method(n, method, runtime, params, params_, uncs_):
         for estimate, (bias_, sd_, rmse_) in metrics.items()
         for param_name, bias_value, sd_value, rmse_value in zip(param_names, bias_, sd_, rmse_)
     ]
+
+
+def main(n_samples, n_repeats, n_jobs, prefer):
+    """fig08"""
+
+    # true parameters and sample sizes to test
+    params = {"a": 0.63, "t0": 0.435, "v": 2.23, "z": 0.008}
+
+    @delayed
+    def run_simulation(rep, n):
+        X = pd.DataFrame({"intercept": np.ones(n)})
+        y = sample_from_pdf(**params, n_samples=n, random_state=rep + n)
+        y_df = pd.DataFrame({"rt": np.abs(y), "response": np.sign(y)})
+        return fit_mle(X, y), fit_mcmc(y_df)
+
+    # compare both models across sample sizes using normalized absolute error
+    df = []
+    for n in n_samples:
+        with Parallel(n_jobs=n_jobs, prefer=prefer) as parallel:
+            results = parallel(run_simulation(rep, n) for rep in range(n_repeats))
+            mle, mcmc = zip(*results)
+
+        for method, values in (("mle", mle), ("mcmc", mcmc)):
+            runtime, params_, uncs_ = map(np.stack, zip(*values))
+            df.extend(summarize_method(n, method, runtime, params, params_, uncs_))
+
+    df = pd.DataFrame.from_records(df)
+
+    # fig07
+    df_plot = (
+        df.melt(id_vars=["n", "method", "estimate", "param"], value_vars=["runtime", "rmse"])
+        .assign(panel=lambda x: np.where(x["variable"].eq("runtime"), "runtime", "rmse | " + x["estimate"]))
+        .query("panel in ['runtime', 'rmse | param', 'rmse | unc']")
+    )
+
+    (
+        so.Plot(df_plot, x="n", y="value", color="param", marker="method", linestyle="method")
+        .facet(col="panel")
+        .layout(size=(15, 3.5))
+        .add(so.Dot())
+        .add(so.Line())
+        .scale(color="binary", x=so.Nominal(order=n_samples))
+        .share(y=False)
+        .label(x="n Trials", y="")
+        .save("./code_ocean/results/fig07.pdf")
+    )
+
+
+if __name__ == "__main__":
+    """set script defaults"""
+    parser = argparse.ArgumentParser(description="Figure 06")
+    parser.add_argument(
+        "--n-samples",
+        nargs="+",
+        type=int,
+        default=[500, 1000, 5000, 10000],
+        help="number of trials to simulate per repeat (space-separated list of ints)",
+    )
+    parser.add_argument("--n-repeats", type=int, default=100, help="number of simulation repeats")
+    parser.add_argument("--n-jobs", type=int, default=-1, help="number of parallel jobs")
+    parser.add_argument(
+        "--prefer", choices=["processes", "threads"], default="processes", help="joblib parallel backend"
+    )
+    args = parser.parse_args()
+    main(n_samples=args.n_samples, n_repeats=args.n_repeats, n_jobs=args.n_jobs, prefer=args.prefer)
