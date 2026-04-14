@@ -31,11 +31,12 @@ def fit_ddm_splines(df):
         X_mm = model_matrix("bs(trial, df=3, degree=2)", grp, output="pandas", na_action="raise")
         spline_cols = [col for col in X_mm.columns if col != "Intercept"]
         fixed = [{col: val for col, val in zip(spline_cols, values[1:])} for values in param_slices]
+        fixed_v = {col: val for col, val in zip(spline_cols, param_slices[2][2:])}
 
         ddm = DriftDiffusionModel(
             a={"formula": "bs(trial, df=3, degree=2)", "fixed": fixed[0]},
             t0={"formula": "bs(trial, df=3, degree=2)", "fixed": fixed[1]},
-            v={"formula": "-1 + coherence + bs(trial, df=3, degree=2)", "fixed": fixed[2]},
+            v={"formula": "-1 + coherence + bs(trial, df=3, degree=2)", "fixed": fixed_v},
             z={"formula": "bs(trial, df=3, degree=2)", "fixed": fixed[3]},
         )
         ddm.fit(grp, grp["y"])

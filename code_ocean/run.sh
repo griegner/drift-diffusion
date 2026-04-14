@@ -29,7 +29,7 @@ if [[ "$mode" == "test" ]]; then
 
     # fig 07
     echo "-> fig07"
-    ./code_ocean/code/fig07.py --n-sample 200 500 --n-repeats 1
+    ./code_ocean/code/fig07.py --n-samples 200 500 --n-repeats 1
 
 elif [[ "$mode" == "paper" ]]; then
     echo "\nrunning PAPER mode ...\n"

@@ -23,7 +23,7 @@ with open("./code_ocean/code/config.json") as f:
 def iid_params(n_samples, params, params_s, seed=1):
     """generate DDM parameters with iid variability (i.e. 7-param DDM)"""
 
-    rng = np.random.default_rng(seed=1)
+    rng = np.random.default_rng(seed=seed)
     t0_iid = rng.uniform(params["t0"] - params_s["t0"] / 2, params["t0"] + params_s["t0"] / 2, size=n_samples)
     v_iid = rng.normal(params["v"], params_s["v"], size=n_samples)
     z_iid = rng.uniform(params["z"] - params_s["z"] / 2, params["z"] + params_s["z"] / 2, size=n_samples)
