@@ -11,6 +11,10 @@ from scipy.io import loadmat
 from drift_diffusion.model import DriftDiffusionModel, pdf
 from drift_diffusion.sim import sim_ddm
 
+with open("./code_ocean/code/config.json") as f:
+    rc_params = json.load(f)["rc-params"]
+    plt.rcParams.update(rc_params)
+
 
 def _mat_to_pd(mat):
     """load matlab file and select trial variables"""
@@ -113,14 +117,8 @@ def main(n_samples):
 if __name__ == "__main__":
     """set script defaults"""
 
-    # input arguments
     parser = argparse.ArgumentParser(description="Figure 01")
     parser.add_argument("--n-samples", type=int, default=2000, help="number of trials sampled per direction")
     args = parser.parse_args()
-
-    # figure defaults
-    with open("./code_ocean/code/config.json") as f:
-        rc_params = json.load(f)["rc-params"]
-        plt.rcParams.update(rc_params)
 
     main(args.n_samples)

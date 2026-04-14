@@ -16,7 +16,11 @@ from tqdm import tqdm
 from drift_diffusion.model import DriftDiffusionModel
 from drift_diffusion.sim import sample_from_pdf
 
-warnings.filterwarnings("ignore")
+# warnings.simplefilter("error")
+
+with open("./code_ocean/code/config.json") as f:
+    rc_params = json.load(f)["rc-params"]
+    plt.rcParams.update(rc_params)
 
 
 def iid_params(n_samples, params, params_s, seed=1):
@@ -106,7 +110,7 @@ def plot_covariance_distributions(covs_df, params_df):
     return g
 
 
-def main(setting, n_samples, n_repeats, n_jobs):
+def main(setting, n_samples, n_repeats, n_jobs, prefer):
     "fig02,03,04"
 
     kwargs = dict(n_samples=n_samples, n_repeats=n_repeats, random_state=0)
@@ -190,7 +194,7 @@ def main(setting, n_samples, n_repeats, n_jobs):
         ]
         return ddm_cp.params_, covs_
 
-    with Parallel(n_jobs=n_jobs) as parallel:
+    with Parallel(n_jobs=n_jobs, prefer=prefer) as parallel:
         results = parallel(run_simulation(rep) for rep in tqdm(range(kwargs["n_repeats"])))
         params_, covs_ = zip(*results)
         params_df = pd.DataFrame(params_, columns=param_names)
@@ -206,19 +210,16 @@ def main(setting, n_samples, n_repeats, n_jobs):
 if __name__ == "__main__":
     """set script defaults"""
 
-    # input arguments
-    parser = argparse.ArgumentParser(description="Figure 02-04")
+    parser = argparse.ArgumentParser(description="Figures 02-04")
     parser.add_argument(
         "--setting", type=str, default="constant", help="simulation setting: constant, coherence, or iid"
     )
     parser.add_argument("--n-samples", type=int, default=1000, help="number of trials to simulate per repeat")
     parser.add_argument("--n-repeats", type=int, default=900, help="number of simulation repeats")
     parser.add_argument("--n-jobs", type=int, default=-1, help="number of parallel jobs")
+    parser.add_argument(
+        "--prefer", choices=["processes", "threads"], default="processes", help="joblib parallel backend"
+    )
     args = parser.parse_args()
 
-    # figure defaults
-    with open("./code_ocean/code/config.json") as f:
-        rc_params = json.load(f)["rc-params"]
-        plt.rcParams.update(rc_params)
-
-    main(args.setting, args.n_samples, args.n_repeats, args.n_jobs)
+    main(args.setting, args.n_samples, args.n_repeats, args.n_jobs, args.prefer)
