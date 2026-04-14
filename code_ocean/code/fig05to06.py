@@ -22,12 +22,15 @@ with open("./code_ocean/code/config.json") as f:
 
 
 def get_y_limits():
+    """match y limits between figures"""
+
     with open("./code_ocean/code/config.json") as f:
         return json.load(f)["y-limits"]
 
 
 def fit_beh(df, fitby):
     """estimate mean reaction time and accuracy + 95% CI under the CLT"""
+
     mean_sem = df.groupby(fitby)[["RT", "correct"]].agg(["mean", "sem"])
 
     rt_ci = 1.96 * mean_sem[("RT", "sem")]  # CLT
@@ -75,6 +78,7 @@ def fit_ddm(df, fitby, prefer="threads"):
 
 def plot_heatmap(ax, df, fitby):
     """plot heatmap of trial counts"""
+
     if fitby == "trial":
         x, y = df["trial"], df["day"]
         ax.set(yticks=[0, 50, 100], ylabel="Day")
@@ -208,8 +212,10 @@ def main(prefer="threads", subset=False):
 
 if __name__ == "__main__":
     """set script defaults"""
+
     parser = argparse.ArgumentParser(description="Figures 05-06")
     parser.add_argument("--prefer", choices=["processes", "threads"], default="threads", help="joblib parallel backend")
     parser.add_argument("--subset", action="store_true", help="use subset of data for testing")
     args = parser.parse_args()
+
     main(prefer=args.prefer, subset=args.subset)

@@ -5,7 +5,7 @@ start_seconds=$SECONDS
 mode="${1:-paper}"
 
 if [[ "$mode" == "test" ]]; then
-    echo "running TEST mode"
+    echo "\nrunning TEST mode ...\n"
 
     # fig01
     echo "-> fig01"
@@ -32,7 +32,7 @@ if [[ "$mode" == "test" ]]; then
     ./code_ocean/code/fig07.py --n-sample 200 500 --n-repeats 1
 
 elif [[ "$mode" == "paper" ]]; then
-    echo "running PAPER mode"
+    echo "\nrunning PAPER mode ...\n"
 
     # fig01
     echo "-> fig01"

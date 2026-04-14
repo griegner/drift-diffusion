@@ -105,7 +105,9 @@ def main(subset=False):
 
 if __name__ == "__main__":
     """set script defaults"""
+
     parser = argparse.ArgumentParser(description="Figure 06")
     parser.add_argument("--subset", action="store_true", help="use subset of data for testing")
     args = parser.parse_args()
+
     main(subset=args.subset)

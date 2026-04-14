@@ -22,6 +22,7 @@ with open("./code_ocean/code/config.json") as f:
 
 def iid_params(n_samples, params, params_s, seed=1):
     """generate DDM parameters with iid variability (i.e. 7-param DDM)"""
+
     rng = np.random.default_rng(seed=1)
     t0_iid = rng.uniform(params["t0"] - params_s["t0"] / 2, params["t0"] + params_s["t0"] / 2, size=n_samples)
     v_iid = rng.normal(params["v"], params_s["v"], size=n_samples)
@@ -31,14 +32,16 @@ def iid_params(n_samples, params, params_s, seed=1):
 
 def cov_to_corr(cov):
     "ii to standard errors, ij to correlations"
+
     stderr = np.sqrt(np.diag(cov))
     corr = cov / np.outer(stderr, stderr)
     np.fill_diagonal(corr, stderr)
     return corr
 
 
-def _zero_formatter():
+def zero_formatter():
     """format tick labels"""
+
     return FuncFormatter(
         lambda v, _: ("0" if np.isclose(v, 0) else (f"{v:.2f}" if f"{v:.3f}".endswith("0") else f"{v:.3f}"))
     )
@@ -67,8 +70,8 @@ def plot_parameter_distributions(params_df, true_params):
     g.map_diag(_diag_plot)
 
     for ax in g.axes.flat:
-        ax.xaxis.set_major_formatter(_zero_formatter())
-        ax.yaxis.set_major_formatter(_zero_formatter())
+        ax.xaxis.set_major_formatter(zero_formatter())
+        ax.yaxis.set_major_formatter(zero_formatter())
         ax.set_xlabel("")
         ax.set_ylabel("")
         ax.set_yticklabels([])
@@ -101,7 +104,7 @@ def plot_covariance_distributions(covs_df, params_df):
             ax.yaxis.tick_right()
             linestyle = "-" if row == col else "--"
             ax.axvline(x=correlation, c="r", lw=2, ls=linestyle)
-            ax.xaxis.set_major_formatter(_zero_formatter())
+            ax.xaxis.set_major_formatter(zero_formatter())
 
     g.tight_layout(w_pad=0.1, h_pad=0)
     return g
@@ -124,6 +127,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
 
     def setup_constant():
         """setup constant DDM parameters"""
+
         param_names = ["a", "t0", "v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 
@@ -136,6 +140,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
 
     def setup_coherence():
         """setup v as linear function of coherence"""
+
         param_names = ["a", "t0", "beta_v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 
@@ -153,6 +158,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
 
     def setup_iid():
         """setup t0, v, z to vary iid"""
+
         param_names = ["a", "t0", "v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 

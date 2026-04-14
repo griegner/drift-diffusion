@@ -22,6 +22,7 @@ with open("./code_ocean/code/config.json") as f:
 
 def fit_mle(X, y):
     """MLE with non-robust uncertainties"""
+
     mle = DriftDiffusionModel(cov_estimator="sample-hessian", p_outlier=1e-12)
     t0 = time.time()
     mle.fit(X, y, params0=np.array([1.0, 0.1, 0.1, 0.1]))
@@ -31,6 +32,7 @@ def fit_mle(X, y):
 
 def fit_mcmc(y_df):
     """MCMC with non-robust uncertainties"""
+
     mcmc = HSSM(data=y_df, model="ddm")
     t0 = time.time()
     mcmc.sample(cores=1, quiet=True, initvals={"a": 1.0, "t": 0.1, "v": 0.1, "z": 0.55})
@@ -42,6 +44,7 @@ def fit_mcmc(y_df):
 
 def bias_sd_rmse(params, params_):
     """params (true values), params_ (matrix of estimates)"""
+
     params_mean_ = params_.mean(axis=0)
     bias_ = np.mean(params_ - params, axis=0)
     sd_ = np.sqrt(np.mean((params_ - params_mean_) ** 2, axis=0))
@@ -51,6 +54,7 @@ def bias_sd_rmse(params, params_):
 
 def summarize_method(n, method, runtime, params, params_, uncs_):
     """params (true key-values), params_ (matrix of estimates)"""
+
     param_names = list(params)
     true_params = np.asarray(list(params.values()))
     runtime_mean = float(np.mean(runtime))
@@ -122,6 +126,7 @@ def main(n_samples, n_repeats, n_jobs, prefer):
 
 if __name__ == "__main__":
     """set script defaults"""
+
     parser = argparse.ArgumentParser(description="Figure 06")
     parser.add_argument(
         "--n-samples",
@@ -136,4 +141,5 @@ if __name__ == "__main__":
         "--prefer", choices=["processes", "threads"], default="processes", help="joblib parallel backend"
     )
     args = parser.parse_args()
+
     main(n_samples=args.n_samples, n_repeats=args.n_repeats, n_jobs=args.n_jobs, prefer=args.prefer)

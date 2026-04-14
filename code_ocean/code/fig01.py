@@ -16,8 +16,9 @@ with open("./code_ocean/code/config.json") as f:
     plt.rcParams.update(rc_params)
 
 
-def _mat_to_pd(mat):
+def mat_to_pd(mat):
     """load matlab file and select trial variables"""
+
     mat = loadmat(mat)
     mat = {k: v.squeeze() for k, v in mat.items() if isinstance(v, np.ndarray) and v.shape == mat["RT"].shape}
     return pd.DataFrame(mat)
@@ -25,9 +26,10 @@ def _mat_to_pd(mat):
 
 def preproc_df(path="./code_ocean/data/Rat195Vectors_241025.mat"):
     """load and preprocess the dataframe for rat195 from Reinagel 2013"""
+
     R, L = 0.0, np.pi  # dot movement
     df = (
-        _mat_to_pd(path)
+        mat_to_pd(path)
         .query("Valid == 1 and RT == RT")  # keep valid trials and non-null RT
         .assign(trialDate=lambda x: pd.to_datetime(x["trialDate"] - 719529, unit="D"))
         .set_index("trialDate")
@@ -54,6 +56,7 @@ def preproc_df(path="./code_ocean/data/Rat195Vectors_241025.mat"):
 
 def fig01a(path="./code_ocean/results/fig01a.pdf"):
     """plot and save fig01a"""
+
     a, t0, v, z = 1, 0.3, 1, 0.3
     fig, axs = plt.subplots(3, 1, figsize=(6, 3), sharex=True, height_ratios=[0.4, 1, 0.1], layout="constrained")
     for s in [5, 7]:
@@ -72,6 +75,7 @@ def fig01a(path="./code_ocean/results/fig01a.pdf"):
 
 def fig01b(ddms, blocks, path="./code_ocean/results/fig01b.pdf"):
     """plot and save fig01b"""
+
     fig, ax = plt.subplots(figsize=(8, 3))
     colors = {"R": "r", "L": "b"}
     y = np.linspace(-3, +3, 1000)
@@ -96,6 +100,7 @@ def fig01b(ddms, blocks, path="./code_ocean/results/fig01b.pdf"):
 
 def main(n_samples):
     """fig01a,b"""
+
     # fit ddm to block of rightward and leftward trials
     df195 = preproc_df()
     ddms = {}
