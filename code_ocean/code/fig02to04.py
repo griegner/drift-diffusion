@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,10 +10,13 @@ import pandas as pd
 import seaborn as sns
 from joblib import Parallel, delayed
 from matplotlib.ticker import FuncFormatter
+from sklearn.base import clone
 from tqdm import tqdm
 
 from drift_diffusion.model import DriftDiffusionModel
 from drift_diffusion.sim import sample_from_pdf
+
+warnings.filterwarnings("ignore")
 
 
 def iid_params(n_samples, params, params_s, seed=1):
@@ -102,7 +106,7 @@ def plot_covariance_distributions(covs_df, params_df):
     return g
 
 
-def main(setting, n_samples, n_repeats):
+def main(setting, n_samples, n_repeats, n_jobs):
     "fig02,03,04"
 
     kwargs = dict(n_samples=n_samples, n_repeats=n_repeats, random_state=0)
@@ -178,14 +182,15 @@ def main(setting, n_samples, n_repeats):
 
     @delayed
     def run_simulation(rep):
-        ddm.fit(X, ys[:, rep])
+        ddm_cp = clone(ddm)
+        ddm_cp.fit(X, ys[:, rep])
         covs_ = [
             {"estimator": k, **{cov_names[i]: val for i, val in enumerate(cov_to_corr(v).flatten())}}
-            for k, v in ddm.covariance_.items()
+            for k, v in ddm_cp.covariance_.items()
         ]
-        return ddm.params_, covs_
+        return ddm_cp.params_, covs_
 
-    with Parallel(n_jobs=-4) as parallel:
+    with Parallel(n_jobs=n_jobs) as parallel:
         results = parallel(run_simulation(rep) for rep in tqdm(range(kwargs["n_repeats"])))
         params_, covs_ = zip(*results)
         params_df = pd.DataFrame(params_, columns=param_names)
@@ -208,6 +213,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--n-samples", type=int, default=1000, help="number of trials to simulate per repeat")
     parser.add_argument("--n-repeats", type=int, default=900, help="number of simulation repeats")
+    parser.add_argument("--n-jobs", type=int, default=-1, help="number of parallel jobs")
     args = parser.parse_args()
 
     # figure defaults
@@ -215,4 +221,4 @@ if __name__ == "__main__":
         rc_params = json.load(f)["rc-params"]
         plt.rcParams.update(rc_params)
 
-    main(args.setting, args.n_samples, args.n_repeats)
+    main(args.setting, args.n_samples, args.n_repeats, args.n_jobs)
