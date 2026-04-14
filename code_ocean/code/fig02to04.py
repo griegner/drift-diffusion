@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,8 +14,6 @@ from tqdm import tqdm
 
 from drift_diffusion.model import DriftDiffusionModel
 from drift_diffusion.sim import sample_from_pdf
-
-# warnings.simplefilter("error")
 
 with open("./code_ocean/code/config.json") as f:
     rc_params = json.load(f)["rc-params"]

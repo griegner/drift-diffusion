@@ -22,7 +22,7 @@ def fit_ddm_splines(df):
     """estimate DDM parameters as functions of trial by day + 95% CI under the CLT"""
 
     param_names = ["a", "t0", "beta_v", "z"]
-    spline_params = np.load("./code_ocean/data/Rat195Params0.npy")
+    spline_params = np.load("./code_ocean/data/Rat195Splines_140426.npy")
     param_slices = [spline_params[:4], spline_params[4:8], spline_params[8:13], spline_params[13:]]
 
     groups = list(df.groupby("day"))
@@ -85,7 +85,7 @@ def main(subset=False):
         cov_estimator="autocorrelation-robust",
         verbose=True,
     )
-    ddm.fit(df195_fig06d, df195_fig06d["y"], params0=np.load("./code_ocean/data/Rat195Params0.npy"))
+    ddm.fit(df195_fig06d, df195_fig06d["y"], params0=np.load("./code_ocean/data/Rat195Splines_140426.npy"))
 
     coherence = np.repeat(1, 100)
     trial_min, trial_max = df195_fig06d["trial"].min(), df195_fig06d["trial"].max()
