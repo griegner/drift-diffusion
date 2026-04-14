@@ -44,17 +44,19 @@ def pdf(y, a, t0, v, z, err=1e-3):
     t = dt / (a**2)
 
     # k terms for large t
+    log_arg_l = np.clip(np.pi * t * err, 1e-300, 1.0)
     k_l = np.where(
         np.pi * t * err < 1,
-        np.sqrt(-2 * np.log(np.pi * t * err) / (np.pi**2 * t)),
+        np.sqrt(-2 * np.log(log_arg_l) / (np.pi**2 * t)),
         1 / (np.pi * np.sqrt(t)),
     )
     k_l = np.maximum(k_l, 1 / (np.pi * np.sqrt(t)))
 
     # k terms for small t
+    log_arg_s = np.clip(2 * np.sqrt(2 * np.pi * t) * err, 1e-300, 1.0)
     k_s = np.where(
         2 * np.sqrt(2 * np.pi * t) * err < 1,
-        2 + np.sqrt(-2 * t * np.log(2 * np.sqrt(2 * np.pi * t) * err)),
+        2 + np.sqrt(-2 * t * np.log(log_arg_s)),
         2,
     )
     k_s = np.maximum(k_s, np.sqrt(t) + 1)
