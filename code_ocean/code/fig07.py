@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+"""Figure 07: MLE vs MCMC"""
+
 import argparse
 import json
 import time
@@ -127,7 +129,7 @@ def main(n_samples, n_repeats, n_jobs, prefer):
 if __name__ == "__main__":
     """set script defaults"""
 
-    parser = argparse.ArgumentParser(description="Figure 06")
+    parser = argparse.ArgumentParser(description="Figure 07: MLE vs MCMC")
     parser.add_argument(
         "--n-samples",
         nargs="+",

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+"""Figures 05-06: Application to Rat Decision Making"""
+
 import argparse
 import json
 
@@ -213,7 +215,7 @@ def main(prefer="threads", subset=False):
 if __name__ == "__main__":
     """set script defaults"""
 
-    parser = argparse.ArgumentParser(description="Figures 05-06")
+    parser = argparse.ArgumentParser(description="Figures 05-06: Application to Rat Decision Making")
     parser.add_argument("--prefer", choices=["processes", "threads"], default="threads", help="joblib parallel backend")
     parser.add_argument("--subset", action="store_true", help="use subset of data for testing")
     args = parser.parse_args()

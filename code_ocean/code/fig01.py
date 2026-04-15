@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+"""Figure 01: Drift Diffusion Model"""
+
 import argparse
 import json
 
@@ -65,6 +67,7 @@ def fig01a(path="./code_ocean/results/fig01a.pdf"):
     axs[1].set(ylim=(-a - 0.2, a + 0.2), xlim=(0, 1.5), ylabel=r"$Z_t$", xlabel=r"time ($t$)")
     axs[1].tick_params(labelbottom=True)
     [axs[1].axhline(val, ls="--", c="k", lw=1) for val in (a, -a)]
+    axs[1].axhline(0, c="gray", lw=0.5)
     y = np.linspace(0, 1.5, 1000)
     axs[0].plot(y, pdf(y, a, t0, v, z), "r")
     axs[2].plot(y, pdf(-y, a, t0, v, z), "r", alpha=0.5)
@@ -122,7 +125,7 @@ def main(n_samples):
 if __name__ == "__main__":
     """set script defaults"""
 
-    parser = argparse.ArgumentParser(description="Figure 01")
+    parser = argparse.ArgumentParser(description="Figure 01: Drift Diffusion Model")
     parser.add_argument("--n-samples", type=int, default=2000, help="number of trials sampled per direction")
     args = parser.parse_args()
 

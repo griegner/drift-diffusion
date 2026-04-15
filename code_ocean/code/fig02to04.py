@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+"""Figures 02-04: Simulation Results"""
+
 import argparse
 import json
 
@@ -213,9 +215,9 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
 if __name__ == "__main__":
     """set script defaults"""
 
-    parser = argparse.ArgumentParser(description="Figures 02-04")
+    parser = argparse.ArgumentParser(description="Figures 02-04: Simulation Results")
     parser.add_argument(
-        "--setting", type=str, default="constant", help="simulation setting: constant, coherence, or iid"
+        "--setting", type=str, choices=["constant", "coherence", "iid"], default="constant", help="simulation setting"
     )
     parser.add_argument("--n-samples", type=int, default=1000, help="number of trials to simulate per repeat")
     parser.add_argument("--n-repeats", type=int, default=900, help="number of simulation repeats")
