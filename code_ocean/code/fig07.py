@@ -80,7 +80,7 @@ def summarize_method(n, method, runtime, params, params_, uncs_):
     ]
 
 
-def main(n_samples, n_repeats, n_jobs, prefer):
+def main(n_samples, n_repeats, n_jobs, prefer, csv):
     """fig08"""
 
     # true parameters and sample sizes to test
@@ -93,18 +93,22 @@ def main(n_samples, n_repeats, n_jobs, prefer):
         y_df = pd.DataFrame({"rt": np.abs(y), "response": np.sign(y)})
         return fit_mle(X, y), fit_mcmc(y_df)
 
-    # compare both models across sample sizes using normalized absolute error
-    df = []
-    for n in n_samples:
-        with Parallel(n_jobs=n_jobs, prefer=prefer) as parallel:
-            results = parallel(run_simulation(rep, n) for rep in range(n_repeats))
-            mle, mcmc = zip(*results)
+    if csv:
+        df = pd.read_csv("code_ocean/data/fig07.csv", index_col=0)
+        n_samples = list(df["n"].drop_duplicates())
+    else:
+        # compare both models across sample sizes using normalized absolute error
+        df = []
+        for n in n_samples:
+            with Parallel(n_jobs=n_jobs, prefer=prefer) as parallel:
+                results = parallel(run_simulation(rep, n) for rep in range(n_repeats))
+                mle, mcmc = zip(*results)
 
-        for method, values in (("mle", mle), ("mcmc", mcmc)):
-            runtime, params_, uncs_ = map(np.stack, zip(*values))
-            df.extend(summarize_method(n, method, runtime, params, params_, uncs_))
+            for method, values in (("mle", mle), ("mcmc", mcmc)):
+                runtime, params_, uncs_ = map(np.stack, zip(*values))
+                df.extend(summarize_method(n, method, runtime, params, params_, uncs_))
 
-    df = pd.DataFrame.from_records(df)
+        df = pd.DataFrame.from_records(df)
 
     # fig07
     df_plot = (
@@ -114,10 +118,10 @@ def main(n_samples, n_repeats, n_jobs, prefer):
     )
 
     (
-        so.Plot(df_plot, x="n", y="value", color="param", marker="method", linestyle="method")
+        so.Plot(df_plot, x="n", y="value", color="param", marker="param", linestyle="method")
         .facet(col="panel")
-        .layout(size=(15, 3.5))
-        .add(so.Dot())
+        .layout(size=(15, 4))
+        .add(so.Dot(pointsize=8))
         .add(so.Line())
         .scale(color="binary", x=so.Nominal(order=n_samples))
         .share(y=False)
@@ -142,6 +146,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--prefer", choices=["processes", "threads"], default="processes", help="joblib parallel backend"
     )
+    parser.add_argument("--csv", action="store_true", help="load precomputed results from data/fig07.csv")
     args = parser.parse_args()
 
-    main(n_samples=args.n_samples, n_repeats=args.n_repeats, n_jobs=args.n_jobs, prefer=args.prefer)
+    main(n_samples=args.n_samples, n_repeats=args.n_repeats, n_jobs=args.n_jobs, prefer=args.prefer, csv=args.csv)

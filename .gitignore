@@ -15,5 +15,4 @@ pixi.lock
 *pyspy
 
 # code ocean
-code_ocean/results/*
-!code_ocean/results/.gitkeep
+code_ocean/results/*.pdf
