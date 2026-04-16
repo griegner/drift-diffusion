@@ -173,6 +173,7 @@ class DriftDiffusionModel(BaseEstimator):
         p_ddm = pdf(y, *all_params)  # ddm
         p_outlier = np.ones_like(y) / (rt.max() - rt.min())  # uniform
         p_mix = (1.0 - self.p_outlier) * p_ddm + self.p_outlier * p_outlier  # mixture
+        p_mix = np.maximum(p_mix, 1e-300)
         return np.log(p_mix)
 
     def _lossloglikelihood(self, params_, X, y):
