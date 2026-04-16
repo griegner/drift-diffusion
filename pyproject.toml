@@ -51,8 +51,8 @@ ruff = "==0.7.0"
 pyupgrade = "==3.19.1"
 
 [tool.pixi.feature.lint.tasks]
-black = { cmd = "black --check --diff drift_diffusion figures/*.py" }
-ruff = { cmd = "ruff check --output-format=full drift_diffusion figures/*.py" }
+black = { cmd = "black --check --diff drift_diffusion" }
+ruff = { cmd = "ruff check --output-format=full drift_diffusion" }
 lint = { depends-on = ["black", "ruff"]}
 
 [tool.pixi.feature.test.dependencies]
