@@ -15,4 +15,8 @@ pixi.lock
 *pyspy
 
 # code ocean
+<<<<<<< HEAD
 code_ocean/results/*.pdf
+=======
+results/*.svg
+>>>>>>> gr/code-ocean

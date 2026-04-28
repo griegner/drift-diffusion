@@ -1,0 +1,43 @@
+{
+    "rc-params": {
+        "figure.constrained_layout.use": true,
+        "font.size": 14,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12,
+        "legend.fontsize": 12,
+        "mathtext.fontset": "cm",
+        "savefig.format": "svg",
+        "savefig.transparent": true,
+        "savefig.bbox": "tight"
+    },
+    "y-limits": {
+        "rt": [
+            0.75,
+            1.28
+        ],
+        "acc": [
+            0.6,
+            1
+        ],
+        "a": [
+            0.59,
+            1.22
+        ],
+        "t0": [
+            0.29,
+            0.54
+        ],
+        "beta_v": [
+            0.44,
+            2.4
+        ],
+        "z": [
+            -0.1,
+            0.57
+        ],
+        "v": [
+            0.46,
+            2.92
+        ]
+    }
+}
