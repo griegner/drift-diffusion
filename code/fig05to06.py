@@ -67,7 +67,7 @@ def preproc_df(path="../data/Rat195Vectors_241025.mat"):
         coherence=lambda x: x["dotDirection"].map({R: +1, L: -1}) * x["coherence"],  # +coh R, -coh L dot movement
         day=shifted_index.map(day_map),  # 6pm-to-6pm day
         hour=lambda x: x.index.hour + 1,  # 1 to 24
-        trial=lambda x: ((x.groupby("day").cumcount() + 1) // 20) * 20,  # trials in day
+        trial=lambda x: (x.groupby("day").cumcount() // 20) * 20,  # trials in day
         reward=lambda x: x["correct"] * x["proposedReward"],
     )
 
