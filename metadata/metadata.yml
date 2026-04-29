@@ -1,0 +1,28 @@
+metadata_version: 1
+name: Quantifying uncertainty in drift diffusion models of decision making
+description: Decision-making behavior changes over time, exhibiting temporal correlation
+  and nonstationarity. Existing drift diffusion model (DDM) fitting methods either
+  do not provide uncertainty of parameter estimates, or rely on restrictive assumptions
+  that decisions are independent and that parameters remain constant over time, potentially
+  underestimating the uncertainty. To address these limitations, we propose a computationally
+  efficient method for estimating analytical uncertainties in DDM parameters that
+  are robust to temporal dependence and unmodeled parameter variability, while explicitly
+  modeling nonstationary variability through covariates. We apply this method to rat
+  decision-making in a two-alternative forced-choice visual task, revealing dynamic
+  decision-making states across multiple timescales.
+tags:
+- Sequential decision making
+- Time-series analysis
+- Perceptual decisions
+- DDM
+- 2AFC
+authors:
+- name: Gabriel Riegner
+  affiliations:
+  - name: UC San Diego
+- name: Armin Schwartzman
+  affiliations:
+  - name: UC San Diego
+- name: Pamela Reinagel
+  affiliations:
+  - name: UC San Diego

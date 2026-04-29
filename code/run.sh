@@ -1,8 +1,9 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 set -e
+
 start_seconds=$SECONDS
 
-mode="${1:-paper}"
+mode=paper
 
 if [[ "$mode" == "test" ]]; then
     echo "\nrunning TEST mode ...\n"
