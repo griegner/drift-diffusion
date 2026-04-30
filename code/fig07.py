@@ -94,7 +94,7 @@ def main(n_samples, n_repeats, n_jobs, prefer, csv):
         return fit_mle(X, y), fit_mcmc(y_df, seed=rep + n)
 
     if csv:
-        df = pd.read_csv("data/fig07.csv", index_col=0)
+        df = pd.read_csv("../data/fig07.csv", index_col=0)
         n_samples = list(df["n"].drop_duplicates())
     else:
         # compare both models across sample sizes using normalized absolute error
@@ -109,6 +109,7 @@ def main(n_samples, n_repeats, n_jobs, prefer, csv):
                 df.extend(summarize_method(n, method, runtime, params, params_, uncs_))
 
         df = pd.DataFrame.from_records(df)
+        # df.to_csv("../data/fig07.csv") # saved for macOS 11CPU, 18GB RAM run on 30APR2026
 
     # fig07
     df_plot = (
