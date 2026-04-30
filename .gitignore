@@ -15,4 +15,4 @@ pixi.lock
 *pyspy
 
 # code ocean
-code_ocean/results/*.svg
+results/*.svg
