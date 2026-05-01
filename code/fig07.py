@@ -18,6 +18,8 @@ from drift_diffusion.sim import sample_from_pdf
 
 with open("./config.json") as f:
     rc_params = json.load(f)["rc-params"]
+    rc_params["xtick.labelsize"] = 14
+    rc_params["ytick.labelsize"] = 14
     plt.rcParams.update(rc_params)
     so.Plot.config.theme.update(plt.rcParams)
 
