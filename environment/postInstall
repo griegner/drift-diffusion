@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -e
+
+pip install "drift-diffusion[code-ocean] @ git+https://github.com/griegner/drift-diffusion.git@gr/code-ocean"

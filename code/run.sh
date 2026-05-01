@@ -1,8 +1,11 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 set -e
+
 start_seconds=$SECONDS
 
-mode="${1:-paper}"
+mode=paper
+
+# download csv from dryad DOI: 10.5061/dryad.hhmgqnkxb
 
 if [[ "$mode" == "test" ]]; then
     echo "\nrunning TEST mode ...\n"
@@ -56,7 +59,7 @@ elif [[ "$mode" == "paper" ]]; then
 
     # fig 07
     echo "-> fig07"
-    ./fig07.py
+    ./fig07.py --csv
 
 else
     echo "Usage: ./run.sh [test|paper]"

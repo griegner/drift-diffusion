@@ -18,6 +18,8 @@ from drift_diffusion.sim import sample_from_pdf
 
 with open("./config.json") as f:
     rc_params = json.load(f)["rc-params"]
+    rc_params["xtick.labelsize"] = 14
+    rc_params["ytick.labelsize"] = 14
     plt.rcParams.update(rc_params)
     so.Plot.config.theme.update(plt.rcParams)
 
@@ -32,12 +34,12 @@ def fit_mle(X, y):
     return runtime, mle.params_, np.sqrt(np.diag(mle.covariance_))
 
 
-def fit_mcmc(y_df):
+def fit_mcmc(y_df, seed=None):
     """MCMC with non-robust uncertainties"""
 
     mcmc = HSSM(data=y_df, model="ddm")
     t0 = time.time()
-    mcmc.sample(cores=1, quiet=True, initvals={"a": 1.0, "t": 0.1, "v": 0.1, "z": 0.55})
+    mcmc.sample(cores=1, quiet=True, initvals={"a": 1.0, "t": 0.1, "v": 0.1, "z": 0.55}, random_seed=seed)
     runtime = time.time() - t0
     params_, unc_ = mcmc.summary().loc[["a", "t", "v", "z"], ["mean", "sd"]].to_numpy().T
     params_[-1], unc_[-1] = 2 * params_[-1] - 1, 2 * unc_[-1]  # rescale z to (-1, 1)
@@ -91,10 +93,10 @@ def main(n_samples, n_repeats, n_jobs, prefer, csv):
         X = pd.DataFrame({"intercept": np.ones(n)})
         y = sample_from_pdf(**params, n_samples=n, random_state=rep + n)
         y_df = pd.DataFrame({"rt": np.abs(y), "response": np.sign(y)})
-        return fit_mle(X, y), fit_mcmc(y_df)
+        return fit_mle(X, y), fit_mcmc(y_df, seed=rep + n)
 
     if csv:
-        df = pd.read_csv("data/fig07.csv", index_col=0)
+        df = pd.read_csv("../data/fig07.csv", index_col=0)
         n_samples = list(df["n"].drop_duplicates())
     else:
         # compare both models across sample sizes using normalized absolute error
@@ -109,8 +111,8 @@ def main(n_samples, n_repeats, n_jobs, prefer, csv):
                 df.extend(summarize_method(n, method, runtime, params, params_, uncs_))
 
         df = pd.DataFrame.from_records(df)
+        # df.to_csv("../data/fig07.csv") # saved for macOS 11CPU, 18GB RAM run on 30APR2026
 
-    # fig07
     # fig07
     df_plot = (
         df.melt(id_vars=["n", "method", "estimate", "param"], value_vars=["runtime", "rmse"])

@@ -19,6 +19,7 @@ from drift_diffusion.sim import sample_from_pdf
 
 with open("./config.json") as f:
     rc_params = json.load(f)["rc-params"]
+    rc_params["figure.constrained_layout.use"] = False
     plt.rcParams.update(rc_params)
 
 
