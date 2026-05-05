@@ -1,5 +1,5 @@
 ### drift-diffusion
-> Quantifying Uncertainty in Drift Diffusion Models of Decision Making
+> Quantifying uncertainty in drift diffusion models of decision making under temporal dependence and parameter variability
 
 <img src="./readme.png" width="800"/>
 
@@ -7,30 +7,26 @@
 [![project slides](https://img.shields.io/badge/slides-PDF-red?style=flat&logo=google-slides&logoColor=white)](https://griegner.github.io/drift-diffusion/slides/slides-12NOV2025.pdf)
 [![codecov](https://codecov.io/gh/griegner/drift-diffusion/graph/badge.svg?token=VP43QWD2NS)](https://codecov.io/gh/griegner/drift-diffusion)
 
-**Project Organization**
+**Overview**
+
+This repository provides a computationally efficient method for estimating drift diffusion model parameters with analytical uncertainty estimates that remain valid under temporal dependence and parameter variability. It also supports covariates to model nonstationary changes in decision making over time.
+
+*Method Implementation*: The `drift-diffusion` package can be installed and used in your own research by following the installation instructions and usage examples below.
+
+*Paper Reproduction*: The accompanying Code Ocean capsule enables readers to run, verify, and modify the code and data in the cloud. The results reported in the bioRxiv paper can be reproduced at [CO.5868634.v1](https://doi.org/10.24433/CO.5868634.v1).
+
+*Citation*:
+```bibtex
+@article{riegner2026,
+  title={Quantifying uncertainty in drift diffusion models of decision making under temporal dependence and parameter variability},
+  author={Riegner, Gabriel and Schwartzman, Armin and Reinagel, Pamela},
+  journal={bioRxiv},
+  year={2026},
+  publisher={Cold Spring Harbor Laboratory}
+}
 ```
-.
-├── drift_diffusion/
-│   ├── model/
-│   │   ├── drift_diffusion_model.py    <- drift diffusion model (ddm)
-│   │   └── pdf.py                      <- probability density function (pdf)
-│   ├── sim/
-│   │   └── sim.py                      <- simulation functions
-│   └── tests/
-│       ├── test_model.py               <- unit tests for ddm and pdf
-│       └── test_sim.py                 <- unit tests for simulation functions
-├── docs/
-│   └── ...                             <- latex/pdf documentation files
 
-├── LICENSE                             <- MIT license
-├── pyproject.toml                      <- python configuration and dependencies
-└── README.md                           <- this readme file
-```
-
-**Paper Reproduction**
-...
-
-**Code Installation**
+**Package Installation**
 
 Install `drift-diffusion` and dependencies:
 ```
@@ -91,4 +87,38 @@ excluded from optimization but included in likelihood evaluation.
     'misspecification-robust': array([[0.00119926]]),
     'autocorrelation-robust': array([[0.00119337]])
 }
+```
+
+**Repository Organization**
+
+*Method Implementation*:
+```
+.
+├── drift_diffusion/
+│   ├── model/
+│   │   ├── drift_diffusion_model.py    <- drift diffusion model (ddm)
+│   │   └── pdf.py                      <- probability density function (pdf)
+│   ├── sim/
+│   │   └── sim.py                      <- simulation functions
+│   └── tests/
+│       ├── test_model.py               <- unit tests for ddm and pdf
+│       └── test_sim.py                 <- unit tests for simulation functions
+├── docs/
+│   └── ...                             <- latex/pdf documentation files
+├── LICENSE                             <- MIT license
+├── pyproject.toml                      <- python configuration and dependencies
+└── README.md                           <- this readme file
+```
+
+*Paper Reproduction*:
+```
+.
+├── code/
+│   ├── fig*.py                         <- python scripts for figures 1-7
+│   └── run.sh                          <- bash script that runs all python scripts
+├── data/
+│   └── Rat195Vectors_290426.csv        <- dataset used in paper
+├── environment/                        <- compute environment
+├── metadata/                           <- title/abstract
+└── results/                            <- outputs of reproducible run
 ```

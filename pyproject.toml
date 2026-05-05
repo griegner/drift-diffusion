@@ -30,7 +30,7 @@ code-ocean = [
 [tool.setuptools]
 packages = {find = {where = ["."], include = ["drift_diffusion*"]}}
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-arm64"]
 
