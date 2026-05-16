@@ -1,0 +1,198 @@
+\documentclass[00-main.tex]{subfiles}
+
+\begin{document}
+\section{Methods}\label{sec:methods}
+
+\subsection{Notation}
+\subsubsection{Drift Diffusion Model}\label{sec:ddm}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\textwidth]{docs/manuscript/figures/fig01-ddm.pdf}
+    \caption{\emph{Drift Diffusion Model.}}
+    \subcaption*{The drift diffusion model describes perceptual decision making as the noisy accumulation of evidence toward one of two decision bounds. In this example, the stimulus is random dot motion and its strength is modulated by \emph{coherence}, the percentage of dots moving in the direction of the correct choice.
+    (A) Shows a random dot stimulus at 50\% rightward coherence, indicating the correct choice is to the right. (B) Shows two realizations of the drift diffusion process $Z_t$ with fixed parameters $\bm{\theta} = (a, z, t_0, v)$. The two realizations evolve as stochastic processes, crossing the upper (solid red; correct rightward) and lower (translucent red; incorrect leftward) bounds at different reaction times $RT$. The correct and error $RT$ probability densities are shown above and below the panel; the correct rightward choice is more probable because $v > 0$ (proportional to rightward coherence) and $z > 0$ (rightward bias).
+    (C) Probability densities of the composite variable $Y$ encoding both the choice (negative for leftward, positive for rightward) and the reaction time ($RT = |Y|$) for a sequence of rightward (red) and leftward (blue) coherence trials. The proportion of correct responses for rightward trials (red) is higher than for leftward trials (blue) because $z>0$ (rightward bias).}
+    \label{fig:ddm}
+\end{figure}
+
+The DDM describes perceptual decision making in 2AFC tasks by parameterizing a latent decision process with choice and reaction time as outputs. This process accumulates noisy sensory evidence over time until it reaches one of two decision bounds, initiating the corresponding choice. A \emph{trial} is a single instance of this process, starting with a stimulus that initiates evidence accumulation and ending with a choice and reaction time. In the present paper, the notation is kept general so that the upper and lower bounds can be mapped to any pair of alternatives (e.g., rightward vs.\ leftward, or correct vs.\ error). The standard DDM has four decision-making parameters as shown in Figure~\ref{fig:ddm}B.
+
+\begin{itemize}
+    \item $a > 0$ is the \emph{decision bound}: evidence is accumulated until the decision variable crosses the upper bound at $+a$ or the lower bound at $-a$, with a separation between bounds of $2a$.
+
+    \item $z \in (-1, +1)$ is the \emph{relative starting point}: the initial bias of the decision variable where $\text{sign}(z)$ indicates bias toward the upper vs.\ lower bound and $|z|$ gives the bias magnitude as a fraction of $a$.
+
+    \item $t_0 \ge 0$ is the \emph{non-decision time}: additive time in seconds capturing processing outside evidence accumulation, including sensory encoding and motor response.
+
+    \item $v\in \mathbb{R}$ is the \emph{drift rate}: the expected rate of change in the decision variable per second, where $\text{sign}(v)$ implies drift toward the upper vs.\ lower bound and $|v|$ gives the evidence strength/quality.
+
+\end{itemize}
+
+Taken together, the vector containing the four parameters $\bm{\theta}=(a, z, t_0, v)$ defines the behavior of the latent decision process for a single trial, which we refer to as the decision-making state throughout. The decision variable $Z_t$ captures evidence accumulation between the upper $+a$ and lower $-a$ decision bounds at time $t$, combining deterministic drift and stochastic diffusion:
+\begin{equation}\label{eq:Z_t}
+Z_t = az + \sum_{k=1}^{(t - t_0)/\Delta t}e_k, \quad e_k \overset{iid}{\sim} \mathcal{N}(v\Delta t, \sigma^2\Delta t), \quad \text{for } t > t_0.
+\end{equation}
+Here, $t$ is the elapsed time and $t_0$ is the non-decision time, both defined as integer multiples of the step duration $\Delta t$. Evidence accumulation begins at $Z_{t_0} = az$ after the non-decision time $t_0$ and proceeds as a random walk with deterministic drift. For simplicity, $t_0$ is treated as preceding the decision process, when in reality it combines non-decision processes before and after. Each subsequent update adds an $iid$ Gaussian step $e_k$ with mean $v\Delta t$ and variance $\sigma^2\Delta t$; each step is random but the process drifts on average toward the upper (if $v>0$) or lower (if $v<0$) bound. The duration $\Delta t$ rescales continuous drift and diffusion rates $v$ and $\sigma^2$ (fixed to $\sigma^2=1$) into discrete steps, where the summation runs over a total of $(t - t_0)/\Delta t$ steps. When $\Delta t \to 0$, this discrete random walk approaches a continuous drift (or Wiener) diffusion process.
+
+\subsubsection{Choice and Reaction Time for a Single Trial}
+A decision is made at the first time $t>t_0$ for which the decision variable $Z_t$ \eqref{eq:Z_t} reaches either decision bound:
+\begin{subequations}
+\begin{align}
+        RT &= \min \{t>t_0 : |Z_t| \ge a\},\label{eq:RT}\\
+        Y &= RT \cdot \text{sign}(Z_{RT}).\label{eq:Y}
+\end{align}
+\end{subequations}
+Here, $RT$ \eqref{eq:RT} is the reaction time and $Y$ \eqref{eq:Y} is a scalar composite variable encoding both the choice and reaction time, where $\text{sign}(Y) \in \{-1, +1\}$ is the binary choice (lower if $-1$, upper if $+1$) and $|Y| = RT > 0$ is the continuous reaction time.
+
+These decision outcomes are stochastic. With the same initial parameters, the diffusion process \eqref{eq:Z_t} evolves as a stochastic process with a distribution governed by the probability density function:
+\begin{equation}\label{eq:f}
+    f(Y ; \bm{\theta}) = \frac{4\pi}{a^2}\exp\left(\frac{\text{sign}(Y)avw-v^2(|Y|-t_0)}{2}\right) \times\sum_{k=1}^\infty k\exp\left(-\frac{2k^2\pi^2 (|Y|-t_0)}{a^2}\right)\sin(k\pi w).
+\end{equation}
+
+This analytical density was derived in \citet[Chapter~14, Equation~6.15]{feller_introduction_1968}, and later by \citet[Equation~13]{navarro_fast_2009} who provided the finite approximation of the infinite sum term that we implemented. The relative starting point $z\in(-1, +1)$ is rewritten as $w = (1-\text{sign}(Y)z)/{2} \in (0, +1)$ to match their notation. For a single trial, the probability of the choice and reaction time pair $\{\text{sign}(Y), |Y|\}$ is given by this bimodal (one mode per choice; Figure~\ref{fig:ddm}C) density function, defined for all $|Y|>t_0$.
+
+\subsubsection{Choice and Reaction Time as Functions of Covariates}\label{sec:covariates}
+The DDM parameters $\bm{\theta} = (a, z, t_0, v)$ and consequent decision outcome $Y$ may be functions of covariates $\bm{X} \in \mathbb{R}^p$, such as stimulus properties or experimental conditions (e.g., stimulus strength or reward size):
+\begin{equation}
+    \bm{X} \xrightarrow{g(\bm{X},\,\bm{\beta})} \bm{\theta}
+    \xrightarrow{f(\,\cdot\,;\,\bm{\theta})} Y.
+\end{equation}
+The link functions $g$ map covariates to each DDM parameter separately:
+\begin{equation}\label{eq:g}
+    \bm{\theta} = g(\bm{X}, \bm{\beta}) = \bigl(g_a(\bm{X}, \bm{\beta}_a),\; g_z(\bm{X}, \bm{\beta}_z),\; g_{t_0}(\bm{X}, \bm{\beta}_{t_0}),\; g_v(\bm{X}, \bm{\beta}_v)\bigr).
+\end{equation}
+Throughout, $\bm{\theta}$ refers to \emph{parameters} and $\bm{\beta}$ to \emph{coefficients} to differentiate DDM parameters from covariate effects. For example, take the drift rate to be a linear function $v = g_v(\bm{X}, \bm{\beta}_v) = \bm{\beta}_v^\top \bm{X}$: if $\bm{X}$ is a scalar $X=1$, this gives a constant $v = \beta_{v,0}$; if $\bm{X}$ is a vector $\bm{X} = (1, \mathrm{coherence})$, then $v = \beta_{v,0} + \beta_{v,1}\mathrm{coherence}$, so the drift rate scales with stimulus strength (Figure~\ref{fig:ddm}B). The same can apply to $a$, $z$, and $t_0$, where the corresponding link functions are similarly defined. Since $a > 0$, $z \in (-1, +1)$, and $t_0 \geq 0$, appropriate link functions (e.g., exponential for $a$ and $t_0$, sigmoid for $z$) map the unbounded linear combination $\bm{\beta}_\theta^\top \bm{X}$ into the valid range of each parameter.
+
+\subsubsection{Choices and Reaction Times for a Sequence of Trials}
+Let $\bm{Y} = (Y_1, \dots, Y_n) \in \mathbb{R}^n$ denote the sequence of decision outcomes for $n$ trials and $\bm{X} = (\bm{X}_1, \dots, \bm{X}_n) \in \mathbb{R}^{n\times p}$ the covariate matrix, with row $\bm{X}_i$ containing the covariates for trial $i = 1, \dots, n$. Applying the covariate model \eqref{eq:g} trialwise, the joint density of the sequence can be written as:
+\begin{equation}\label{eq:f_joint}
+    f(\bm{Y};\, \bm{X}, \bm{\beta}) = f\bigl(Y_1, \dots, Y_n;\,
+    \bm{\theta}_1 = g(\bm{X}_1, \bm\beta), \dots, \bm{\theta}_n = g(\bm{X}_n, \bm\beta)\bigr).
+\end{equation}
+This provides the complete probability specification of $\bm{Y}$ and is built
+from the trialwise marginal densities $f(Y_i; \bm{\theta}_i)$ defined in
+\eqref{eq:f}. The specific factorization depends on whether the marginal
+densities are treated as independent and/or identically distributed:
+\begin{subequations}
+\begin{align}
+    f^*(\bm{Y};\, \bm{X}, \bm{\beta}) &=
+        \prod_{i=1}^n f\!\left(Y_i;\, \bm{\theta}_i = g(\bm{X}_i,
+        \bm{\beta})\right), \label{eq:f_ind} \\
+    f_0(\bm{Y};\, \bm{X}, \bm{\beta}) &=
+        f\!\left(Y_1;\, \bm{\theta}_1 = g(\bm{X}_1, \bm{\beta})\right)
+        \prod_{i=2}^n f\!\left(Y_i \mid Y_{i-1}, \dots, Y_1;\,
+        \bm{\theta}_i = g(\bm{X}_i, \bm{\beta})\right). \label{eq:f_dep}
+\end{align}
+\end{subequations}
+Equation \eqref{eq:f_ind} defines the \emph{independent} case (superscript $*$), in which, conditional on covariates $\bm{X}$ and coefficients $\bm{\beta}$, the joint density is the product of trialwise marginal densities. Equation \eqref{eq:f_dep} defines the \emph{dependent} case (subscript $0$), in which the joint density factorizes into conditional densities that can depend on the full history of past outcomes. In both cases, non-constant covariates can induce trial-to-trial parameter variability $\bm{\theta}_i = g(\bm{X}_i, \bm{\beta})$ and hence non-identically distributed outcomes. When covariates contribute only a constant intercept $X_i = 1$ for all $i$, the parameters are fixed $\bm{\theta}_i = \bm{\theta}$ and the marginal densities are identical. Then \eqref{eq:f_ind} reduces to the usual $iid$ product of identical marginals, while \eqref{eq:f_dep} retains dependence through conditioning on past outcomes.
+
+\subsubsection{Misspecification of the Joint Density Function}\label{sec:misspecification}
+As discussed, decisions are rarely isolated events; they are richly structured in time with changing internal and external states and influenced by the outcomes of previous decisions. Because of this, it is most realistic to view sequences of trials as neither identically distributed nor independent with joint density function \eqref{eq:f_dep}. Going forward, we take this to be the true data-generating density. However, specifying the full data-generating density is often infeasible, as it requires correctly specifying each function that maps measured covariates to DDM parameters, and the complex history effects that induce serial dependence between sequential choices and reaction times.
+
+Instead, for pragmatic reasons, we take the \emph{independent} density \eqref{eq:f_ind} (superscript $*$) as a working approximation of the true density \eqref{eq:f_dep} (subscript $0$), accepting the misspecification $f^* \neq f_0$. By treating trials as independent when they may not be, the working joint density simplifies to the product of trialwise densities conditional only on covariates, rather than on past outcomes. Under this simplification, misspecification can arise from (i) unmodeled DDM parameter variability, (ii) modeled parameter variability with the incorrect functional form (e.g., linear when the true relationship is nonlinear), or (iii) unmodeled serial dependence between trials.
+
+This mismatch between the true and working densities influences estimation and inference, such that the targets of inference are not necessarily the ``true'' coefficients $\bm{\beta}_0$ and associated trialwise DDM parameter sequence $(\bm{\theta}_{0,1}, \dots, \bm{\theta}_{0,n})$ of the complex joint density, but rather the ``pseudo-true'' coefficients $\bm{\beta}^*$ and parameters $(\bm{\theta}^*_1, \dots, \bm{\theta}^*_n)$ under the independent working density approximation. This best approximation has an intuitive interpretation, in that the ``pseudo-true'' coefficients are those that minimize the divergence between joint densities $f^*$ \eqref{eq:f_ind} and $f_0$ \eqref{eq:f_dep}. Acknowledging that these densities will differ in practice, we formalize the pseudo- (or quasi-) maximum likelihood estimator and explicitly show conditions under which it is consistent and asymptotically normal with a covariance matrix that accounts for this joint-density misspecification. This provides a principled way to quantify estimation uncertainties (e.g., standard errors and confidence intervals) of the ``pseudo-true'' coefficients under the explicitly general assumptions of unmodeled parameter variability, incorrect functional forms, and/or dependence between trials.
+
+\subsection{Definitions and Estimation}
+\subsubsection{(Pseudo-) Log-Likelihood Function}
+The working joint density $f^*(\bm{Y}; \bm{X}, \bm\beta)$ \eqref{eq:f_ind} is a function of the decision outcomes $\bm{Y}$ given fixed covariates $\bm{X}$ and coefficients $\bm\beta$. Evaluated at the observed outcomes and re-interpreted as a function of $\bm\beta$ (with $\bm{X}$ and $\bm{Y}$ held fixed), this same product of trialwise densities defines the working likelihood, or ``pseudo-likelihood'' under misspecification. The expected log-likelihood and its sample average analog (denoted by $\hat{\phantom{x}}$) are defined as:
+\begin{subequations}
+\begin{align}
+    \ell^* (\bm{\beta}) &= \underset{Y_i, X_i}{\mathbb{E}}[\log f^*(Y_i; \bm\theta_i = g(\bm{X}_i, \bm{\beta}))],\label{eq:ell}\\
+    \hat\ell^* (\bm{\beta}) &= \frac{1}{n}\sum_{i=1}^n \log f^*(Y_i ; \bm{\theta}_i = g(\bm{X}_i, \bm{\beta})).\label{eq:ell_}
+\end{align}
+\end{subequations}
+
+The population expectation \eqref{eq:ell} is over the joint distribution of $(\bm{X}_i, Y_i)$; the sample analog \eqref{eq:ell_} conditions on the observed $\bm{X}$ as fixed (non-random).
+
+\subsubsection{(Pseudo-) Maximum Likelihood Estimator}
+The ``pseudo-true'' vector $\bm\beta^*$ contains the coefficients most compatible with the decision outcomes under the possibly misspecified working log-likelihood; equivalently, those that maximize the expected log-likelihood \eqref{eq:ell}. Similarly, the sample analog $\hat{\bm\beta}^*$ are the coefficients that maximize the sample log-likelihood \eqref{eq:ell_}, i.e., the pseudo-maximum likelihood estimator (MLE):
+\begin{subequations}
+\begin{align}
+   \bm{\beta}^* &= \underset{\bm{\beta}}{\text{argmax}}\;\ell^* (\bm{\beta}),\label{eq:beta}\\
+    \hat{\bm{\beta}}^* &= \underset{\bm{\beta}}{\text{argmax}}\;\hat\ell^* (\bm{\beta}).\label{eq:beta_}
+\end{align}
+\end{subequations}
+
+In this paper, we use the \emph{Newton conjugate gradient trust-region algorithm} to iteratively update the estimate of $\hat{\bm\beta}^*$ until convergence, when the gradient norm goes below a $10^{-5}$ tolerance. This algorithm moves in the direction of steepest ascent toward the maximum of \eqref{eq:ell_} using a local quadratic approximation \citep{steihaug_conjugate_1983}, as implemented in \emph{SciPy} \citep{virtanen_scipy_2020}. This requires first- and second-order derivatives (gradients and Hessians) which are intractable to derive analytically and inefficient to compute numerically with finite differences. Instead, we use automatic differentiation as implemented in \emph{Autograd} \citep{maclaurin_autograd_2015}, which propagates derivatives through a computation graph via the chain rule, providing accurate gradients and Hessians that make the log likelihood efficient to optimize.
+
+Numerical issues in estimation can also arise from outliers because extremely fast or slow reaction times have close to zero probability under the DDM density \eqref{eq:f}, so their log-density terms are close to $-\infty$, destabilizing optimization of the log-likelihood function. A standard remedy is a mixture model that assumes each trial is generated either by the DDM process with probability $1-\epsilon$ or by an outlier process with probability $\epsilon$, where the outlier density $f_\text{outlier}$ is taken to be uniform over the interval $(\min|\bm{Y}|, \max|\bm{Y}|)$ \citep{ratcliff_estimating_2002}. This mixture assigns outliers nonzero probability, preventing extreme log-likelihood penalties and reducing their leverage on the MLE.
+
+\subsection{Estimator Properties}\label{sec:properties}
+\subsubsection{Assumptions}\label{sec:assumptions}
+So far, we have argued that the joint process $(\bm{X}_i, Y_i)$ governed by $f_0$ from \eqref{eq:f_dep} is plausibly neither independent nor identically distributed. However, this level of generality is too broad for large-sample theory, because laws of large numbers and central limit theorems require some form of distributional constancy and restriction on serial dependence. Following \citet{hansen_probability_2022,hansen_econometrics_2022}, we adopt the intermediate assumptions of \emph{strict stationarity} and \emph{strong mixing}.
+
+\emph{Strict stationarity} generalizes ``identically distributed.'' A process is strictly stationary if the joint density of any subset of $k$ trials $f_0\bigl((\bm{X}_i, Y_i), \dots, (\bm{X}_{i+k}, Y_{i+k})\bigr)$ is invariant to the trial index $i$ \citep[Definition~14.2]{hansen_econometrics_2022}. \emph{Strong mixing} ($\alpha$-mixing) generalizes ``independence.'' It requires that dependence between events separated by a lag $m$ must vanish asymptotically as $m\to\infty$, such that the mixing coefficients which measure this dependence $\alpha(m)\to0$ \citep[Section~14.12]{hansen_econometrics_2022}. Mixing also implies the weaker condition of \emph{ergodicity} \citep[Theorem~14.14]{hansen_econometrics_2022}, and the ergodic theorem ensures consistent estimation as a generalization of the weak law of large numbers \citep[Theorem~14.9]{hansen_econometrics_2022}. Additionally, under strong mixing with sufficiently fast decay and the required moment conditions, the central limit theorem for correlated observations ensures asymptotic normality of the pseudo-MLE \citep[Theorem~14.15]{hansen_econometrics_2022}.
+
+In context, these stability properties are assumptions on the \emph{joint} process $(\bm{X}_i, Y_i)$, not on $Y_i$ alone. This distinction is important. The decision outcomes $Y_i$, and the trialwise parameters $\bm{\theta}_i = g(\bm{X}_i, \bm{\beta})$, may be nonstationary, exhibiting trends or drifts across trials. Such nonstationarity does not break the theory, provided it is explicitly modeled by the covariates $\bm{X}_i$. For example, if the drift rate $v_i$ trends over time, including the trial number as a covariate (e.g.,\ $\bm{X}_i = (1, i)$) allows $g(\bm{X}_i, \bm{\beta})$ to model this trend, rendering the joint process $(\bm{X}_i, Y_i)$ stationary even if $Y_i$ alone is not. Stationarity and mixing therefore apply to the unexplained variability in $Y_i$ after conditioning on $\bm{X}_i$, not to the marginal behavior of $Y_i$ alone. Both properties are preserved under the transformation $\bm{\theta}_i = g(\bm{X}_i, \bm{\beta})$ \citep[Theorems~14.2,14.12]{hansen_econometrics_2022}, ensuring the sequence of DDM parameters is also stationary, mixing, and ergodic.
+
+\subsubsection{Consistency}
+The pseudo-MLE $\hat{\bm{\beta}}^*$ \eqref{eq:beta_} is the maximizer of the sample log-likelihood \eqref{eq:ell_}, which is itself a sample average version of the expected log-likelihood \eqref{eq:ell}. Assuming that the underlying process $(\bm{X}_i, Y_i)$ is stationary and ergodic (as established above), the log-likelihood contributions $\log f^*(Y_i; \bm\theta_i)$ are also ergodic transformations \citep[Theorem~14.5]{hansen_econometrics_2022}. Consequently, the ergodic theorem applies \citep[Theorem~14.9]{hansen_econometrics_2022}, ensuring that the sample log-likelihood converges to the expected log-likelihood:
+\begin{equation}
+    \hat{\ell}^*(\bm\beta)  \underset{p}{\to} \ell^*(\bm\beta) \;\text{as}\;n\to\infty.
+\end{equation}
+
+Provided that the ``pseudo-true'' maximizer $\bm\beta^*$ \eqref{eq:beta} is unique (identifiable), such that $\ell^*(\bm\beta) < \ell^*(\bm\beta^*)$ for all $\bm\beta\ne\bm\beta^*$, the estimator converges to the pseudo-true parameter vector \citep[Theorem~10.8]{hansen_probability_2022}:
+\begin{equation}\label{eq:consistent}
+    \hat{\bm{\beta}}^* \underset{p}{\to} \bm{\beta}^*\;\text{as}\;n\to\infty.
+\end{equation}
+
+\subsubsection{Asymptotic Normality}
+The uncertainty of the pseudo-MLE is determined by the local curvature of the log-likelihood function at its maximum, where a sharp peak (high curvature) indicates high precision and low variance, while a flat peak (low curvature) indicates greater uncertainty. To formalize its limiting variance, we adapt the central limit theorem for the conventional MLE \citep[Theorem~10.9]{hansen_probability_2022} by replacing independent observations with \emph{strict stationarity} and \emph{strong mixing}, and allowing for misspecification of the joint density. Since consistency \eqref{eq:consistent} ensures that $\hat{\bm\beta}^*$ is close to $\bm\beta^*$ for large $n$, we can apply a Taylor approximation of the sample first-order condition $\frac{\partial}{\partial\bm\beta} \hat\ell^*(\hat{\bm\beta}^*) = 0$ around $\bm\beta^*$, yielding the large-sample approximation:
+\begin{equation}\label{eq:taylor}
+    \sqrt{n}(\hat{\bm\beta}^* - \bm\beta^*) \approx \left[-\frac{\partial^2}{\partial\bm\beta\partial\bm\beta^\prime} \hat{\ell}^*(\bm\beta^*) \right]^{-1} \left[ \sqrt{n} \frac{\partial}{\partial\bm\beta} \hat{\ell}^*(\bm\beta^*) \right].
+\end{equation}
+
+In this expansion, the gradient and Hessian are evaluated at the fixed pseudo-true parameter $\bm\beta^*$, not the random estimator $\hat{\bm\beta}^*$, allowing us to apply standard limit theorems to these terms.
+
+The first term in \eqref{eq:taylor} involves the sample Hessian evaluated at $\bm\beta^*$. By the ergodic theorem \citep[Theorem~14.9]{hansen_econometrics_2022}, it converges to the \emph{expected Hessian} $\mathcal{H}_{\bm\beta}$, defined as the negative expected second derivative:
+\begin{equation}
+    -\frac{\partial^2}{\partial\bm\beta\partial\bm\beta^\prime} \hat{\ell}^*(\bm\beta^*) \underset{p}{\to} \mathcal{H}_{\bm\beta} = -\mathbb{E}\left[\frac{\partial^2}{\partial\bm\beta\partial\bm\beta^{\prime}} \log f^*(Y_i; \bm\theta^*_i = g(\bm{X}_i, \bm\beta^*))\right].
+\end{equation}
+
+The second term in \eqref{eq:taylor} is the normalized sum of efficient scores. The \emph{efficient score} $S_i$ is the gradient of the log-likelihood for a single trial, evaluated at $\bm\beta^*$:
+\begin{equation}
+    S_i = \frac{\partial}{\partial\bm\beta} \log f^*(Y_i; \bm\theta^*_i = g(\bm{X}_i, \bm\beta^*)).
+\end{equation}
+
+Under \emph{strict stationarity} and \emph{strong mixing}, the score sequence preserves these properties \citep[Theorems~14.2 and 14.12]{hansen_econometrics_2022}, and because $\bm\beta^*$ is a maximizer, $\mathbb{E}[S_i]=0$. The \emph{Fisher Information Matrix} $\mathscr{I}_{\bm\beta}$ is the variance of these scores. While the standard form (without $\tilde{\phantom{x}}$) suffices under independence, serial correlation requires the long-run variance (with $\tilde{\phantom{x}}$), which sums the autocovariances at all lags $k$:
+\begin{equation}
+    \mathscr{I}_{\bm\beta} = \mathbb{E}[S_i S_i^\prime], \quad\tilde{\mathscr{I}}_{\bm\beta} = \sum_{k=-\infty}^{\infty} \mathbb{E}[S_i S_{i+k}^\prime].
+\end{equation}
+
+Applying a central limit theorem for correlated observations \citep[Theorem~14.15]{hansen_econometrics_2022}, the second term converges to a normal distribution determined by this long-run variance:
+\begin{equation}
+    \sqrt{n} \frac{\partial}{\partial\bm\beta} \hat{\ell}^*(\bm\beta^*) = \frac{1}{\sqrt{n}} \sum_{i=1}^n S_i \underset{d}{\to} \mathcal{N}(0, \tilde{\mathscr{I}}_{\bm\beta}).
+\end{equation}
+
+Finally, combining these limits in \eqref{eq:taylor} yields the asymptotic distribution. For correctly specified models, the information matrix equality ($\tilde{\mathscr{I}}_{\bm\beta} = \mathcal{H}_{\bm\beta}$) simplifies its covariance. However, under misspecification, this equality does not hold, resulting in a ``sandwich'' form covariance $V$ \citep[Theorem~10.16]{hansen_probability_2022}:
+\begin{equation}
+    \sqrt{n}(\hat{\bm\beta}^* - \bm\beta^*) \underset{d}{\to}  \mathcal{H}_{\bm\beta}^{-1}\;\mathcal{N} \left(0, \mathscr{I}_{\bm\beta}\right) = \mathcal{N}\left(0, V=\mathcal{H}_{\bm\beta}^{-1} \mathscr{I}_{\bm\beta} \mathcal{H}_{\bm\beta}^{-1}\right).
+\end{equation}
+
+This result accommodates both misspecification, via the failure of the information equality, and serial dependence, via the off-diagonal autocovariance terms in $\mathscr{I}_{\bm\beta}$.
+
+\subsubsection{Covariance Estimation}\label{sec:covariance-estimation}
+In practice, the asymptotic covariance is estimated by replacing population moments with their sample counterparts evaluated at the pseudo-MLE $\hat{\bm\beta}^*$. We define the sample Hessian matrix $\widehat{\mathcal{H}}_{\bm\beta}$, and the sample Fisher Information matrices (short-run $\widehat{\mathscr{I}}_{\bm\beta}$ and long-run $\widehat{\tilde{\mathscr{I}}}_{\bm\beta}$):
+\begin{equation}
+    \widehat{\mathcal{H}}_{\bm\beta} = -\frac{1}{n} \sum_{i=1}^n \frac{\partial^2}{\partial\bm\beta\partial\bm\beta^\prime} \log f^*(Y_i), \quad
+    \widehat{\mathscr{I}}_{\bm\beta} = \frac{1}{n} \sum_{i=1}^n \hat{S}_i \hat{S}_i^\prime, \quad
+    \widehat{\tilde{\mathscr{I}}}_{\bm\beta} = \frac{1}{n} \sum_{i,j=1}^n w_{|i-j|} \hat{S}_i \hat{S}_j^\prime.
+\end{equation}
+
+Here, $\hat{S}_i$ are the efficient scores evaluated at $\hat{\bm\beta}^*$, and $w_{|i-j|}$ are kernel weights (e.g., Bartlett) that taper autocovariances as the lag $|i-j|$ increases to ensure positive semi-definiteness \citep{newey_simple_1987}.
+
+We consider four estimators of the covariance matrix, ordered from most to least robust:
+\begin{subequations}
+\begin{align}
+    \widehat V_\text{AR} &= \widehat{\mathcal{H}}_{\bm\beta}^{-1} \widehat{\tilde{\mathscr{I}}}_{\bm\beta} \widehat{\mathcal{H}}_{\bm\beta}^{-1}, \label{eq:V_ar} \\
+    \widehat V_\text{MR} &= \widehat{\mathcal{H}}_{\bm\beta}^{-1}\widehat{\mathscr{I}}_{\bm\beta}\widehat{\mathcal{H}}_{\bm\beta}^{-1}, \label{eq:V_mr} \\
+    \widehat V_\text{SH} &= \widehat{\mathcal{H}}_{\bm\beta}^{-1}, \label{eq:V_sh} \\
+    \widehat V_\text{OP} &= \widehat{\mathscr{I}}_{\bm\beta}^{-1}. \label{eq:V_op}
+\end{align}
+\end{subequations}
+
+The \emph{Autocorrelation Robust (AR)} estimator \eqref{eq:V_ar} is the most general form, consistent under both misspecification and serial dependence \citep{newey_simple_1987}. The \emph{Misspecification Robust (MR)} estimator \eqref{eq:V_mr}, or ``sandwich'' estimator, allows for misspecification ($\mathcal{H}_{\bm\beta} \neq \mathscr{I}_{\bm\beta}$) but assumes independence ($\tilde{\mathscr{I}}_{\bm\beta} \approx \mathscr{I}_{\bm\beta}$) \citep{white_maximum_1982}. The \emph{Sample Hessian (SH)} \eqref{eq:V_sh} and \emph{Outer Product (OP)} \eqref{eq:V_op} estimators rely on the information matrix equality ($\mathcal{H}_{\bm\beta} = \mathscr{I}_{\bm\beta} = \tilde{\mathscr{I}}_{\bm\beta}$), which holds only when the model is correctly specified and the observations are independent \citep[Theorem~10.5]{hansen_probability_2022}. Standard errors for $\hat{\bm\beta}^*$ are constructed by taking the square roots of the diagonal elements of $\frac{1}{n}\widehat{V}$.
+
+\end{document}

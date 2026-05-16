@@ -1,0 +1,67 @@
+\documentclass[12pt]{article}
+
+% \usepackage[margin=1.375in]{geometry} % 1 3/8 inch on all sides
+
+\usepackage{subfiles} % include subfiles
+\usepackage{fullpage} % 1-in margins
+\usepackage{amsmath, amsfonts, amssymb, mathrsfs, bm, mathtools} % equations
+\mathtoolsset{showonlyrefs} % only number referenced equations
+\usepackage{graphicx} % figures
+\usepackage{subcaption} % captions
+\subcaptionsetup{margin=0.25cm}
+\captionsetup[SCfigure]{font=small}
+\usepackage[rightcaption, raggedright]{sidecap} % side captions
+\sidecaptionvpos{figure}{t} % align top
+\usepackage{float} % figures
+\usepackage{natbib} % citations + references
+\bibliographystyle{apalike-ejor} % citations + references
+\renewcommand{\familydefault}{\sfdefault} % font: CMU sans serif
+\usepackage{parskip} % no indents
+\usepackage{xcolor} % links
+\usepackage[colorlinks=true, linkcolor=gray, citecolor=gray, urlcolor=gray]{hyperref} % links
+\usepackage[bottom]{footmisc} % footnote
+
+
+% title + authors%
+\title{\Large Quantifying uncertainty in drift diffusion models of decision making under temporal dependence and parameter variability}
+\author{Gabriel Riegner $^{1}$, Armin Schwartzman $^{1,2}$, Pamela Reinagel $^{3}$\\
+{\small $^{1}$Halicio\u{g}lu Data Science Institute, University of California San Diego}\\
+{\small $^{2}$Division of Biostatistics, University of California San Diego}\\
+{\small $^{3}$Department of Neurobiology, University of California San Diego}\\
+}
+\date{}
+
+
+\begin{document}
+\maketitle
+
+\section*{Abstract}
+
+Decision-making behavior changes over time, exhibiting temporal correlation and nonstationarity. Existing drift diffusion model (DDM) fitting methods either do not provide uncertainty quantification for parameter estimates, or rely on restrictive assumptions that decisions are independent and that parameters remain constant over time, potentially underestimating uncertainty. To address these limitations, we propose a computationally efficient method for estimating analytic uncertainties in DDM parameters that are robust to temporal dependence and unmodeled parameter variability, while explicitly modeling nonstationary variability through covariates. We apply this method to rat decision-making in a two-alternative forced-choice (2AFC) visual task, revealing dynamic decision-making states across multiple timescales. A Python implementation of the method is provided.
+
+\vfill
+\noindent\textit{Keywords:} sequential decision making, perceptual decisions, time-series analysis, DDM, 2AFC
+\thispagestyle{empty}
+\newpage
+\setcounter{page}{1}
+
+\subfile{01-introduction}
+
+\subfile{02-methods}
+
+\subfile{03-simulations}
+
+\subfile{04-applications}
+
+\subfile{05-conclusions}
+
+\section{Code and Data Availability}
+The Python source code for the methods described in this paper is publicly available on GitHub (\href{https://github.com/griegner/drift-diffusion}{https://github.com/griegner/drift-diffusion}). The data, scripts, and computational environment used to reproduce the results reported in this paper are publicly available on Code Ocean (\href{https://doi.org/10.24433/CO.5868634.v1}{https://doi.org/10.24433/CO.5868634.v1}).
+
+\newpage
+
+% references
+\bigskip
+\bibliography{docs/references}
+
+\end{document}
