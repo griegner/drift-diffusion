@@ -1,0 +1,187 @@
+\documentclass[8pt,aspectratio=169]{beamer}
+\usetheme{default}
+\usecolortheme{dove}
+\setbeamercovered{transparent}
+\setbeamertemplate{navigation symbols}{} % remove navigation symbols
+
+% \usepackage{fontspec} % font
+% \setmainfont{Helvetica} % font
+
+\usepackage{natbib} % citations + references
+\bibliographystyle{apalike} % citations + references
+
+\usepackage{mathrsfs} % equations
+
+\title{Neuro-Dinner 2025}
+\author[]{Gabriel Riegner}
+\date{November 2025}
+
+\begin{document}
+
+
+% slide %
+\begin{frame}{}
+\textbf{Drift Diffusion Process}
+\begin{align}
+    Z_\tau = a z + \sum_{t=1}^\tau e_t, \quad e_t \sim \mathcal{N}(v\Delta \tau, \sigma^2 \Delta \tau)
+\end{align}
+$a > 0$ is the boundary height with decision boundaries at $\pm a$\\
+$z \in [-1, +1]$ is the relative starting point \\
+$v \in \mathbb{R}$ is the drift rate\\
+$\sigma^2$ is the Gaussian noise variance\\
+$\Delta \tau \to 0$ is a continuous drift diffusion process\\
+$\tau$ is the diffusion time index with resolution $\Delta\tau$\\
+
+\vfill
+\textbf{Choice and Reaction Time for a Single Trial}
+\begin{align}
+    RT = \begin{cases}
+        + \min\{\tau>0: Z_\tau \ge +a\} \cdot \Delta\tau + t_0\\
+        - \min\{\tau>0: Z_\tau \le -a\} \cdot \Delta\tau + t_0
+        \end{cases}
+\end{align}
+$t_0 \ge 0$ is the non-decision time\\
+$\text{sign}(RT) \in \{-1, +1\}$ is the binary choice and $|RT|> 0$ is the reaction time\\
+$+$ is upper boundary crossing, $-$ is lower boundary crossing
+
+\vfill
+\textbf{Choices and Reaction Times for Multiple Trials}
+\begin{align}
+    \{RT_i\}_{i=1}^n \sim f(RT;\theta = (a, t_0, v, z))
+\end{align}
+
+$i = 1, 2 \ldots,n$ is the trial index\\
+$f$ is the joint choice and reaction time density determined by parameters $\theta$
+\end{frame}
+
+% slide %
+\begin{frame}{}
+\textbf{Probability Density Function} \citep{feller_introduction_1968, navarro_fast_2009}
+\begin{align}
+    f(RT ; \theta) = &\frac{4\pi}{a^2}\exp\left(\frac{\text{sign}(RT)avw-v^2(|RT|-t_0)}{2}\right)\\
+    &\times\sum_{k=1}^\infty k\exp\left(-\frac{2k^2\pi^2 (|RT|-t_0)}{a^2}\right)\sin(k\pi w)\notag
+\end{align}
+
+$w = \frac{1-\text{sign}(RT)z}{2}$\\
+$|RT| > t_0$
+
+
+\vfill
+\textbf{Log-Likelihood Function}
+\begin{align}
+    \ell_n (\theta ; \{RT_i\}_{i=1}^n) = \frac{1}{n}\sum_{i=1}^n \log f(RT_i ; \theta)
+\end{align}
+
+$\ell_n$ is the average log-likelihood over all trials
+
+\vfill
+\textbf{Maximum Likelihood Estimator}
+\begin{align}
+    \hat{\theta} = \underset{\theta}{\text{argmax}}\;\ell_n (\theta ; \{RT_i\}_{i=1}^n)
+\end{align}
+
+$\hat{\theta}$ is the parameter vector that maximizes the log-likelihood
+
+\end{frame}
+
+
+% slide %
+\begin{frame}{}
+
+\textbf{Hessian Matrix}
+\begin{align}
+        \widehat{\mathcal{H}} = -\frac{1}{n}\sum_{i=1}^n\frac{\partial^2}{\partial\theta\partial\theta^{\prime}}\log f(RT_i;\hat{\theta}) =-\frac{1}{n}\frac{\partial^2}{\partial\theta\partial\theta^{\prime}}\ell_n(\hat{\theta})
+\end{align}
+$\widehat{\mathcal{H}}$ is the sample Hessian, the matrix of second derivatives of the log-likelihood
+
+\vfill
+\textbf{Fisher Information Matrix}
+\begin{align}
+    \widehat{\mathscr{I}} = \frac{1}{n}\sum_{i=1}^n\left(\frac{\partial}{\partial\theta}\log f(RT_i;\hat{\theta})\right)\left(\frac{\partial}{\partial\theta}\log f(RT_i;\hat{\theta})\right)^{\prime} = \frac{1}{n} \sum_{i=1}^n \hat{S_i} \hat{S_i}^\prime
+\end{align}
+$\hat{S_i}$ is the score vector for trial $i$, the gradient of the log-likelihood\\
+$\widehat{\mathscr{I}}$ is the sample Fisher information, the outer product of the scores
+
+\end{frame}
+
+
+\begin{frame}{}
+\textbf{Sample Hessian}
+\begin{align}
+    \widehat V_\text{SH} = \widehat{\mathcal{H}}^{-1}
+\end{align}
+$\widehat V_\text{SH}$ is the covariance matrix estimated from the Hessian
+\vfill
+
+\textbf{Outer Product}
+\begin{align}
+    \widehat V_\text{OP} = \widehat{\mathscr{I}}^{-1}
+\end{align}
+$\widehat V_\text{OP}$ is the covariance matrix estimated from the Fisher information\\
+\vfill
+
+\textbf{Misspecification Robust} $\mathscr{I} \ne \mathcal{H}$\\
+\begin{align}
+    \widehat V_\text{MR} = \widehat{\mathcal{H}}_\theta^{-1} \widehat{\mathscr{I}}_\theta \widehat{\mathcal{H}}_\theta^{-1}
+\end{align}
+$\widehat V\text{MR}$ is the sandwich estimator, robust to model misspecification
+
+\vfill
+\textbf{Autocorrelation Robust}\\
+\begin{align}
+    \widehat V_\text{AR} = \widehat{\mathcal{H}}^{-1} \left(\frac{1}{n} \sum_{i,j=1}^n w_{|i-j|} \hat{S_i} \hat{S_j}^\prime\right) \widehat{\mathcal{H}}^{-1}
+\end{align}
+$\widehat V_\text{AR}$ is a covariance matrix estimator robust to autocorrelation\\
+$w_{|i-j|}$ are weights that taper long-range autocorrelations
+
+\end{frame}
+
+% slide %
+\begin{frame}{}
+
+\textbf{Consistent Estimation} \citep[Theorem~10.8]{hansen_probability_2022}
+\begin{align}
+    \hat{\theta} \underset{p}{\to} \theta_0\;\text{as}\;n\to\infty
+\end{align}
+
+under \emph{Stationarity} and \emph{Ergodicity} \citep[Theorem~14.9]{hansen_econometrics_2022}\\
+denotes convergence in probability of the estimator $\hat\theta$ to the true value $\theta_0$
+
+\vfill
+\textbf{Asymptotic Normality} \citep[Theorem~10.16]{hansen_probability_2022}
+\begin{align}
+    \sqrt{n}(\hat{\theta} - \theta_0) \underset{d}{\to} \mathcal{N}(0, V) \;\text{as}\;n\to\infty
+\end{align}
+
+under \emph{Strong Mixing} \citep[Theorem~14.15]{hansen_econometrics_2022}\\
+denotes convergence in distribution to a Gaussian with mean 0 and covariance $V$
+\end{frame}
+
+\begin{frame}{}
+    \begin{align}
+        \hat{a}\; \bar{a}\\
+        |\hat{v}|\; |\bar{v}|\\
+        \hat{z}\; \bar{z}
+    \end{align}
+
+    \begin{align}
+         \hat{f}(RT)\\
+         f(RT; \theta^{(0)})\\
+         f(RT; \hat\theta)
+    \end{align}
+
+    \begin{align}
+         \ell_n (\theta=(a,v) ; \{RT_i\}_{i=1}^n)\\
+         \ell_n (\theta=v ; \{RT_i\}_{i=1}^n)
+    \end{align}
+
+    \begin{align}
+        a_i = a_{i-1} + \mathcal{N}(0, 0.02)
+    \end{align}
+\end{frame}
+
+\begin{frame}{}
+    \bibliography{docs/references}
+\end{frame}
+
+\end{document}
