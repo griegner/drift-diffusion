@@ -3,7 +3,7 @@
 
 <img src="./readme.png" width="800"/>
 
-[![manuscript](https://img.shields.io/badge/manuscript-PDF-red?style=flat&logo=google-docs&logoColor=white)](https://griegner.github.io/drift-diffusion/manuscript/bioRxiv-16MAY2026.pdf)
+[![bioRxiv](https://img.shields.io/badge/bioRxiv-PDF-red?style=flat&logo=google-docs&logoColor=white)](https://www.biorxiv.org/content/10.64898/2026.05.17.722295v1.full.pdf)
 [![project poster](https://img.shields.io/badge/poster-PDF-red?style=flat&logo=google-docs&logoColor=white)](https://griegner.github.io/drift-diffusion/poster/poster-15NOV2025.pdf)
 [![project slides](https://img.shields.io/badge/slides-PDF-red?style=flat&logo=google-slides&logoColor=white)](https://griegner.github.io/drift-diffusion/slides/slides-12NOV2025.pdf)
 [![codecov](https://codecov.io/gh/griegner/drift-diffusion/graph/badge.svg?token=VP43QWD2NS)](https://codecov.io/gh/griegner/drift-diffusion)
@@ -56,8 +56,8 @@ excluded from optimization but included in likelihood evaluation.
 ```python
 >>> y = sample_from_pdf(a=1.0, t0=0.2, v=0.3, z=0, n_samples=n, random_state=0)
 >>> ddm = DriftDiffusionModel(a="+1", t0=0.2, v=0.3, z=0).fit(X, y)  # intercept/constant `a`
->>> ddm.params_, ddm.covariance_ # parameter/standard error estimates for `a`
-(array([0.99537521]), array([[0.0001443]]))
+>>> ddm.params_, np.sqrt(ddm.covariance_) # parameter/standard error estimates for `a`
+(array([0.99537521]), array([[0.01201239]]))
 ```
 
 (ii) *Free*: set `v = beta * stim`; fit `a, beta, t0, z`

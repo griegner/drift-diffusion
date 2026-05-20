@@ -69,8 +69,8 @@ class DriftDiffusionModel(BaseEstimator):
         (i) *Fixed*: fix `t0, v, z`; fit `a`
         >>> y = sample_from_pdf(a=1.0, t0=0.2, v=0.3, z=0, n_samples=n, random_state=0)
         >>> ddm = DriftDiffusionModel(a="+1", t0=0.2, v=0.3, z=0).fit(X, y)  # intercept/constant a
-        >>> ddm.params_, ddm.covariance_ # parameter/standard error estimates for a
-        (array([0.99537521]), array([[0.0001443]]))
+        >>> ddm.params_, np.sqrt(ddm.covariance_) # parameter/standard error estimates for a
+        (array([0.99537521]), array([[0.01201239]]))
 
         (ii) *Free*: set `v = beta * stim`; fit `a`, `beta`, `t0`, `z`
         >>> beta_v = 0.8; v = beta_v * stim # v as linear function of stimulus
