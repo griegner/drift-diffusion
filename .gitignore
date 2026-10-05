@@ -16,3 +16,6 @@ pixi.lock
 
 # code ocean
 results/*.svg
+
+# revisions
+REVISIONS.md
