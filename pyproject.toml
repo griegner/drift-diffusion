@@ -8,23 +8,24 @@ version = "0.0.1"
 authors = [{name = "Gabriel Riegner", email = "gariegner@ucsd.edu"}]
 description = "drift diffusion models of decision making"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
-    "autograd",
-    "better_optimize",
-    "formulaic",
-    "numpy",
-    "pandas",
-    "scikit-learn",
-    "scipy",
-    "statsmodels",
+    "autograd>=1.9.1,<2",
+    "better-optimize>=0.4.2,<0.5",
+    "formulaic>=1.2.2,<2",
+    "notebook>=7.6.3,<8",
+    "numpy>=2.4.6,<3",
+    "pandas>=3.0.6,<4",
+    "scikit-learn>=1.9.1,<2",
+    "scipy>=1.18.1,<2",
+    "statsmodels>=0.15.0,<0.16",
 ]
 
 [project.optional-dependencies]
 code-ocean = [
-    "hssm",
-    "matplotlib",
-    "seaborn",
+    "hssm>=0.5.0,<0.6",
+    "matplotlib>=3.11.2,<4",
+    "seaborn>=0.13.2,<0.14",
 ]
 
 [tool.setuptools]
@@ -36,19 +37,19 @@ platforms = ["win-64", "linux-64", "osx-arm64"]
 
 [tool.pixi.dependencies]
 # conda dependencies
-python = "3.12.*"
+python = ">=3.12"
 
 [tool.pixi.pypi-dependencies]
 # pypi dependencies
 drift_diffusion = { path=".", editable=true }
-pyddm = "*"
+pyddm = ">=0.9.0, <0.10"
 
 [tool.pixi.feature.lint.dependencies]
 # matches version in .pre-commit-config.yaml
-pre-commit = "==4.2.0"
-black = "==24.10.0"
-ruff = "==0.7.0"
-pyupgrade = "==3.19.1"
+pre-commit = ">=4.6.2,<5"
+black = ">=26.5.1,<27"
+ruff = ">=0.16.10,<0.17"
+pyupgrade = ">=3.21.2,<4"
 
 [tool.pixi.feature.lint.tasks]
 black = { cmd = "black --check --diff drift_diffusion" }
@@ -56,9 +57,9 @@ ruff = { cmd = "ruff check --output-format=full drift_diffusion" }
 lint = { depends-on = ["black", "ruff"]}
 
 [tool.pixi.feature.test.dependencies]
-pytest = "*"
-pytest-cov = "*"
-py-spy = "*"
+pytest = ">=9.1.1,<10"
+pytest-cov = ">=7.1.0,<8"
+py-spy = ">=0.4.2,<0.5"
 
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest -vsl --cov=drift_diffusion --cov-report=xml drift_diffusion" }
@@ -93,7 +94,6 @@ exclude=[
     "__pycache__",
     "dist",
     "build",
-    "*ipynb" # ignore example notebook (for now)
 ]
 
 [tool.ruff.lint]
