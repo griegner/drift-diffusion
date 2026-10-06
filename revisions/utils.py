@@ -28,3 +28,14 @@ def conditional_accuracy(rt, a, t0, v, z, err=1e-3, *, correct_boundary=1):
     f_correct = np.average(np.where(correct_boundary[:, None] == 1, f_upper, f_lower), axis=0)
     f_total = np.average(f_upper + f_lower, axis=0)
     return np.divide(f_correct, f_total, out=np.full_like(f_total, np.nan), where=f_total > 0)
+
+
+def conditional_accuracy_sdv(rt, **params):
+    """CAF integrated over iid normal drift; +1 denotes a correct response."""
+    from hssm.likelihoods.analytical import logp_ddm_sdv
+
+    rt = np.asarray(rt)
+    logp_correct, logp_error = (
+        logp_ddm_sdv(np.column_stack((rt, np.full_like(rt, response))), **params).eval() for response in (1, -1)
+    )
+    return np.exp(logp_correct - np.logaddexp(logp_correct, logp_error))

@@ -19,6 +19,7 @@ dependencies = [
     "scikit-learn>=1.9.1,<2",
     "scipy>=1.18.1,<2",
     "statsmodels>=0.15.0,<0.16",
+    "ipywidgets>=8.1,<9",
 ]
 
 [project.optional-dependencies]
