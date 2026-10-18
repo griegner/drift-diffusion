@@ -18,7 +18,7 @@ if [[ "$mode" == "test" ]]; then
     echo "-> fig02"
     ./fig02to04.py --setting constant --n-samples 100 --n-repeats 20
     echo "-> fig03"
-    ./fig02to04.py --setting coherence --n-samples 100 --n-repeats 20
+    ./fig02to04.py --setting time --n-samples 100 --n-repeats 20
     echo "-> fig04"
     ./fig02to04.py --setting iid --n-samples 100 --n-repeats 20
 
@@ -49,7 +49,7 @@ elif [[ "$mode" == "paper" ]]; then
     echo "-> fig02"
     ./fig02to04.py --setting constant
     echo "-> fig03"
-    ./fig02to04.py --setting coherence
+    ./fig02to04.py --setting time
     echo "-> fig04"
     ./fig02to04.py --setting iid
 

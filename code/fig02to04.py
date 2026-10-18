@@ -72,7 +72,7 @@ def plot_parameter_distributions(params_df, true_params):
     g.map_lower(_lower_plot)
     g.map_diag(_diag_plot)
 
-    label_map = {"a": r"$a$", "t0": r"$t_0$", "v": r"$v$", "beta_v": r"$\beta_v$", "z": r"$z$"}
+    label_map = {"a": r"$a$", "beta_a": r"$\beta_a$", "t0": r"$t_0$", "v": r"$v$", "z": r"$z$"}
     for i, col in enumerate(params_df.columns):
         label = label_map[col]
         g.axes[-1, i].set_xlabel(label, fontsize=22)
@@ -102,7 +102,7 @@ def plot_covariance_distributions(covs_df, params_df):
 
     n_cols = g._ncol
     correlations = cov_to_corr(np.cov(params_df.T)).flatten()
-    label_map = {"a": r"$a$", "t0": r"$t_0$", "v": r"$v$", "beta_v": r"$\beta_v$", "z": r"$z$"}
+    label_map = {"a": r"$a$", "beta_a": r"$\beta_a$", "t0": r"$t_0$", "v": r"$v$", "z": r"$z$"}
     param_labels = [label_map[col] for col in params_df.columns]
     for idx, (ax, correlation) in enumerate(zip(g.axes.flat, correlations)):
         row, col = divmod(idx, n_cols)
@@ -133,7 +133,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
     kwargs = dict(n_samples=n_samples, n_repeats=n_repeats, random_state=0)
     figure_paths = {
         "constant": ("../results/fig02a", "../results/fig02b"),
-        "coherence": ("../results/fig03a", "../results/fig03b"),
+        "time": ("../results/fig03a", "../results/fig03b"),
         "iid": ("../results/fig04a", "../results/fig04b"),
     }
     path_a, path_b = figure_paths[setting]
@@ -155,22 +155,20 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         ddm = DriftDiffusionModel(cov_estimator="all")
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
-    def setup_coherence():
-        """setup v as linear function of coherence"""
+    def setup_time():
+        """setup a as linear function of normalized time in session"""
 
-        param_names = ["a", "t0", "beta_v", "z"]
+        param_names = ["beta_a", "t0", "v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 
-        beta_v = 1
-        coh = np.linspace(
-            params["v"] + params_s["v"] * np.sqrt(3), params["v"] - params_s["v"] * np.sqrt(3), kwargs["n_samples"]
-        )
-        v_coh = beta_v * coh
-        pseudotrue_params = {"a": params["a"], "t0": params["t0"], "beta_v": beta_v, "z": params["z"]}
+        beta_a = params["a"]
+        time = np.linspace(0.8, 1.2, kwargs["n_samples"])
+        a_time = beta_a * time
+        pseudotrue_params = {"beta_a": beta_a, "t0": params["t0"], "v": params["v"], "z": params["z"]}
 
-        X = pd.DataFrame({"intercept": np.ones(kwargs["n_samples"]), "coherence": coh})
-        ys = sample_from_pdf(a=params["a"], t0=params["t0"], v=v_coh, z=params["z"], **kwargs)
-        ddm = DriftDiffusionModel(v="-1+coherence", cov_estimator="all", p_outlier=1e-12)
+        X = pd.DataFrame({"intercept": np.ones(kwargs["n_samples"]), "time": time})
+        ys = sample_from_pdf(a=a_time, t0=params["t0"], v=params["v"], z=params["z"], **kwargs)
+        ddm = DriftDiffusionModel(a="-1+time", cov_estimator="all", p_outlier=1e-12)
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
     def setup_iid():
@@ -197,12 +195,12 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
 
     if setting == "constant":
         X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_constant()
-    elif setting == "coherence":
-        X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_coherence()
+    elif setting == "time":
+        X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_time()
     elif setting == "iid":
         X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_iid()
     else:
-        raise ValueError("choose 'constant', 'coherence', or 'iid'")
+        raise ValueError("choose 'constant', 'time', or 'iid'")
 
     @delayed
     def run_simulation(rep):
@@ -232,7 +230,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Figures 02-04: Simulation Results")
     parser.add_argument(
-        "--setting", type=str, choices=["constant", "coherence", "iid"], default="constant", help="simulation setting"
+        "--setting", type=str, choices=["constant", "time", "iid"], default="constant", help="simulation setting"
     )
     parser.add_argument("--n-samples", type=int, default=1000, help="number of trials to simulate per repeat")
     parser.add_argument("--n-repeats", type=int, default=900, help="number of simulation repeats")
