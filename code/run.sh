@@ -32,7 +32,11 @@ if [[ "$mode" == "test" ]]; then
 
     # fig 07
     echo "-> fig07"
-    ./fig07.py --n-samples 200 500 --n-repeats 1
+    ./fig07.py --n-trials 200
+
+    # fig08
+    echo "-> fig08"
+    ./fig08.py --n-samples 200 500 --n-repeats 1
 
 elif [[ "$mode" == "paper" ]]; then
     echo "\nrunning PAPER mode ...\n"
@@ -59,7 +63,11 @@ elif [[ "$mode" == "paper" ]]; then
 
     # fig 07
     echo "-> fig07"
-    ./fig07.py --csv
+    ./fig07.py
+
+    # fig08
+    echo "-> fig08"
+    ./fig08.py --csv
 
 else
     echo "Usage: ./run.sh [test|paper]"
