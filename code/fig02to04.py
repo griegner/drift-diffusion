@@ -19,7 +19,7 @@ from tqdm import tqdm
 from drift_diffusion.model import DriftDiffusionModel, pdf
 from drift_diffusion.sim import sample_from_pdf
 
-with open("./config.json") as f:
+with (Path(__file__).resolve().parent / "config.json").open() as f:
     rc_params = json.load(f)["rc-params"]
     rc_params["figure.constrained_layout.use"] = False
     plt.rcParams.update(rc_params)
