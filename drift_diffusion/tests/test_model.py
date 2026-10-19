@@ -6,6 +6,7 @@ import pytest
 from joblib import Parallel, delayed
 from numpy import testing
 from pyddm import gddm
+from sklearn.base import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.utils.estimator_checks import parametrize_with_checks
 
@@ -117,6 +118,39 @@ def test_cov_estimator():
     for cov in covariances_:
         assert cov.shape == (4, 4)
         testing.assert_allclose(covariances_[0], cov, atol=0.001)
+
+
+@pytest.mark.parametrize("autocorrelation_lags", [0, 4, 20])
+def test_autocorrelation_lags(autocorrelation_lags):
+    """Custom bandwidth matches Bartlett weights and leaves the fit/other covariances unchanged."""
+    y = sample_from_pdf(a=0.7, t0=0.2, v=1.2, z=0.1, n_samples=120, random_state=0)
+    X = pd.DataFrame({"intercept": np.ones(len(y))})
+    default = DriftDiffusionModel(cov_estimator="all").fit(X, y)
+    custom = clone(DriftDiffusionModel(cov_estimator="all", autocorrelation_lags=autocorrelation_lags)).fit(X, y)
+    assert custom.autocorrelation_lags == autocorrelation_lags
+    testing.assert_allclose(custom.params_, default.params_, rtol=1e-12)
+    for name in ["sample-hessian", "outer-product", "misspecification-robust"]:
+        testing.assert_allclose(custom.covariance_[name], default.covariance_[name], rtol=1e-12)
+
+    distance = np.abs(np.arange(len(y))[:, None] - np.arange(len(y))[None, :])
+    weights = np.maximum(0, 1 - distance / (autocorrelation_lags + 1))
+    hessian_inv = custom.covariance_["sample-hessian"]
+    expected = hessian_inv @ (custom.score_.T @ weights @ custom.score_) @ hessian_inv
+    testing.assert_allclose(custom.covariance_["autocorrelation-robust"], expected, rtol=1e-10, atol=1e-13)
+    if autocorrelation_lags == 0:
+        testing.assert_allclose(expected, custom.covariance_["misspecification-robust"], rtol=1e-12)
+    elif autocorrelation_lags == 4:  # Existing automatic cutoff for 120 observations.
+        testing.assert_allclose(expected, default.covariance_["autocorrelation-robust"], rtol=1e-12, atol=1e-13)
+
+
+@pytest.mark.parametrize("autocorrelation_lags", [-1, 1.5, True, "20"])
+def test_autocorrelation_lags_raises(autocorrelation_lags):
+    """Reject invalid bandwidths instead of silently changing the HAC weights."""
+    y = sample_from_pdf(a=0.7, t0=0.2, v=1.2, z=0.1, n_samples=20, random_state=0)
+    X = pd.DataFrame({"intercept": np.ones(len(y))})
+    ddm = DriftDiffusionModel(cov_estimator="autocorrelation-robust", autocorrelation_lags=autocorrelation_lags)
+    with pytest.raises(ValueError, match="autocorrelation_lags must be a nonnegative integer or None"):
+        ddm.fit(X, y)
 
 
 def test_fitted_pdf():

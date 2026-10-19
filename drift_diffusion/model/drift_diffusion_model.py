@@ -1,6 +1,7 @@
 """Drift diffusion model."""
 
 from functools import cache
+from numbers import Integral
 
 import autograd.numpy as np
 from autograd import hessian, jacobian
@@ -16,7 +17,17 @@ from .pdf import pdf
 
 
 class DriftDiffusionModel(BaseEstimator):
-    def __init__(self, a="+1", t0="+1", v="+1", z="+1", cov_estimator="sample-hessian", p_outlier=1e-12, verbose=False):
+    def __init__(
+        self,
+        a="+1",
+        t0="+1",
+        v="+1",
+        z="+1",
+        cov_estimator="sample-hessian",
+        autocorrelation_lags=None,
+        p_outlier=1e-12,
+        verbose=False,
+    ):
         """Drift diffusion model (DDM) of binary decision making.
 
         DriftDiffusionModel fits decision making parameters by maximum likelihood estimation.
@@ -45,6 +56,9 @@ class DriftDiffusionModel(BaseEstimator):
         cov_estimator : str
             {"sample-hessian", "outer-product", "misspecification-robust",
              "autocorrelation-robust", "all"}, by default "sample-hessian"
+        autocorrelation_lags : int or None, default None
+            Bartlett lag cutoff for autocorrelation-robust covariance. None uses
+            floor(4 * (n_samples / 100) ** (2 / 9)); zero gives the MR covariance.
         p_outlier : float
             mixture probability (`0-1`) that a trial is drawn from a uniform outlier
             distribution rather than the DDM, by default 1e-12
@@ -100,6 +114,7 @@ class DriftDiffusionModel(BaseEstimator):
         super().__init__()
         self.a, self.t0, self.v, self.z = a, t0, v, z
         self.cov_estimator = cov_estimator
+        self.autocorrelation_lags = autocorrelation_lags
         self.p_outlier = p_outlier
         self.verbose = verbose
 
@@ -219,6 +234,8 @@ class DriftDiffusionModel(BaseEstimator):
             jac = jac[:, np.newaxis] if jac.ndim == 1 else jac
             if n_lags is None:
                 n_lags = int(np.floor(4 * (len(jac) / 100.0) ** (2.0 / 9.0)))
+            elif isinstance(n_lags, bool) or not isinstance(n_lags, Integral) or n_lags < 0:
+                raise ValueError("autocorrelation_lags must be a nonnegative integer or None")
             weights = 1 - np.arange(n_lags + 1) / (n_lags + 1)
             outer_product = jac.T @ jac
             for lag in range(1, n_lags + 1):
@@ -229,7 +246,7 @@ class DriftDiffusionModel(BaseEstimator):
         def autocorrelation_robust():
             hessian_inv_ = get_hessian_inv()
             score_ = get_score()
-            newey_west_ = newey_west(score_)
+            newey_west_ = newey_west(score_, n_lags=self.autocorrelation_lags)
             return hessian_inv_ @ newey_west_ @ hessian_inv_
 
         cov_estimators = {

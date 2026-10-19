@@ -4,7 +4,6 @@
 
 import argparse
 import json
-from itertools import product
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -27,15 +26,14 @@ with open("./config.json") as f:
 
 
 def persistent_cdfs(params):
-    """Conditional signed-RT CDFs for the eight combinations of binary states."""
+    """conditional signed-RT CDFs for the two shared parameter states."""
 
-    # Illustrative half-ranges, chosen in pilots to expose marginal and serial effects.
-    amplitudes = dict(t0=0.06, v=1.33, z=0.60)
+    amplitudes = dict(t0=0.03, v=1.33, z=0.60)
     rt = np.linspace(params["t0"] - amplitudes["t0"] + 1e-6, params["t0"] + 12, 16001)
     y = np.r_[-rt, rt]
     cdfs = []
-    for signs in product([-1, 1], repeat=3):
-        p = {**params, **{k: params[k] + s * amplitudes[k] for k, s in zip(amplitudes, signs)}}
+    for sign in [-1, 1]:
+        p = {**params, **{k: params[k] + sign * amplitude for k, amplitude in amplitudes.items()}}
         density = np.zeros_like(y)
         supported = abs(y) > p["t0"]
         density[supported] = pdf(y[supported], **p)
@@ -47,20 +45,24 @@ def persistent_cdfs(params):
     return np.r_[-rt[::-1], rt], np.array(cdfs)
 
 
+def persistent_states(n_samples, rng):
+    """stationary shared binary state with P(stay) = 0.75 (lag-one correlation 0.50)."""
+
+    state = np.empty(n_samples, dtype=int)
+    state[0] = rng.integers(2)
+    state[1:] = (state[0] + np.cumsum(rng.random(n_samples - 1) < 0.25)) % 2
+    return state
+
+
 def sample_persistent(n_samples, rep, signed_rt, cdfs, seed=0):
-    """Fresh stationary, independent state chains and conditional noise per replication."""
+    """fresh stationary shared state and independent conditional noise per replication."""
 
     rng = np.random.default_rng(np.random.SeedSequence([seed, rep]))
-    states = np.empty((3, n_samples), dtype=int)
-    for state in states:
-        state[0] = rng.integers(2)
-        # P(stay) = 0.85, hence lag-one state correlation = 0.70.
-        state[1:] = (state[0] + np.cumsum(rng.random(n_samples - 1) < 0.15)) % 2
-    component = 4 * states[0] + 2 * states[1] + states[2]
+    state = persistent_states(n_samples, rng)
     u = rng.random(n_samples)
     y = np.empty(n_samples)
     for j, cdf in enumerate(cdfs):
-        mask = component == j
+        mask = state == j
         y[mask] = np.interp(u[mask], cdf, signed_rt)
     return y
 
@@ -78,7 +80,7 @@ def zero_formatter():
     """format tick labels"""
 
     return FuncFormatter(
-        lambda v, _: ("0" if np.isclose(v, 0) else (f"{v:.2f}" if f"{v:.3f}".endswith("0") else f"{v:.3f}"))
+        lambda v, _: "0" if np.isclose(v, 0) else (f"{v:.2f}" if f"{v:.3f}".endswith("0") else f"{v:.3f}")
     )
 
 
@@ -204,14 +206,14 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer, output_dir="../results")
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
     def setup_persistent():
-        """Unmodeled persistent t0, v, z states; fit all four constants freely."""
+        """unmodeled shared t0, v, z state; fit all four constants freely."""
 
         param_names = ["a", "t0", "v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 
-        # Expected working likelihood integrated over the eight equally weighted
-        # stationary components; doubling the grid changes each target by < 2e-10.
-        pseudotrue_params = dict(a=0.574811573912, t0=0.339121135155, v=1.266882041136, z=-0.042264693209)
+        # Expected working likelihood integrated over the two equally weighted
+        # stationary components on a 32,001-point RT grid per response.
+        pseudotrue_params = dict(a=0.480982694715, t0=0.398542819174, v=1.526425715608, z=-0.277543237917)
 
         X = pd.DataFrame({"intercept": np.ones(kwargs["n_samples"])})
         signed_rt, cdfs = persistent_cdfs(params)
@@ -221,7 +223,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer, output_dir="../results")
                 for rep in range(n_repeats)
             ]
         )
-        ddm = DriftDiffusionModel(cov_estimator="all")
+        ddm = DriftDiffusionModel(cov_estimator="all", autocorrelation_lags=20)
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
     if setting == "constant":
