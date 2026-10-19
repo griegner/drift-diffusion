@@ -20,7 +20,7 @@ if [[ "$mode" == "test" ]]; then
     echo "-> fig03"
     ./fig02to04.py --setting time --n-samples 100 --n-repeats 20
     echo "-> fig04"
-    ./fig02to04.py --setting iid --n-samples 100 --n-repeats 20
+    ./fig02to04.py --setting persistent --n-samples 100 --n-repeats 20
 
     # fig05-06
     echo "-> fig05-06"
@@ -51,7 +51,7 @@ elif [[ "$mode" == "paper" ]]; then
     echo "-> fig03"
     ./fig02to04.py --setting time
     echo "-> fig04"
-    ./fig02to04.py --setting iid
+    ./fig02to04.py --setting persistent
 
     # fig05-06
     echo "-> fig05-06"

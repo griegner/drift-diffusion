@@ -4,6 +4,8 @@
 
 import argparse
 import json
+from itertools import product
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,10 +13,11 @@ import pandas as pd
 import seaborn as sns
 from joblib import Parallel, delayed
 from matplotlib.ticker import FuncFormatter
+from scipy.integrate import cumulative_trapezoid
 from sklearn.base import clone
 from tqdm import tqdm
 
-from drift_diffusion.model import DriftDiffusionModel
+from drift_diffusion.model import DriftDiffusionModel, pdf
 from drift_diffusion.sim import sample_from_pdf
 
 with open("./config.json") as f:
@@ -23,14 +26,43 @@ with open("./config.json") as f:
     plt.rcParams.update(rc_params)
 
 
-def iid_params(n_samples, params, params_s, seed=1):
-    """generate DDM parameters with iid variability (i.e. 7-param DDM)"""
+def persistent_cdfs(params):
+    """Conditional signed-RT CDFs for the eight combinations of binary states."""
 
-    rng = np.random.default_rng(seed=seed)
-    t0_iid = rng.uniform(params["t0"] - params_s["t0"] / 2, params["t0"] + params_s["t0"] / 2, size=n_samples)
-    v_iid = rng.normal(params["v"], params_s["v"], size=n_samples)
-    z_iid = rng.uniform(params["z"] - params_s["z"] / 2, params["z"] + params_s["z"] / 2, size=n_samples)
-    return t0_iid, v_iid, z_iid
+    # Illustrative half-ranges, chosen in pilots to expose marginal and serial effects.
+    amplitudes = dict(t0=0.06, v=1.33, z=0.60)
+    rt = np.linspace(params["t0"] - amplitudes["t0"] + 1e-6, params["t0"] + 12, 16001)
+    y = np.r_[-rt, rt]
+    cdfs = []
+    for signs in product([-1, 1], repeat=3):
+        p = {**params, **{k: params[k] + s * amplitudes[k] for k, s in zip(amplitudes, signs)}}
+        density = np.zeros_like(y)
+        supported = abs(y) > p["t0"]
+        density[supported] = pdf(y[supported], **p)
+        integrals = cumulative_trapezoid(density.reshape(2, -1), rt, axis=1, initial=0)
+        masses = integrals[:, -1]
+        if not np.isclose(masses.sum(), 1, atol=2e-7, rtol=0):
+            raise ValueError("Conditional RT grid has insufficient probability mass")
+        cdfs.append(np.r_[masses[0] - integrals[0, ::-1], masses[0] + integrals[1]] / masses.sum())
+    return np.r_[-rt[::-1], rt], np.array(cdfs)
+
+
+def sample_persistent(n_samples, rep, signed_rt, cdfs, seed=0):
+    """Fresh stationary, independent state chains and conditional noise per replication."""
+
+    rng = np.random.default_rng(np.random.SeedSequence([seed, rep]))
+    states = np.empty((3, n_samples), dtype=int)
+    for state in states:
+        state[0] = rng.integers(2)
+        # P(stay) = 0.85, hence lag-one state correlation = 0.70.
+        state[1:] = (state[0] + np.cumsum(rng.random(n_samples - 1) < 0.15)) % 2
+    component = 4 * states[0] + 2 * states[1] + states[2]
+    u = rng.random(n_samples)
+    y = np.empty(n_samples)
+    for j, cdf in enumerate(cdfs):
+        mask = component == j
+        y[mask] = np.interp(u[mask], cdf, signed_rt)
+    return y
 
 
 def cov_to_corr(cov):
@@ -127,20 +159,20 @@ def plot_covariance_distributions(covs_df, params_df):
     return g
 
 
-def main(setting, n_samples, n_repeats, n_jobs, prefer):
+def main(setting, n_samples, n_repeats, n_jobs, prefer, output_dir="../results"):
     "fig02,03,04"
 
     kwargs = dict(n_samples=n_samples, n_repeats=n_repeats, random_state=0)
     figure_paths = {
-        "constant": ("../results/fig02a", "../results/fig02b"),
-        "time": ("../results/fig03a", "../results/fig03b"),
-        "iid": ("../results/fig04a", "../results/fig04b"),
+        "constant": ("fig02a", "fig02b"),
+        "time": ("fig03a", "fig03b"),
+        "persistent": ("fig04a", "fig04b"),
     }
-    path_a, path_b = figure_paths[setting]
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    path_a, path_b = (Path(output_dir) / name for name in figure_paths[setting])
 
     # DDM parameters, from Matzke 2009, Table 3 (Mean)
     params = dict(a=0.63, t0=0.435, v=2.23, z=0.008)
-    params_s = dict(t0=0.018, v=1.33, z=0.37)
 
     def setup_constant():
         """setup constant DDM parameters"""
@@ -171,25 +203,24 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         ddm = DriftDiffusionModel(a="-1+time", cov_estimator="all", p_outlier=1e-12)
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
-    def setup_iid():
-        """setup t0, v, z to vary iid"""
+    def setup_persistent():
+        """Unmodeled persistent t0, v, z states; fit all four constants freely."""
 
         param_names = ["a", "t0", "v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 
-        n = 10_000
-        X_pt = pd.DataFrame({"intercept": np.ones(n)})
-        t0_iid, v_iid, z_iid = iid_params(n, params, params_s)
-        y_pt = sample_from_pdf(
-            a=params["a"], t0=t0_iid, v=v_iid, z=z_iid, n_samples=n, n_repeats=1, random_state=kwargs["random_state"]
-        )
-        ddm = DriftDiffusionModel()
-        ddm.fit(X_pt, y_pt)
-        pseudotrue_params = dict(zip(param_names, ddm.params_))
+        # Expected working likelihood integrated over the eight equally weighted
+        # stationary components; doubling the grid changes each target by < 2e-10.
+        pseudotrue_params = dict(a=0.574811573912, t0=0.339121135155, v=1.266882041136, z=-0.042264693209)
 
         X = pd.DataFrame({"intercept": np.ones(kwargs["n_samples"])})
-        t0_iid, v_iid, z_iid = iid_params(kwargs["n_samples"], params, params_s)
-        ys = sample_from_pdf(a=params["a"], t0=t0_iid, v=v_iid, z=z_iid, **kwargs)
+        signed_rt, cdfs = persistent_cdfs(params)
+        ys = np.column_stack(
+            [
+                sample_persistent(n_samples, rep, signed_rt, cdfs, seed=kwargs["random_state"])
+                for rep in range(n_repeats)
+            ]
+        )
         ddm = DriftDiffusionModel(cov_estimator="all")
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
@@ -197,10 +228,10 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_constant()
     elif setting == "time":
         X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_time()
-    elif setting == "iid":
-        X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_iid()
+    elif setting == "persistent":
+        X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_persistent()
     else:
-        raise ValueError("choose 'constant', 'time', or 'iid'")
+        raise ValueError("choose 'constant', 'time', or 'persistent'")
 
     @delayed
     def run_simulation(rep):
@@ -210,11 +241,19 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
             {"estimator": k, **{cov_names[i]: val for i, val in enumerate(cov_to_corr(v).flatten())}}
             for k, v in ddm_cp.covariance_.items()
         ]
-        return ddm_cp.params_, covs_
+        # Retain untrimmed numerical results and optimizer diagnostics for validation.
+        audit = dict(
+            cov=np.array(list(ddm_cp.covariance_.values())),
+            success=bool(ddm_cp.fit_.success),
+            message=str(ddm_cp.fit_.message),
+            gradient_max=float(np.max(abs(ddm_cp.fit_.jac))),
+            score_ac1=np.array([np.corrcoef(s[:-1], s[1:])[0, 1] for s in ddm_cp.score_.T]),
+        )
+        return ddm_cp.params_, covs_, audit
 
     with Parallel(n_jobs=n_jobs, prefer=prefer) as parallel:
         results = parallel(run_simulation(rep) for rep in tqdm(range(kwargs["n_repeats"])))
-        params_, covs_ = zip(*results)
+        params_, covs_, audits = zip(*results)
         params_df = pd.DataFrame(params_, columns=param_names)
         covs_df = pd.DataFrame([row for c in covs_ for row in c])
 
@@ -224,20 +263,27 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
     fig = plot_covariance_distributions(covs_df, params_df)
     fig.savefig(path_b)
 
+    return dict(
+        params=np.array(params_),
+        target=np.array(list(pseudotrue_params.values())),
+        **{key: np.array([audit[key] for audit in audits]) for key in audits[0]},
+    )
+
 
 if __name__ == "__main__":
     """set script defaults"""
 
     parser = argparse.ArgumentParser(description="Figures 02-04: Simulation Results")
     parser.add_argument(
-        "--setting", type=str, choices=["constant", "time", "iid"], default="constant", help="simulation setting"
+        "--setting", type=str, choices=["constant", "time", "persistent"], default="constant", help="simulation setting"
     )
     parser.add_argument("--n-samples", type=int, default=1000, help="number of trials to simulate per repeat")
     parser.add_argument("--n-repeats", type=int, default=900, help="number of simulation repeats")
     parser.add_argument("--n-jobs", type=int, default=-1, help="number of parallel jobs")
+    parser.add_argument("--output-dir", default="../results", help="directory for figure panels")
     parser.add_argument(
         "--prefer", choices=["processes", "threads"], default="processes", help="joblib parallel backend"
     )
     args = parser.parse_args()
 
-    main(args.setting, args.n_samples, args.n_repeats, args.n_jobs, args.prefer)
+    main(args.setting, args.n_samples, args.n_repeats, args.n_jobs, args.prefer, args.output_dir)
