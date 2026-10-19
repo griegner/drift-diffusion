@@ -25,46 +25,71 @@ with open("./config.json") as f:
     plt.rcParams.update(rc_params)
 
 
-def persistent_cdfs(params):
-    """conditional signed-RT CDFs for the two shared parameter states."""
+def persistent_parameters():
+    """Matzke Table 3 scales: near-neutral engagement and persistent right bias."""
 
-    amplitudes = dict(t0=0.03, v=1.33, z=0.60)
-    rt = np.linspace(params["t0"] - amplitudes["t0"] + 1e-6, params["t0"] + 12, 16001)
+    # Convert noise SD 0.1 and boundaries [0, A] to noise SD 1 and bounds +/-a.
+    params = dict(a=0.125 / (2 * 0.1), t0=0.435, v=0.223 / 0.1, z=2 * 0.063 / 0.125 - 1)
+    # eta is an SD; st and sz are full uniform widths (DMAT convention).
+    sd_t0, sd_v, sd_z = 0.183 / np.sqrt(12), 0.133 / 0.1, (2 * 0.037 / 0.125) / np.sqrt(12)
+    engaged = {**params, "t0": params["t0"] - sd_t0, "v": params["v"] + sd_v}
+    disengaged = {
+        **params,
+        "t0": params["t0"] + sd_t0,
+        "v": params["v"] - sd_v,
+        "z": params["z"] + 2 * sd_z,
+    }
+    # Equal state weights preserve all three source variances. The z mean shifts
+    # rightward because the engaged state, rather than the pooled mean, is near zero.
+    return engaged, disengaged
+
+
+def persistent_cdfs():
+    """conditional signed-RT CDFs indexed by stimulus direction and hidden state."""
+
+    states = persistent_parameters()
+    rt = np.linspace(min(p["t0"] for p in states) + 1e-6, max(p["t0"] for p in states) + 12, 16001)
     y = np.r_[-rt, rt]
     cdfs = []
-    for sign in [-1, 1]:
-        p = {**params, **{k: params[k] + sign * amplitude for k, amplitude in amplitudes.items()}}
-        density = np.zeros_like(y)
-        supported = abs(y) > p["t0"]
-        density[supported] = pdf(y[supported], **p)
-        integrals = cumulative_trapezoid(density.reshape(2, -1), rt, axis=1, initial=0)
-        masses = integrals[:, -1]
-        if not np.isclose(masses.sum(), 1, atol=2e-7, rtol=0):
-            raise ValueError("Conditional RT grid has insufficient probability mass")
-        cdfs.append(np.r_[masses[0] - integrals[0, ::-1], masses[0] + integrals[1]] / masses.sum())
+    for direction in [-1, 1]:
+        state_cdfs = []
+        for state in states:
+            p = {**state, "v": direction * state["v"]}
+            density = np.zeros_like(y)
+            supported = abs(y) > p["t0"] + 1e-4
+            density[supported] = pdf(y[supported], **p)
+            integrals = cumulative_trapezoid(density.reshape(2, -1), rt, axis=1, initial=0)
+            masses = integrals[:, -1]
+            if not np.isclose(masses.sum(), 1, atol=2e-7, rtol=0):
+                raise ValueError("Conditional RT grid has insufficient probability mass")
+            state_cdfs.append(np.r_[masses[0] - integrals[0, ::-1], masses[0] + integrals[1]] / masses.sum())
+        cdfs.append(state_cdfs)
     return np.r_[-rt[::-1], rt], np.array(cdfs)
 
 
 def persistent_states(n_samples, rng):
-    """stationary shared binary state with P(stay) = 0.75 (lag-one correlation 0.50)."""
+    """stationary shared binary state with P(stay)=0.95 and mean runs of 20 trials."""
 
     state = np.empty(n_samples, dtype=int)
     state[0] = rng.integers(2)
-    state[1:] = (state[0] + np.cumsum(rng.random(n_samples - 1) < 0.25)) % 2
+    state[1:] = (state[0] + np.cumsum(rng.random(n_samples - 1) < 1 - 0.95)) % 2
     return state
 
 
 def sample_persistent(n_samples, rep, signed_rt, cdfs, seed=0):
-    """fresh stationary shared state and independent conditional noise per replication."""
+    """fresh hidden states, iid equiprobable stimuli, and conditional outcome noise."""
 
     rng = np.random.default_rng(np.random.SeedSequence([seed, rep]))
     state = persistent_states(n_samples, rng)
+    direction = rng.integers(2, size=n_samples)
+    stim = 2 * direction - 1
     u = rng.random(n_samples)
     y = np.empty(n_samples)
-    for j, cdf in enumerate(cdfs):
-        mask = state == j
-        y[mask] = np.interp(u[mask], cdf, signed_rt)
-    return y
+    for d in range(2):
+        for j in range(2):
+            mask = (direction == d) & (state == j)
+            y[mask] = np.interp(u[mask], cdfs[d, j], signed_rt)
+    return stim, y, state
 
 
 def cov_to_corr(cov):
@@ -106,7 +131,7 @@ def plot_parameter_distributions(params_df, true_params):
     g.map_lower(_lower_plot)
     g.map_diag(_diag_plot)
 
-    label_map = {"a": r"$a$", "beta_a": r"$\beta_a$", "t0": r"$t_0$", "v": r"$v$", "z": r"$z$"}
+    label_map = {"a": r"$a$", "beta_a": r"$\beta_a$", "t0": r"$t_0$", "v": r"$v$", "abs_v": r"$|v|$", "z": r"$z$"}
     for i, col in enumerate(params_df.columns):
         label = label_map[col]
         g.axes[-1, i].set_xlabel(label, fontsize=22)
@@ -136,7 +161,7 @@ def plot_covariance_distributions(covs_df, params_df):
 
     n_cols = g._ncol
     correlations = cov_to_corr(np.cov(params_df.T)).flatten()
-    label_map = {"a": r"$a$", "beta_a": r"$\beta_a$", "t0": r"$t_0$", "v": r"$v$", "z": r"$z$"}
+    label_map = {"a": r"$a$", "beta_a": r"$\beta_a$", "t0": r"$t_0$", "v": r"$v$", "abs_v": r"$|v|$", "z": r"$z$"}
     param_labels = [label_map[col] for col in params_df.columns]
     for idx, (ax, correlation) in enumerate(zip(g.axes.flat, correlations)):
         row, col = divmod(idx, n_cols)
@@ -161,10 +186,12 @@ def plot_covariance_distributions(covs_df, params_df):
     return g
 
 
-def main(setting, n_samples, n_repeats, n_jobs, prefer, output_dir="../results"):
+def main(setting, n_samples, n_repeats, n_jobs, prefer, output_dir="../results", seed=None):
     "fig02,03,04"
 
-    kwargs = dict(n_samples=n_samples, n_repeats=n_repeats, random_state=0)
+    if seed is None:
+        seed = 720261019 if setting == "persistent" else 0
+    kwargs = dict(n_samples=n_samples, n_repeats=n_repeats, random_state=seed)
     figure_paths = {
         "constant": ("fig02a", "fig02b"),
         "time": ("fig03a", "fig03b"),
@@ -206,25 +233,16 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer, output_dir="../results")
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
     def setup_persistent():
-        """unmodeled shared t0, v, z state; fit all four constants freely."""
+        """unmodeled engagement state; fit a, t0, drift magnitude, and side bias."""
 
-        param_names = ["a", "t0", "v", "z"]
+        param_names = ["a", "t0", "abs_v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 
-        # Expected working likelihood integrated over the two equally weighted
-        # stationary components on a 32,001-point RT grid per response.
-        pseudotrue_params = dict(a=0.480982694715, t0=0.398542819174, v=1.526425715608, z=-0.277543237917)
-
-        X = pd.DataFrame({"intercept": np.ones(kwargs["n_samples"])})
-        signed_rt, cdfs = persistent_cdfs(params)
-        ys = np.column_stack(
-            [
-                sample_persistent(n_samples, rep, signed_rt, cdfs, seed=kwargs["random_state"])
-                for rep in range(n_repeats)
-            ]
-        )
-        ddm = DriftDiffusionModel(cov_estimator="all", autocorrelation_lags=20)
-        return X, ys, ddm, param_names, cov_names, pseudotrue_params
+        # Independently integrated expected working likelihood, averaging over
+        # both hidden states and both observed stimulus directions.
+        pseudotrue_params = dict(a=0.613275658969, t0=0.381493834668, abs_v=1.478601882646, z=0.051482449097)
+        ddm = DriftDiffusionModel(v="-1+stim", cov_estimator="all", autocorrelation_lags=60)
+        return None, None, ddm, param_names, cov_names, pseudotrue_params
 
     if setting == "constant":
         X, ys, ddm, param_names, cov_names, pseudotrue_params = setup_constant()
@@ -235,10 +253,18 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer, output_dir="../results")
     else:
         raise ValueError("choose 'constant', 'time', or 'persistent'")
 
+    sampling = persistent_cdfs() if setting == "persistent" else None
+
     @delayed
     def run_simulation(rep):
         ddm_cp = clone(ddm)
-        ddm_cp.fit(X, ys[:, rep])
+        if setting == "persistent":
+            stim, y, state = sample_persistent(n_samples, rep, *sampling, seed=seed)
+            # The hidden state is omitted; only observed stimulus direction enters.
+            # Initialize at the population optimum while estimating all four coefficients.
+            ddm_cp.fit(pd.DataFrame({"stim": stim}), y, params0=np.array(list(pseudotrue_params.values())))
+        else:
+            ddm_cp.fit(X, ys[:, rep])
         covs_ = [
             {"estimator": k, **{cov_names[i]: val for i, val in enumerate(cov_to_corr(v).flatten())}}
             for k, v in ddm_cp.covariance_.items()
@@ -251,6 +277,9 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer, output_dir="../results")
             gradient_max=float(np.max(abs(ddm_cp.fit_.jac))),
             score_ac1=np.array([np.corrcoef(s[:-1], s[1:])[0, 1] for s in ddm_cp.score_.T]),
         )
+        if setting == "persistent":
+            audit["state_trials"] = np.bincount(state, minlength=2)
+            audit["state_correct"] = np.bincount(state, weights=(np.sign(y) == stim), minlength=2)
         return ddm_cp.params_, covs_, audit
 
     with Parallel(n_jobs=n_jobs, prefer=prefer) as parallel:
@@ -259,17 +288,24 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer, output_dir="../results")
         params_df = pd.DataFrame(params_, columns=param_names)
         covs_df = pd.DataFrame([row for c in covs_ for row in c])
 
+    if setting == "persistent":
+        accuracy = np.sum([audit["state_correct"] for audit in audits], axis=0) / np.sum(
+            [audit["state_trials"] for audit in audits], axis=0
+        )
+        print(f"Average accuracy: engaged {accuracy[0]:.2%}; disengaged {accuracy[1]:.2%}")
+
     fig = plot_parameter_distributions(params_df, pseudotrue_params)
     fig.savefig(path_a)
 
     fig = plot_covariance_distributions(covs_df, params_df)
     fig.savefig(path_b)
 
-    return dict(
+    result = dict(
         params=np.array(params_),
         target=np.array(list(pseudotrue_params.values())),
         **{key: np.array([audit[key] for audit in audits]) for key in audits[0]},
     )
+    return result
 
 
 if __name__ == "__main__":
@@ -283,9 +319,10 @@ if __name__ == "__main__":
     parser.add_argument("--n-repeats", type=int, default=900, help="number of simulation repeats")
     parser.add_argument("--n-jobs", type=int, default=-1, help="number of parallel jobs")
     parser.add_argument("--output-dir", default="../results", help="directory for figure panels")
+    parser.add_argument("--seed", type=int, help="random seed (default: 720261019 for persistent, 0 otherwise)")
     parser.add_argument(
         "--prefer", choices=["processes", "threads"], default="processes", help="joblib parallel backend"
     )
     args = parser.parse_args()
 
-    main(args.setting, args.n_samples, args.n_repeats, args.n_jobs, args.prefer, args.output_dir)
+    main(args.setting, args.n_samples, args.n_repeats, args.n_jobs, args.prefer, args.output_dir, args.seed)
