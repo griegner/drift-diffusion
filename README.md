@@ -115,7 +115,7 @@ excluded from optimization but included in likelihood evaluation.
 ```
 .
 ├── code/
-│   ├── fig*.py                         <- python scripts for figures 1-7
+│   ├── fig*.py                         <- python scripts for figures 1-8
 │   └── run.sh                          <- bash script that runs all python scripts
 ├── data/
 │   └── Rat195Vectors_290426.csv        <- dataset used in paper
