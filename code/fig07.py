@@ -22,12 +22,6 @@ from drift_diffusion.model import DriftDiffusionModel, pdf
 from drift_diffusion.sim import sample_from_pdf
 
 
-def slow_traces(rng, n_rows, n_pts, tau_pts):
-    noise = rng.normal(size=(n_rows, n_pts))
-    smooth = gaussian_filter1d(noise, tau_pts, axis=1, mode="wrap")
-    return smooth / smooth.std(axis=1, keepdims=True)
-
-
 def conditional_accuracy(rt, a, t0, v, z, err=1e-3, *, correct_boundary=1):
     """Model-implied accuracy; correct_boundary is +1 (R) or -1 (L) per trial.
 
@@ -71,7 +65,8 @@ def main(n_trials=1000, seed=7):
     rng = np.random.default_rng(seed)
 
     # one slow pupil trace shared across trials
-    pupil = 0.5 + 0.15 * slow_traces(rng, 1, n_trials, pupil_tau / trial_dur)[0]
+    pupil = gaussian_filter1d(rng.normal(size=n_trials), pupil_tau / trial_dur, mode="wrap")
+    pupil = 0.5 + 0.15 * (pupil / pupil.std())
     pupil_centered = pupil - pupil.mean()
     coherence = rng.choice([-1, 1], n_trials)
 
@@ -90,20 +85,20 @@ def main(n_trials=1000, seed=7):
 
     X = pd.DataFrame({"coherence": coherence, "pupil_centered": pupil_centered})
     param_names = ("a", "t0", "v", "z")
-    models = {}
-    for key, pupil_terms in [("constant", ""), ("covariate", " + pupil_centered")]:
-        formulas = dict.fromkeys(param_names, "1" + pupil_terms)
-        formulas["v"] = "0 + coherence" + (" + coherence:pupil_centered" if pupil_terms else "")
-        models[key] = DriftDiffusionModel(**formulas).fit(X, ys)
-
-    covariate = models["covariate"]
+    constant = DriftDiffusionModel(a="1", t0="1", v="0 + coherence", z="1").fit(X, ys)
+    covariate = DriftDiffusionModel(
+        a="1 + pupil_centered",
+        t0="1 + pupil_centered",
+        v="0 + coherence + coherence:pupil_centered",
+        z="1 + pupil_centered",
+    ).fit(X, ys)
+    models = {"constant": constant, "covariate": covariate}
     estimates = covariate.params_.reshape(4, 2)
     errors = np.sqrt(np.diag(covariate.covariance_)).reshape(4, 2)
     for name, estimate, error in zip(param_names, estimates[:, 1], errors[:, 1]):
         target = beta_pupil if name == "v" else 0
         print(f"{name} pupil slope: true={target:.3f}, fitted={estimate:.3f} +/- {error:.3f}")
 
-    constant = models["constant"]
     print(
         f"coherence coefficient: true={beta_coherence:.3f}, "
         f"fitted={constant.params_[2]:.3f} +/- {np.sqrt(constant.covariance_[2, 2]):.3f}"
