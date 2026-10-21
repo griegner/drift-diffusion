@@ -20,3 +20,6 @@ results/*.svg
 # revisions
 revisions.md
 osync.sh
+
+# fig08 checkpoints
+data/fig08-mcmc/

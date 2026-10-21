@@ -36,7 +36,7 @@ if [[ "$mode" == "test" ]]; then
 
     # fig08
     echo "-> fig08"
-    ./fig08.py --n-samples 500 1000 --n-repeats 3
+    ./fig08.py --n-samples 500 1000 --n-repeats 3 --n-repeats-mcmc 3 --tune 100 --draws 200
 
 elif [[ "$mode" == "paper" ]]; then
     echo "\nrunning PAPER mode ...\n"
