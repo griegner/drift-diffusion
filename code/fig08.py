@@ -15,13 +15,10 @@ from multiprocessing import get_context
 from pathlib import Path
 
 import arviz as az
-import hssm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pymc as pm
-from hddm_wfpt import wfpt
-from hssm.likelihoods.blackbox import hddm_to_hssm
+from ddm7p import sample_full_ddm
 from joblib import Parallel, delayed, effective_n_jobs
 from matplotlib.lines import Line2D
 from matplotlib.ticker import FuncFormatter, NullFormatter
@@ -125,40 +122,12 @@ def fit_mle(X, y):
         return time.perf_counter() - started, np.full(6, np.nan), np.full((2, 6, 6), np.nan), False
 
 
-@hddm_to_hssm
-def logp_full_ddm(data, v, a, z, t, sz, sv, st):
-    """hssm's full_ddm likelihood with a looser sz/st integration tolerance (1e-8 is ~70x slower)."""
-    return wfpt.wiener_logp_array(x=data, v=v, sv=sv, a=a * 2, z=z, sz=sz, t=t, st=st, err=1e-8, simps_err=1e-4)
-
-
 def fit_mcmc(X, y, params_mle, chains, tune, draws, seed):
-    """seven-parameter full_ddm without covariates; DEMetropolisZ chains start at the MLE."""
+    """seven-parameter full_ddm with stimulus-coded drift and no other covariates; chains start at the MLE."""
     started = time.perf_counter()
-    model = hssm.HSSM(
-        data=pd.DataFrame(dict(rt=np.abs(y), response=np.sign(y).astype(int), stim=X["stim"])),
-        model="full_ddm",
-        loglik_kind="blackbox",
-        loglik=logp_full_ddm,
-        p_outlier=0,
-        include=[
-            dict(
-                name="v",
-                formula="v ~ 0 + stim",
-                link="identity",
-                prior={"stim": {"name": "Normal", "mu": 0.0, "sigma": 3.0}},
-            )
-        ],
-    )
     mle = dict(zip(PARAM_NAMES, params_mle if np.isfinite(params_mle).all() else [0.63, 0, 0.44, 2.2, 0, 0.15]))
-    model.sample(
-        sampler="pymc",
-        step=pm.DEMetropolisZ(model=model.pymc_model, compile_kwargs={"mode": "cvm"}),
-        chains=chains,
-        cores=chains,
-        tune=tune,
-        draws=draws,
-        blas_cores=1,
-        mp_ctx="spawn",
+    model = sample_full_ddm(
+        pd.DataFrame(dict(rt=np.abs(y), response=np.sign(y).astype(int), stim=X["stim"])),
         initvals=dict(
             a=mle["a_intercept"],
             t=mle["t0"] - 0.01,
@@ -168,9 +137,18 @@ def fit_mcmc(X, y, params_mle, chains, tune, draws, seed):
             sv=0.8,
             st=0.02,
         ),
-        random_seed=seed,
-        progressbar=False,
-        idata_kwargs={"log_likelihood": False},
+        chains=chains,
+        tune=tune,
+        draws=draws,
+        seed=seed,
+        include=[
+            dict(
+                name="v",
+                formula="v ~ 0 + stim",
+                link="identity",
+                prior={"stim": {"name": "Normal", "mu": 0.0, "sigma": 3.0}},
+            )
+        ],
     )
     runtime = time.perf_counter() - started
     summary = az.summary(model.traces, var_names=MCMC_NAMES, round_to="none")

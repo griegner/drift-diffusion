@@ -2,19 +2,19 @@
 
 """Figure 07: pupil-dependent drift and conditional accuracy.
 
-Compare covariate and constant 4p DDMs with an iid drift-variability 5p DDM.
-The generating drift has no additional noise term; see revisions.md for details.
+Compare covariate and constant 4p DDMs with a 7p DDM (iid variability in v, z, t0).
 """
 
 import argparse
 import json
 from pathlib import Path
 
-import hssm
+import arviz as az
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytensor
+from ddm7p import logp_full_ddm, sample_full_ddm
 from matplotlib.colors import to_rgb
 from scipy.ndimage import gaussian_filter1d
 
@@ -42,13 +42,12 @@ def conditional_accuracy(rt, a, t0, v, z, err=1e-3, *, correct_boundary=1):
     return np.divide(f_correct, f_total, out=np.full_like(f_total, np.nan), where=f_total > 0)
 
 
-def conditional_accuracy_sdv(rt, **params):
-    """CAF integrated over iid normal drift; +1 denotes a correct response."""
-    from hssm.likelihoods.analytical import logp_ddm_sdv
-
-    rt = np.asarray(rt)
+def conditional_accuracy_full(rt, v, a, z, t, sz, sv, st):
+    """CAF integrated over iid variability in v, z, and t0; +1 denotes a correct response."""
+    rt = np.asarray(rt, dtype=float)
     logp_correct, logp_error = (
-        logp_ddm_sdv(np.column_stack((rt, np.full_like(rt, response))), **params).eval() for response in (1, -1)
+        logp_full_ddm(np.column_stack((rt, np.full_like(rt, response))), v, a, z, t, sz, sv, st)  # positional only
+        for response in (1, -1)
     )
     return np.exp(logp_correct - np.logaddexp(logp_correct, logp_error))
 
@@ -104,17 +103,22 @@ def main(n_trials=1000, seed=7):
         f"fitted={constant.params_[2]:.3f} +/- {np.sqrt(constant.covariance_[2, 2]):.3f}"
     )
 
-    ddm_hssm = hssm.HSSM(
-        data=pd.DataFrame({"rt": rts, "response": choices * coherence}), model="ddm_sdv", p_outlier=1e-12
+    # accuracy-coded responses (z ~ 0 here); chains start at the constant 4p MLE
+    a0, t0, v0, _ = constant.params_
+    ddm_hssm = sample_full_ddm(
+        pd.DataFrame({"rt": rts, "response": choices * coherence}),
+        initvals=dict(a=a0, t=t0 - 0.01, v=v0, z=0.5, sz=0.3, sv=0.8, st=0.02),
+        seed=seed,
     )
-    ddm_hssm.sample(random_seed=seed)
 
-    params_hssm = {name: float(ddm_hssm.traces.posterior[name].mean()) for name in ("v", "a", "z", "t", "sv")}
+    names = ("v", "a", "z", "t", "sz", "sv", "st")
+    print(az.summary(ddm_hssm.traces, var_names=list(names), round_to=3)[["mean", "sd", "r_hat", "ess_bulk"]])
+    params_hssm = {name: float(ddm_hssm.traces.posterior[name].mean()) for name in names}
     trial = np.arange(1, n_trials + 1)
-    rt_grid = np.linspace(max(params["t0"], params_hssm["t"]) + 0.1, params["t0"] + 5, 100)
+    rt_grid = np.linspace(max(params["t0"], params_hssm["t"] + params_hssm["st"] / 2) + 0.1, params["t0"] + 5, 100)
     v_example = np.random.default_rng(seed).normal(params_hssm["v"], params_hssm["sv"], n_trials)
     accuracy_sim = conditional_accuracy(rt_grid, **params, correct_boundary=coherence)
-    accuracy_hssm = conditional_accuracy_sdv(rt_grid, **params_hssm)
+    accuracy_hssm = conditional_accuracy_full(rt_grid, **params_hssm)
 
     fits = {}
     for key, ddm in models.items():
@@ -128,7 +132,7 @@ def main(n_trials=1000, seed=7):
         "true": "True DDM",
         "constant": "Constant 4p-DDM",
         "covariate": "Pupil-Dependent 4p-DDM",
-        "variable": "Across-Trial Variability 5p-DDM",
+        "variable": "Across-Trial Variability 7p-DDM",
     }
     axes_labels = [
         dict(xlabel="Trial", ylabel=r"$|v|$", title="A. Pupil-Dependent Drift Rate"),
