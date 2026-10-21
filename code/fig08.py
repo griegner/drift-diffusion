@@ -391,7 +391,7 @@ if __name__ == "__main__":
         default=[1000, 5000, 10000],
         help="number of trials per repeat (500 is half a session)",
     )
-    parser.add_argument("--n-repeats", type=int, default=500, help="number of independent simulation repeats")
+    parser.add_argument("--n-repeats", type=int, default=900, help="number of independent simulation repeats")
     parser.add_argument(
         "--n-repeats-mcmc", type=int, default=100, help="first repeats also fit with full_ddm MCMC (0 skips MCMC)"
     )
