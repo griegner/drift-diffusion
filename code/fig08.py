@@ -101,7 +101,7 @@ def simulate(design, n, rep):
 
 
 def fit_mle(X, y):
-    """fit the package model and time optimization plus covariance estimation."""
+    """fit from the package's default start (a=1, all else 0); time optimization plus covariance estimation."""
     mle = DriftDiffusionModel(
         a="1 + time",
         t0="1",
@@ -113,11 +113,8 @@ def fit_mle(X, y):
     )
     started = time.perf_counter()
     try:
-        for start in [[0.63, 0.20, 0.35, 2.2, 4.0, 0.15], [0.7, 0.10, 0.30, 1.5, 2.0, 0.0]]:
-            mle.fit(X, y, params0=np.array(start))
-            if np.isfinite(mle.fit_.fun) and np.max(abs(mle.fit_.jac)) < 0.01:
-                break
-        else:
+        mle.fit(X, y)
+        if not (np.isfinite(mle.fit_.fun) and np.max(abs(mle.fit_.jac)) < 0.01):
             raise ValueError("MLE did not converge")
         runtime = time.perf_counter() - started
         cov = np.array([mle.covariance_[method] for method in METHODS])
@@ -335,12 +332,19 @@ def run_mcmc(fits, n_samples, n_repeats, n_jobs, chains, tune, draws):
     CHECKPOINTS.mkdir(exist_ok=True)
     n_fits = max(1, effective_n_jobs(n_jobs) // chains)
     tasks = [(n, rep) for n in sorted(n_samples, reverse=True) for rep in range(n_repeats)]
-    params_mle = [fits["params"][(fits["n"] == n) & (fits["rep"] == rep)][0] for n, rep in tasks]
     print(f"MCMC: {len(tasks)} fits, {n_fits} at a time with {chains} chains each", flush=True)
     with ProcessPoolExecutor(n_fits, mp_context=get_context("spawn")) as pool:
         futures = [
-            pool.submit(run_mcmc_checkpoint, n, rep, params, chains, tune, draws)
-            for (n, rep), params in zip(tasks, params_mle)
+            pool.submit(
+                run_mcmc_checkpoint,
+                n,
+                rep,
+                fits["params"][(fits["n"] == n) & (fits["rep"] == rep)][0],
+                chains,
+                tune,
+                draws,
+            )
+            for n, rep in tasks
         ]
         records = [future.result() for future in futures]
     return dict(zip(["n", "rep", *MCMC_FIELDS], map(np.array, zip(*records))))
