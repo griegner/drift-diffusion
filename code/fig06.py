@@ -4,6 +4,7 @@
 
 import argparse
 import json
+from pathlib import Path
 
 import fig05to06
 import matplotlib.pyplot as plt
@@ -24,41 +25,63 @@ with open("./config.json") as f:
     plt.rcParams.update(rc_params)
 
 
-def fit_ddm_splines(df):
-    """estimate DDM parameters as functions of trial by day + 95% CI under the CLT"""
+def spline_formula(trial):
+    """quadratic B-spline in trial (df=3) with knots and bounds fixed by the pooled trials, so every fit and
+    prediction shares one basis; beyond the bounds the basis is held at its boundary value."""
 
-    spline_formula = "bs(trial, df=3, degree=2)"
+    lower, knot, upper = np.percentile(trial, [0, 50, 100])
+    return f"bs(trial, knots=[{knot:g}], degree=2, lower_bound={lower:g}, upper_bound={upper:g}, extrapolation='clip')"
+
+
+def fit_ddm_pooled(df, spline, path=Path("../data/fig06.npy")):
+    """estimate a, t0, z, and the coherence slope of v as spline functions of trial in day;
+    warm-started from a previous fit saved at path (delete it to fit from the defaults)"""
+
+    params0 = np.load(path) if path.exists() else None
+    if params0 is not None and len(params0) != 16:  # 4 coefficients per parameter; else stale
+        params0 = None
+
+    ddm = DriftDiffusionModel(
+        a=spline,
+        t0=spline,
+        v=f"0 + coherence + coherence:{spline}",
+        z=spline,
+        cov_estimator="autocorrelation-robust",
+        verbose=True,
+    )
+    return ddm.fit(df, df["y"], params0=params0)
+
+
+def fit_ddm_splines(df, spline, params):
+    """estimate DDM parameters at trial 400 by day + 95% CI under the CLT, fixing the pooled spline coefficients"""
+
     param_names = ["a", "t0", "beta_v", "z"]
-    param_slices = np.split(np.load("../data/fig06.npy"), [4, 8, 13])
+    param_slices = np.split(params, 4)  # (intercept or coherence slope, 3 spline coefficients) per parameter
 
-    trial_ref = 400
+    X_ref = model_matrix(spline, pd.DataFrame({"trial": [400]}), output="pandas")
+    spline_cols = [col for col in X_ref.columns if col != "Intercept"]
+    b_at_400 = X_ref[spline_cols].values[0]  # shape (3,)
+
+    fixed = [
+        {(f"coherence:{col}" if name == "beta_v" else col): val for col, val in zip(spline_cols, values[1:])}
+        for name, values in zip(param_names, param_slices)
+    ]
+    ddm = DriftDiffusionModel(
+        a={"formula": spline, "fixed": fixed[0]},
+        t0={"formula": spline, "fixed": fixed[1]},
+        v={"formula": f"-1 + coherence + coherence:{spline}", "fixed": fixed[2]},
+        z={"formula": spline, "fixed": fixed[3]},
+        cov_estimator="autocorrelation-robust",
+    )
+
     results = []
     for day, grp in tqdm(df.groupby("day"), desc="fit ddm splines by day"):
-        X_mm = model_matrix(spline_formula, grp, output="pandas", na_action="raise")
-        spline_cols = [col for col in X_mm.columns if col != "Intercept"]
-
-        ref_row = pd.DataFrame({"trial": [trial_ref]})
-        X_ref = model_matrix(spline_formula, ref_row, output="pandas")
-        b_at_400 = X_ref[spline_cols].values[0]  # shape (3,)
-
-        fixed = [
-            {col: val for col, val in zip(spline_cols, values[2:] if name == "beta_v" else values[1:])}
-            for name, values in zip(param_names, param_slices)
-        ]
-
-        ddm = DriftDiffusionModel(
-            a={"formula": spline_formula, "fixed": fixed[0]},
-            t0={"formula": spline_formula, "fixed": fixed[1]},
-            v={"formula": "-1 + coherence + bs(trial, df=3, degree=2)", "fixed": fixed[2]},
-            z={"formula": spline_formula, "fixed": fixed[3]},
-        )
         ddm.fit(grp, grp["y"])
-        params = ddm.params_
         se = np.sqrt(np.diag(ddm.covariance_))
 
         res = {"day": day}
-        for name, beta0, se0, values in zip(param_names, params, se, param_slices):
-            val_at_400 = beta0 + (values[2:] if name == "beta_v" else values[1:]) @ b_at_400
+        for name, beta0, se0, values in zip(param_names, ddm.params_, se, param_slices):
+            val_at_400 = beta0 + values[1:] @ b_at_400
             res[name] = val_at_400
             res[f"{name}+"] = val_at_400 + 1.96 * se0
             res[f"{name}-"] = val_at_400 - 1.96 * se0
@@ -81,10 +104,16 @@ def main(subset=False):
     day_q = "trial > 0"
     trial_q = "day > 35 and trial > 0 and trial <= 800"
     ddm_cols = ["a", "t0", "beta_v", "z"]
+    spline = spline_formula(df195.query(trial_q)["trial"])
+
+    # pooled spline fit (fig06d), whose spline coefficients are fixed in the by-day fits (fig06c)
+    ddm = fit_ddm_pooled(df195.query(trial_q), spline)
+    if not subset:
+        np.save("../data/fig06.npy", ddm.params_)
 
     # fig 06c
     label_map = {"a": r"$a$", "t0": r"$t_0$", "beta_v": r"$\beta_v$", "v": r"$\beta_v$", "z": r"$z$"}
-    ddm_fitby_day = fit_ddm_splines(df195.query(day_q))
+    ddm_fitby_day = fit_ddm_splines(df195.query(day_q), spline, ddm.params_)
     fig, axs = plt.subplots(nrows=4, ncols=3, figsize=(7, 4.4), width_ratios=[10, 0.6, 1.5], sharex="col")
     fig.align_ylabels(axs)
     for row, col in enumerate(ddm_cols):
@@ -95,17 +124,7 @@ def main(subset=False):
     axs[3, 2].set(xlabel="Lag(Day)")
     fig.savefig("../results/fig06c")
 
-    # fig 06d
-    ddm = DriftDiffusionModel(
-        a="bs(trial, df=3, degree=2)",
-        t0="bs(trial, df=3, degree=2)",
-        v="coherence + bs(trial, df=3, degree=2)",
-        z="bs(trial, df=3, degree=2)",
-        cov_estimator="autocorrelation-robust",
-        verbose=True,
-    )
-    ddm.fit(df195.query(trial_q), df195.query(trial_q)["y"], params0=np.load("../data/fig06.npy"))
-
+    # fig 06d: v at coherence 1 is the coherence slope beta_v
     trial = np.arange(20, 801, 10)
     idx_400 = np.where(trial == 400)[0][0]
     coherence = np.repeat(1, len(trial))

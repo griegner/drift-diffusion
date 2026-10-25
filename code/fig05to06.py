@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 from formulaic import model_matrix
 from joblib import Parallel, delayed
-from scipy.io import loadmat
 from sklearn.base import clone
 from statsmodels.api import OLS
 from statsmodels.stats.proportion import proportion_confint
