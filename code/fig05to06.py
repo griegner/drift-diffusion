@@ -148,8 +148,14 @@ def plot_estimates(axs, df, fitby, col, formula=None):
     axs[1].hist(df[col], color="gray", bins=25, orientation="horizontal")
     axs[1].axis("off")
 
-    n_lags = len(df) // 3
-    acf_input = residuals if fitby == "trial" else df.iloc[17:][col]
+    if fitby == "trial":
+        acf_input = residuals
+        n_lags = len(df) // 3
+    else:
+        # Keep gaps in the calendar so lag one means one day, and exclude the
+        # entire practice period rather than a fixed number of observed days.
+        acf_input = df[col].reindex(range(36, int(df.index.max()) + 1))
+        n_lags = len(acf_input) // 3
     acf_, confint = acf(acf_input, nlags=n_lags, fft=True, bartlett_confint=True, missing="conservative", alpha=0.05)
     lags = -np.arange(n_lags + 1)[::-1]
     axs[2].axhline(y=0, color="k", linestyle="--", lw=1)
