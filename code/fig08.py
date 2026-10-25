@@ -56,7 +56,7 @@ def simulation_design():
     beta_p = (2.23 + 1.33 * np.sqrt(3) - 0.1) / np.ptp(pupil[:5000])
     beta_v = 0.1 - beta_p * centered[:5000].min()
     session_time = np.tile(np.linspace(-0.5, 0.5, 1000), 10)
-    z = 2 * 0.063 / 0.125 - 1 + np.array([0, 2]) * (2 * 0.037 / 0.125) / np.sqrt(12)
+    z = 0.008 + np.array([0, 2]) * (2 * 0.037 / 0.125) / np.sqrt(12)
     return dict(
         time=session_time,
         pupil_centered=centered,
@@ -190,7 +190,7 @@ def summarize_method(n, method, runtime, params, params_, uncs_):
             "rmse": rmse,
             "reference": reference,
             "rrmse": 100 * rmse / abs(reference),
-            "common_repeats": len(params_),
+            "n_repeats": len(params_),
         }
         for estimate, (bias_, sd_, rmse_) in metrics.items()
         for name, bias, sd, rmse, reference in zip(QUANTITIES, bias_, sd_, rmse_, references[estimate])
@@ -198,28 +198,42 @@ def summarize_method(n, method, runtime, params, params_, uncs_):
 
 
 def summarize(fits, mcmc, design):
-    """shared quantities for each method on its valid repetitions, against generating values"""
+    """shared quantities against generating values; with MCMC, both methods are scored on the same
+    repetitions (valid MLE and converged MCMC), while MLE runtime averages all valid MLE fits."""
 
     rows = []
     for n in np.unique(fits["n"]):
         L, params = comparable(design, n)
-        selected = (fits["n"] == n) & fits["valid"]
-        print(f"n={n}: {selected.sum()}/{np.sum(fits['n'] == n)} valid MLE fits")
+        valid = (fits["n"] == n) & fits["valid"]
+        print(f"n={n}: {valid.sum()}/{np.sum(fits['n'] == n)} valid MLE fits")
+        selected = valid
+        if mcmc:
+            converged = (mcmc["n"] == n) & mcmc["valid"]
+            print(f"n={n}: {converged.sum()}/{np.sum(mcmc['n'] == n)} converged MCMC fits")
+            reps = np.intersect1d(fits["rep"][valid], mcmc["rep"][converged])
+            print(f"n={n}: {len(reps)} repetitions shared by both methods")
+            converged = converged & np.isin(mcmc["rep"], reps)
+            if len(reps) >= 3:
+                selected = valid & np.isin(fits["rep"], reps)
+            else:
+                print(f"n={n}: too few shared repetitions; MLE scored on all valid fits, MCMC omitted")
         estimates = [
             (
                 method,
-                fits["runtime"][selected],
+                fits["runtime"][valid],
                 fits["params"][selected] @ L.T,
                 np.sqrt(np.einsum("ij,rjk,ik->ri", L, fits["cov"][selected, m], L)),  # diag(L cov L')
             )
             for m, method in enumerate(METHODS)
         ]
         if mcmc:
-            selected = (mcmc["n"] == n) & mcmc["valid"]
-            print(f"n={n}: {selected.sum()}/{np.sum(mcmc['n'] == n)} converged MCMC fits")
             shared = slice(len(QUANTITIES))
             estimates.append(
-                ("mcmc", mcmc["runtime"][selected], *(mcmc[k][selected, shared] for k in ["params", "sd"]))
+                (
+                    "mcmc",
+                    mcmc["runtime"][converged],
+                    *(mcmc[k][converged, shared] for k in ["params", "sd"]),
+                )
             )
         for method, runtime, params_, uncs_ in estimates:
             if len(params_) >= 3:
