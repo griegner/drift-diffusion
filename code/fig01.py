@@ -60,7 +60,7 @@ if __name__ == "__main__":
     """set script defaults"""
 
     parser = argparse.ArgumentParser(description="Figures 02-04: Simulation Results")
-    parser.add_argument("--params", nargs=4, type=str, default=[1, 0.3, 1, 0.3], help="a, t0, v, z parameter values")
+    parser.add_argument("--params", nargs=4, type=float, default=[1, 0.3, 1, 0.3], help="a, t0, v, z parameter values")
     args = parser.parse_args()
 
     main(params=args.params)

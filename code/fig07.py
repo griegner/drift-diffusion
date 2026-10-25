@@ -13,7 +13,6 @@ import arviz as az
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pytensor
 from ddm7p import logp_full_ddm, sample_full_ddm
 from matplotlib.colors import to_rgb
 from scipy.ndimage import gaussian_filter1d
@@ -42,21 +41,25 @@ def conditional_accuracy(rt, a, t0, v, z, err=1e-3, *, correct_boundary=1):
     return np.divide(f_correct, f_total, out=np.full_like(f_total, np.nan), where=f_total > 0)
 
 
-def conditional_accuracy_full(rt, v, a, z, t, sz, sv, st):
-    """CAF integrated over iid variability in v, z, and t0; +1 denotes a correct response."""
+def conditional_accuracy_full(rt, v_coherence, a, z, t, sz, sv, st, *, coherence):
+    """CAF integrated over iid variability in v, z, and t0; stimulus-coded drift v_coherence * coherence,
+    pooling trials by their correct boundary (coherence) as in conditional_accuracy."""
     rt = np.asarray(rt, dtype=float)
-    logp_correct, logp_error = (
-        logp_full_ddm(np.column_stack((rt, np.full_like(rt, response))), v, a, z, t, sz, sv, st)  # positional only
-        for response in (1, -1)
-    )
-    return np.exp(logp_correct - np.logaddexp(logp_correct, logp_error))
+
+    def density(response, c):
+        data = np.column_stack((rt, np.full_like(rt, response)))
+        return np.exp(logp_full_ddm(data, c * v_coherence, a, z, t, sz, sv, st))  # positional only
+
+    weights = {c: np.mean(coherence == c) for c in (1, -1)}
+    f_correct = sum(w * density(c, c) for c, w in weights.items())
+    f_error = sum(w * density(-c, c) for c, w in weights.items())
+    return f_correct / (f_correct + f_error)
 
 
-pytensor.config.cxx = ""
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def main(n_trials=1000, seed=7):
+def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
     with (ROOT / "code/config.json").open() as f:
         plt.rcParams.update(json.load(f)["rc-params"])
     plt.rcParams["font.size"] = 12
@@ -76,6 +79,7 @@ def main(n_trials=1000, seed=7):
     v_pupil = coherence * (beta_coherence + beta_pupil * pupil_centered)
     params = dict(a=0.63, t0=0.435, v=v_pupil, z=0.008)
 
+    # fixed sampling stream (independent of rng); --seed still varies the pupil trace and stimuli
     ys = sample_from_pdf(**params, n_samples=n_trials, random_state=0)
     choices, rts = np.sign(ys), np.abs(ys)
 
@@ -84,12 +88,13 @@ def main(n_trials=1000, seed=7):
 
     X = pd.DataFrame({"coherence": coherence, "pupil_centered": pupil_centered})
     param_names = ("a", "t0", "v", "z")
-    constant = DriftDiffusionModel(a="1", t0="1", v="0 + coherence", z="1").fit(X, ys)
+    constant = DriftDiffusionModel(a="1", t0="1", v="0 + coherence", z="1", p_outlier=0).fit(X, ys)
     covariate = DriftDiffusionModel(
         a="1 + pupil_centered",
         t0="1 + pupil_centered",
         v="0 + coherence + coherence:pupil_centered",
         z="1 + pupil_centered",
+        p_outlier=0,
     ).fit(X, ys)
     models = {"constant": constant, "covariate": covariate}
     estimates = covariate.params_.reshape(4, 2)
@@ -103,22 +108,33 @@ def main(n_trials=1000, seed=7):
         f"fitted={constant.params_[2]:.3f} +/- {np.sqrt(constant.covariance_[2, 2]):.3f}"
     )
 
-    # accuracy-coded responses (z ~ 0 here); chains start at the constant 4p MLE
-    a0, t0, v0, _ = constant.params_
+    # stimulus-coded responses and drift, as in the 4p fits and fig08; chains start at the constant 4p MLE
+    a0, t0, v0, z0 = constant.params_
     ddm_hssm = sample_full_ddm(
-        pd.DataFrame({"rt": rts, "response": choices * coherence}),
-        initvals=dict(a=a0, t=t0 - 0.01, v=v0, z=0.5, sz=0.3, sv=0.8, st=0.02),
+        pd.DataFrame({"rt": rts, "response": choices.astype(int), "coherence": coherence}),
+        initvals=dict(a=a0, t=t0 - 0.01, v_coherence=v0, z=(z0 + 1) / 2, sz=0.3, sv=0.8, st=0.02),
+        chains=chains,
+        tune=tune,
+        draws=draws,
         seed=seed,
+        include=[
+            dict(
+                name="v",
+                formula="v ~ 0 + coherence",
+                link="identity",
+                prior={"coherence": {"name": "Normal", "mu": 0.0, "sigma": 3.0}},
+            )
+        ],
     )
 
-    names = ("v", "a", "z", "t", "sz", "sv", "st")
+    names = ("v_coherence", "a", "z", "t", "sz", "sv", "st")
     print(az.summary(ddm_hssm.traces, var_names=list(names), round_to=3)[["mean", "sd", "r_hat", "ess_bulk"]])
     params_hssm = {name: float(ddm_hssm.traces.posterior[name].mean()) for name in names}
     trial = np.arange(1, n_trials + 1)
     rt_grid = np.linspace(max(params["t0"], params_hssm["t"] + params_hssm["st"] / 2) + 0.1, params["t0"] + 5, 100)
-    v_example = np.random.default_rng(seed).normal(params_hssm["v"], params_hssm["sv"], n_trials)
+    v_example = rng.normal(params_hssm["v_coherence"], params_hssm["sv"], n_trials)
     accuracy_sim = conditional_accuracy(rt_grid, **params, correct_boundary=coherence)
-    accuracy_hssm = conditional_accuracy_full(rt_grid, **params_hssm)
+    accuracy_hssm = conditional_accuracy_full(rt_grid, **params_hssm, coherence=coherence)
 
     fits = {}
     for key, ddm in models.items():
@@ -168,7 +184,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-trials", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--chains", type=int, default=4, help="MCMC chains, run in parallel")
+    parser.add_argument("--tune", type=int, default=1000, help="MCMC tuning iterations per chain")
+    parser.add_argument("--draws", type=int, default=12000, help="MCMC draws per chain")
     args = parser.parse_args()
     if args.n_trials < 2:
         parser.error("--n-trials must be at least 2")
-    main(n_trials=args.n_trials, seed=args.seed)
+    main(n_trials=args.n_trials, seed=args.seed, chains=args.chains, tune=args.tune, draws=args.draws)

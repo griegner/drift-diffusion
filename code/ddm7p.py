@@ -5,10 +5,16 @@ piloted on fig08 at n=1000: a looser sz/st integration tolerance (~70x faster) a
 DEMetropolisZ chains started near the MLE (~6x the ESS/s of HSSM's default Slice).
 """
 
+import sys
+
 import hssm
 import pymc as pm
+import pytensor
 from hddm_wfpt import wfpt
 from hssm.likelihoods.blackbox import hddm_to_hssm
+
+if sys.platform == "darwin":
+    pytensor.config.cxx = ""  # macOS clang rejects pytensor's -ld64 link flag; use the python backend
 
 
 @hddm_to_hssm

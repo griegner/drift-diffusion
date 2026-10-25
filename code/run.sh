@@ -3,7 +3,7 @@ set -e
 
 start_seconds=$SECONDS
 
-mode=paper
+mode=${1:-paper}
 
 # download csv from dryad DOI: 10.5061/dryad.hhmgqnkxb
 
@@ -12,62 +12,62 @@ if [[ "$mode" == "test" ]]; then
 
     # fig01
     echo "-> fig01"
-    ./fig01.py
+    python fig01.py
 
     # fig02-04
     echo "-> fig02"
-    ./fig02to04.py --setting constant --n-samples 100 --n-repeats 20
+    python fig02to04.py --setting constant --n-samples 100 --n-repeats 20
     echo "-> fig03"
-    ./fig02to04.py --setting time --n-samples 100 --n-repeats 20
+    python fig02to04.py --setting time --n-samples 100 --n-repeats 20
     echo "-> fig04"
-    ./fig02to04.py --setting persistent --n-samples 100 --n-repeats 20
+    python fig02to04.py --setting persistent --n-samples 100 --n-repeats 20
 
     # fig05-06
     echo "-> fig05-06"
-    ./fig05to06.py --subset
+    python fig05to06.py --subset
 
     # fig 06
     echo "-> fig06"
-    ./fig06.py --subset
+    python fig06.py --subset
 
     # fig 07
     echo "-> fig07"
-    ./fig07.py --n-trials 200
+    python fig07.py --n-trials 200 --tune 100 --draws 200
 
     # fig08
     echo "-> fig08"
-    ./fig08.py --n-samples 500 1000 --n-repeats 3 --n-repeats-mcmc 3 --tune 100 --draws 200
+    python fig08.py --n-samples 500 1000 --n-repeats 3 --n-repeats-mcmc 3 --tune 100 --draws 200
 
 elif [[ "$mode" == "paper" ]]; then
     echo "\nrunning PAPER mode ...\n"
 
     # fig01
     echo "-> fig01"
-    ./fig01.py
+    python fig01.py
 
     # fig02-04
     echo "-> fig02"
-    ./fig02to04.py --setting constant
+    python fig02to04.py --setting constant
     echo "-> fig03"
-    ./fig02to04.py --setting time
+    python fig02to04.py --setting time
     echo "-> fig04"
-    ./fig02to04.py --setting persistent
+    python fig02to04.py --setting persistent
 
     # fig05-06
     echo "-> fig05-06"
-    ./fig05to06.py
+    python fig05to06.py
 
     # fig 06
     echo "-> fig06"
-    ./fig06.py
+    python fig06.py
 
     # fig 07
     echo "-> fig07"
-    ./fig07.py
+    python fig07.py
 
     # fig08
     echo "-> fig08"
-    ./fig08.py --csv
+    python fig08.py --csv
 
 else
     echo "Usage: ./run.sh [test|paper]"

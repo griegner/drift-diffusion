@@ -12,10 +12,11 @@ import pandas as pd
 import seaborn as sns
 from joblib import Parallel, delayed
 from matplotlib.ticker import FuncFormatter
+from pseudotrue import pmf, pseudotrue, sampler_grid
 from sklearn.base import clone
 from tqdm import tqdm
 
-from drift_diffusion.model import DriftDiffusionModel
+from drift_diffusion.model import DriftDiffusionModel, pdf
 from drift_diffusion.sim import sample_from_pdf
 
 with (Path(__file__).resolve().parent / "config.json").open() as f:
@@ -27,8 +28,8 @@ with (Path(__file__).resolve().parent / "config.json").open() as f:
 def persistent_parameters():
     """Matzke Table 3 scales: near-neutral engagement and persistent right bias."""
 
-    # Convert noise SD 0.1 and boundaries [0, A] to noise SD 1 and bounds +/-a.
-    params = dict(a=0.125 / (2 * 0.1), t0=0.435, v=0.223 / 0.1, z=2 * 0.063 / 0.125 - 1)
+    # Matzke means converted to noise SD 1 and bounds +/-a (a rounded to 0.63, as in all settings).
+    params = dict(a=0.63, t0=0.435, v=2.23, z=0.008)
     # eta is an SD; st and sz are full uniform widths (DMAT convention).
     sd_t0, sd_v, sd_z = 0.183 / np.sqrt(12), 0.133 / 0.1, (2 * 0.037 / 0.125) / np.sqrt(12)
     engaged = {**params, "t0": params["t0"] - sd_t0, "v": params["v"] + sd_v}
@@ -50,6 +51,24 @@ def persistent_states(n_samples, rng):
     state[0] = rng.integers(2)
     state[1:] = (state[0] + np.cumsum(rng.random(n_samples - 1) < 1 - 0.95)) % 2
     return state
+
+
+def persistent_pseudotrue():
+    """continuous-DDM (a, t0, abs_v, z) maximizing the expected working likelihood, averaged over the
+    equally weighted hidden states and both stimulus directions on the sampler's RT grid."""
+
+    states = persistent_parameters()
+    y = sampler_grid([state["t0"] for state in states])
+    ys, weights, stims = [], [], []
+    for state in states:
+        for stim in (-1, 1):
+            ys.append(y)
+            weights.append(pmf(y, state["a"], state["t0"], stim * state["v"], state["z"]) / 4)
+            stims.append(np.full_like(y, stim))
+    y, weights, stims = map(np.concatenate, (ys, weights, stims))
+    x0 = [np.mean([state[name] for state in states]) for name in ["a", "t0", "v", "z"]]
+    theta = pseudotrue(y, weights, lambda p, y: pdf(y, p[0], p[1], p[2] * stims, p[3]), x0)
+    return dict(zip(["a", "t0", "abs_v", "z"], theta))
 
 
 def sample_persistent(n_samples, rep, seed=0):
@@ -78,7 +97,7 @@ def zero_formatter():
     """format tick labels"""
 
     return FuncFormatter(
-        lambda v, _: ("0" if np.isclose(v, 0) else (f"{v:.2f}" if f"{v:.3f}".endswith("0") else f"{v:.3f}"))
+        lambda v, _: "0" if np.isclose(v, 0) else (f"{v:.2f}" if f"{v:.3f}".endswith("0") else f"{v:.3f}")
     )
 
 
@@ -183,7 +202,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
 
         X = pd.DataFrame({"intercept": np.ones(kwargs["n_samples"])})
         ys = sample_from_pdf(**params, **kwargs)
-        ddm = DriftDiffusionModel(cov_estimator="all")
+        ddm = DriftDiffusionModel(cov_estimator="all", p_outlier=0)
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
     def setup_time():
@@ -199,7 +218,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
 
         X = pd.DataFrame({"intercept": np.ones(kwargs["n_samples"]), "time": time})
         ys = sample_from_pdf(a=a_time, t0=params["t0"], v=params["v"], z=params["z"], **kwargs)
-        ddm = DriftDiffusionModel(a="-1+time", cov_estimator="all", p_outlier=1e-12)
+        ddm = DriftDiffusionModel(a="-1+time", cov_estimator="all", p_outlier=0)
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
     def setup_persistent():
@@ -208,9 +227,9 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         param_names = ["a", "t0", "abs_v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 
-        # Continuous-DDM reference targets, averaging over hidden states and stimuli.
-        pseudotrue_params = dict(a=0.613275658969, t0=0.381493834668, abs_v=1.478601882646, z=0.051482449097)
-        ddm = DriftDiffusionModel(v="-1+stim", cov_estimator="all", autocorrelation_lags=60)
+        pseudotrue_params = persistent_pseudotrue()
+        print("pseudo-true:", {name: round(value, 6) for name, value in pseudotrue_params.items()})
+        ddm = DriftDiffusionModel(v="-1+stim", cov_estimator="all", autocorrelation_lags=60, p_outlier=0)
         return None, None, ddm, param_names, cov_names, pseudotrue_params
 
     if setting == "constant":
@@ -228,8 +247,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         if setting == "persistent":
             stim, y = sample_persistent(n_samples, rep, seed=kwargs["random_state"])
             # The hidden state is omitted; only observed stimulus direction enters.
-            # Initialize at the population optimum while estimating all four coefficients.
-            ddm_cp.fit(pd.DataFrame({"stim": stim}), y, params0=np.array(list(pseudotrue_params.values())))
+            ddm_cp.fit(pd.DataFrame({"stim": stim}), y)
         else:
             ddm_cp.fit(X, ys[:, rep])
         covs_ = [

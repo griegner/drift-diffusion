@@ -38,7 +38,7 @@ platforms = ["win-64", "linux-64", "osx-arm64"]
 
 [tool.pixi.dependencies]
 # conda dependencies
-python = ">=3.12"
+python = ">=3.12,<3.13"
 
 [tool.pixi.pypi-dependencies]
 # pypi dependencies
