@@ -37,7 +37,7 @@
 
 \section*{Abstract}
 
-Decision-making behavior changes over time, exhibiting temporal correlation and nonstationarity. Confidence intervals from drift diffusion models (DDMs) can have incorrect coverage when parameter variability or temporal dependence remains unmodeled. To address these limitations, we propose a computationally efficient method for estimating analytic uncertainties in DDM parameters that are robust to temporal dependence and unmodeled parameter variability, while explicitly modeling nonstationary variability through covariates. We apply this method to rat decision-making in a two-alternative forced-choice (2AFC) visual task, revealing dynamic decision-making states across multiple timescales. A Python implementation of the method is provided.
+Decision-making behavior changes over time, exhibiting temporal correlation and nonstationarity. Existing drift diffusion model (DDM) fitting methods often omit uncertainty estimates or rely on restrictive assumptions that decisions are independent and parameters remain constant over time, potentially underestimating uncertainty when parameter variability or temporal dependence remains unmodeled. To address these limitations, we propose a computationally efficient method that models systematic parameter variation through covariates and provides analytical uncertainty estimates robust to unmodeled parameter variability and temporal dependence. We apply this method to rat decision-making in a two-alternative forced-choice (2AFC) visual task, revealing dynamic decision-making states across multiple timescales. A Python implementation of the method is provided.
 
 \vfill
 \noindent\textit{Keywords:} sequential decision making, perceptual decisions, time-series analysis, DDM, 2AFC
