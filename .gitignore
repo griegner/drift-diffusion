@@ -20,6 +20,16 @@ results/*.svg
 # revisions
 revisions.md
 osync.sh
+docs-v0
+tracked-changes.md
+reviewer-response-assessment.md
+docs/manuscript/00-main-clean.tex
+docs/manuscript/00-main-clean.pdf
+docs/manuscript/00-main-clean-numbered.tex
+docs/manuscript/00-main-clean-numbered.pdf
+docs/manuscript/00-main-tracked.tex
+docs/manuscript/00-main-tracked.pdf
+docs/manuscript/neural-comp-response-draft.pdf
 
 # fig08 checkpoints
 data/fig08-mcmc/

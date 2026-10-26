@@ -47,7 +47,7 @@ Here, $RT$ \eqref{eq:RT} is the reaction time and $Y$ \eqref{eq:Y} is a scalar c
 
 These decision outcomes are stochastic. With the same initial parameters, the diffusion process \eqref{eq:Z_t} evolves as a stochastic process with a distribution governed by the probability density function:
 \begin{equation}\label{eq:f}
-    f(Y ; \bm{\theta}) = \frac{4\pi}{a^2}\exp\left(\frac{\text{sign}(Y)avw-v^2(|Y|-t_0)}{2}\right) \times\sum_{k=1}^\infty k\exp\left(-\frac{2k^2\pi^2 (|Y|-t_0)}{a^2}\right)\sin(k\pi w).
+    f(Y ; \bm{\theta}) = \frac{\pi}{4a^2}\exp\left(2\,\text{sign}(Y)avw-\frac{v^2(|Y|-t_0)}{2}\right) \times\sum_{k=1}^\infty k\exp\left(-\frac{k^2\pi^2 (|Y|-t_0)}{8a^2}\right)\sin(k\pi w).
 \end{equation}
 
 This analytical density was derived in \citet[Chapter~14, Equation~6.15]{feller_introduction_1968}, and later by \citet[Equation~13]{navarro_fast_2009} who provided the finite approximation of the infinite sum term that we implemented. The relative starting point $z\in(-1, +1)$ is rewritten as $w = (1-\text{sign}(Y)z)/{2} \in (0, +1)$ to match their notation. For a single trial, the probability of the choice and reaction time pair $\{\text{sign}(Y), |Y|\}$ is given by this bimodal (one mode per choice; Figure~\ref{fig:ddm}C) density function, defined for all $|Y|>t_0$.
@@ -168,10 +168,10 @@ Applying a central limit theorem for correlated observations \citep[Theorem~14.1
 
 Finally, combining these limits in \eqref{eq:taylor} yields the asymptotic distribution. For correctly specified models, the information matrix equality ($\tilde{\mathscr{I}}_{\bm\beta} = \mathcal{H}_{\bm\beta}$) simplifies its covariance. However, under misspecification, this equality does not hold, resulting in a ``sandwich'' form covariance $V$ \citep[Theorem~10.16]{hansen_probability_2022}:
 \begin{equation}
-    \sqrt{n}(\hat{\bm\beta}^* - \bm\beta^*) \underset{d}{\to}  \mathcal{H}_{\bm\beta}^{-1}\;\mathcal{N} \left(0, \mathscr{I}_{\bm\beta}\right) = \mathcal{N}\left(0, V=\mathcal{H}_{\bm\beta}^{-1} \mathscr{I}_{\bm\beta} \mathcal{H}_{\bm\beta}^{-1}\right).
+    \sqrt{n}(\hat{\bm\beta}^* - \bm\beta^*) \underset{d}{\to}  \mathcal{H}_{\bm\beta}^{-1}\;\mathcal{N} \left(0, \tilde{\mathscr{I}}_{\bm\beta}\right) = \mathcal{N}\left(0, V=\mathcal{H}_{\bm\beta}^{-1} \tilde{\mathscr{I}}_{\bm\beta} \mathcal{H}_{\bm\beta}^{-1}\right).
 \end{equation}
 
-This result accommodates both misspecification, via the failure of the information equality, and serial dependence, via the off-diagonal autocovariance terms in $\mathscr{I}_{\bm\beta}$.
+This result accommodates both misspecification, via the failure of the information equality, and serial dependence, via the nonzero-lag autocovariances in $\tilde{\mathscr{I}}_{\bm\beta}$.
 
 \subsubsection{Covariance Estimation}\label{sec:covariance-estimation}
 In practice, the asymptotic covariance is estimated by replacing population moments with their sample counterparts evaluated at the pseudo-MLE $\hat{\bm\beta}^*$. We define the sample Hessian matrix $\widehat{\mathcal{H}}_{\bm\beta}$, and the sample Fisher Information matrices (short-run $\widehat{\mathscr{I}}_{\bm\beta}$ and long-run $\widehat{\tilde{\mathscr{I}}}_{\bm\beta}$):
