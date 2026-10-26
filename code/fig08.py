@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 
-"""figure 08: MLE with session trends, pupil effects, and hidden engagement states.
+"""figure 08: MLE with session trends, pupil effects, and hidden engagement states"""
 
-Compare the covariate MLE (sample-Hessian and autocorrelation-robust SEs) with the
-seven-parameter HSSM full_ddm (MCMC) on the quantities both estimate, using rRMSE
-against generating values. Use --csv to replot saved results.
-"""
+# compare covariate MLE and seven-parameter HSSM MCMC via rRMSE against generating values
+# use sample-Hessian and autocorrelation-robust MLE SEs; --csv replots saved results
 
 import argparse
 import json
@@ -34,11 +32,11 @@ METHODS = ["sample-hessian", "autocorrelation-robust"]
 COLORS = ["#a88140", "#cf3e40"]
 MCMC_COLOR = "#3b6fb6"
 PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
-# hssm full_ddm names; z and sz live on [0, 1] in hssm and [-1, 1] here
+# rescale HSSM z -> 2*z - 1 and sz -> 2*sz
 MCMC_NAMES = ["a", "t", "v_stim", "z", "sz", "sv", "st"]
 MCMC_SCALE, MCMC_OFFSET = np.array([1, 1, 1, 2, 2, 1, 1]), np.array([0, 0, 0, -1, 0, 0, 0])
 MCMC_FIELDS = ["runtime", "params", "sd", "r_hat", "ess", "valid"]
-# quantities both models estimate: the first four MCMC_NAMES, and linear combinations of MLE coefficients
+# shared targets: first four MCMC_NAMES and contrasts of MLE coefficients
 QUANTITIES = ["a_mid", "t0", "v_avg", "z"]
 QUANTITY_LABELS = [r"$a$: mid-session", r"$t_0$", r"$v$: at mean pupil", r"$z$"]
 MARKERS = ["o", "^", "D", "P"]
@@ -48,7 +46,8 @@ with (ROOT / "code/config.json").open() as f:
 
 
 def simulation_design():
-    """fixed pupil traces; keep the original five-session calibration."""
+    """generate fixed pupil traces with the original five-session calibration"""
+
     rng = np.random.default_rng(np.random.SeedSequence([SEED, 17]))
     pupil = gaussian_filter1d(rng.normal(size=(10, 1000)), 20, axis=1, mode="wrap")
     pupil = (0.5 + 0.15 * pupil / pupil.std(axis=1, keepdims=True)).ravel()
@@ -69,17 +68,19 @@ def simulation_design():
 
 def comparable(design, n):
     """contrasts from the MLE coefficients to QUANTITIES, and their generating values in the first n trials"""
+
     L = np.zeros((len(QUANTITIES), len(PARAM_NAMES)))
-    L[0, [0, 1]] = 1, design["time"][:n].mean()  # a at the average session time (the midpoint)
+    L[0, [0, 1]] = 1, design["time"][:n].mean()  # a at mean session time
     L[1, 2] = 1
-    L[2, [3, 4]] = 1, design["pupil_centered"][:n].mean()  # drift at the average pupil
+    L[2, [3, 4]] = 1, design["pupil_centered"][:n].mean()  # drift at mean pupil
     L[3, 5] = 1
     truth = [design["a"][:n].mean(), design["t0"], design["magnitude"][:n].mean(), design["z"].mean()]
     return L, np.array(truth)
 
 
 def simulate(design, n, rep):
-    """sample RTs with persistent states and independent stimulus directions."""
+    """sample RTs with persistent states and independent stimulus directions"""
+
     rng = np.random.default_rng(np.random.SeedSequence([SEED, 2, n, rep]))
     state = np.empty(n, dtype=int)
     state[0] = rng.integers(2)
@@ -98,7 +99,8 @@ def simulate(design, n, rep):
 
 
 def fit_mle(X, y):
-    """fit from the package's default start (a=1, all else 0); time optimization plus covariance estimation."""
+    """fit from the package's default start (a=1, all else 0); time optimization plus covariance estimation"""
+
     mle = DriftDiffusionModel(
         a="1 + time",
         t0="1",
@@ -123,7 +125,8 @@ def fit_mle(X, y):
 
 
 def fit_mcmc(X, y, params_mle, chains, tune, draws, seed):
-    """seven-parameter full_ddm with stimulus-coded drift and no other covariates; chains start at the MLE."""
+    """fit seven-parameter full_ddm with stimulus-coded drift and no other covariates; start chains at the MLE"""
+
     started = time.perf_counter()
     mle = dict(zip(PARAM_NAMES, params_mle if np.isfinite(params_mle).all() else [0.63, 0, 0.44, 2.2, 0, 0.15]))
     model = sample_full_ddm(
@@ -153,7 +156,7 @@ def fit_mcmc(X, y, params_mle, chains, tune, draws, seed):
     runtime = time.perf_counter() - started
     summary = az.summary(model.traces, var_names=MCMC_NAMES, round_to="none")
     r_hat, ess = summary["r_hat"].to_numpy(), summary["ess_bulk"].to_numpy()
-    # st sits at its zero bound and mixes slowly; judge convergence on the other six
+    # st mixes slowly at zero; check convergence on the other six
     valid = bool(np.all(r_hat[:-1] < 1.05) and np.all(ess[:-1] >= 100))
     mean = MCMC_SCALE * summary["mean"].to_numpy() + MCMC_OFFSET
     sd = MCMC_SCALE * summary["sd"].to_numpy()
@@ -198,9 +201,9 @@ def summarize_method(n, method, runtime, params, params_, uncs_):
 
 
 def summarize(fits, mcmc, design):
-    """shared quantities against generating values; with MCMC, both methods are scored on the same
-    repetitions (valid MLE and converged MCMC), while MLE runtime averages all valid MLE fits."""
+    """summarize shared quantities against generating values"""
 
+    # pair valid MLE/converged MCMC repeats; average MLE runtime over all valid MLE fits
     rows = []
     for n in np.unique(fits["n"]):
         L, params = comparable(design, n)
@@ -242,7 +245,8 @@ def summarize(fits, mcmc, design):
 
 
 def plot_benchmark(df):
-    """paired rRMSE; reference lines are descriptive, not acceptance cutoffs."""
+    """plot paired rRMSE with descriptive reference lines, not acceptance cutoffs"""
+
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.7), layout="constrained")
     sizes = sorted(df.n.unique())
     x = np.arange(len(sizes))
@@ -304,7 +308,8 @@ def plot_benchmark(df):
 
 
 def run_mcmc_checkpoint(n, rep, params_mle, chains, tune, draws):
-    """one MCMC fit, saved to data/fig08-mcmc/ so an interrupted run resumes where it stopped."""
+    """save one MCMC fit to data/fig08-mcmc/ so an interrupted run resumes where it stopped"""
+
     path = CHECKPOINTS / f"n{n}-rep{rep}-c{chains}-t{tune}-d{draws}.npz"
     if not path.exists():
         X, y = simulate(simulation_design(), n, rep)
@@ -317,10 +322,9 @@ def run_mcmc_checkpoint(n, rep, params_mle, chains, tune, draws):
 
 
 def run_mcmc(fits, n_samples, n_repeats, n_jobs, chains, tune, draws):
-    """chains run in parallel within a fit; fits run in parallel across the remaining cpus.
+    """run chains in parallel within a fit and fits in parallel across the remaining CPUs"""
 
-    Fits run in spawned processes: their chain processes cannot nest in loky workers or threads.
-    """
+    # spawn fits: chain processes cannot nest in loky workers or threads
     CHECKPOINTS.mkdir(exist_ok=True)
     n_fits = max(1, effective_n_jobs(n_jobs) // chains)
     tasks = [(n, rep) for n in sorted(n_samples, reverse=True) for rep in range(n_repeats)]
@@ -343,7 +347,8 @@ def run_mcmc(fits, n_samples, n_repeats, n_jobs, chains, tune, draws):
 
 
 def main(n_samples, n_repeats, n_repeats_mcmc, n_jobs, chains, tune, draws, csv):
-    """run the fixed simulation or replot the prepared benchmark data."""
+    """run the fixed simulation or replot the prepared benchmark data"""
+
     if csv:
         df = pd.read_csv(ROOT / "data/fig08.csv").query("n in @n_samples")
     else:
@@ -374,6 +379,8 @@ def main(n_samples, n_repeats, n_repeats_mcmc, n_jobs, chains, tune, draws, csv)
 
 
 if __name__ == "__main__":
+    # set script defaults
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--n-samples",

@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
-"""Figure 07: pupil-dependent drift and conditional accuracy.
+"""figure 07: pupil-dependent drift and conditional accuracy"""
 
-Compare covariate and constant 4p DDMs with a 7p DDM (iid variability in v, z, t0).
-"""
+# compare covariate and constant 4p DDMs with a 7p DDM (iid variability in v, z, t0)
 
 import argparse
 import json
@@ -22,10 +21,9 @@ from drift_diffusion.sim import sample_from_pdf
 
 
 def conditional_accuracy(rt, a, t0, v, z, err=1e-3, *, correct_boundary=1):
-    """Model-implied accuracy; correct_boundary is +1 (R) or -1 (L) per trial.
+    """compute model-implied accuracy with correct_boundary +1 (R) or -1 (L) per trial"""
 
-    Correct boundaries are supplied by the task, independently of drift.
-    """
+    # task-defined correct boundaries are independent of drift
     a, t0, v, z, correct_boundary = np.broadcast_arrays(*[np.atleast_1d(p) for p in (a, t0, v, z, correct_boundary)])
     if not np.isin(correct_boundary, [-1, 1]).all():
         raise ValueError("correct_boundary must contain only -1 or +1")
@@ -42,8 +40,9 @@ def conditional_accuracy(rt, a, t0, v, z, err=1e-3, *, correct_boundary=1):
 
 
 def conditional_accuracy_full(rt, v_coherence, a, z, t, sz, sv, st, *, coherence):
-    """CAF integrated over iid variability in v, z, and t0; stimulus-coded drift v_coherence * coherence,
-    pooling trials by their correct boundary (coherence) as in conditional_accuracy."""
+    """compute CAF integrated over iid variability in v, z, and t0"""
+
+    # drift = v_coherence * coherence; pool by correct boundary as in conditional_accuracy
     rt = np.asarray(rt, dtype=float)
 
     def density(response, c):
@@ -60,6 +59,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
+    """plot and save fig07"""
+
     with (ROOT / "code/config.json").open() as f:
         plt.rcParams.update(json.load(f)["rc-params"])
     plt.rcParams["font.size"] = 12
@@ -79,7 +80,7 @@ def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
     v_pupil = coherence * (beta_coherence + beta_pupil * pupil_centered)
     params = dict(a=0.63, t0=0.435, v=v_pupil, z=0.008)
 
-    # fixed sampling stream (independent of rng); --seed still varies the pupil trace and stimuli
+    # fixed RT sampling seed; --seed varies pupil and stimuli
     ys = sample_from_pdf(**params, n_samples=n_trials, random_state=0)
     choices, rts = np.sign(ys), np.abs(ys)
 
@@ -108,7 +109,7 @@ def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
         f"fitted={constant.params_[2]:.3f} +/- {np.sqrt(constant.covariance_[2, 2]):.3f}"
     )
 
-    # stimulus-coded responses and drift, as in the 4p fits and fig08; chains start at the constant 4p MLE
+    # stimulus coding matches 4p fits and fig08; start chains at the constant 4p MLE
     a0, t0, v0, z0 = constant.params_
     ddm_hssm = sample_full_ddm(
         pd.DataFrame({"rt": rts, "response": choices.astype(int), "coherence": coherence}),
@@ -138,7 +139,7 @@ def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
 
     fits = {}
     for key, ddm in models.items():
-        bands = ddm.g(X, alpha=0.05)  # Pointwise 95% intervals.
+        bands = ddm.g(X, alpha=0.05)  # pointwise 95% intervals
         accuracy = conditional_accuracy(
             rt_grid, **{name: band["g"] for name, band in bands.items()}, correct_boundary=coherence
         )
@@ -181,6 +182,8 @@ def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
 
 
 if __name__ == "__main__":
+    # set script defaults
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-trials", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=7)

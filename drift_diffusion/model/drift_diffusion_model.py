@@ -24,9 +24,9 @@ class DriftDiffusionModel(BaseEstimator):
         v="+1",
         z="+1",
         cov_estimator="sample-hessian",
-        autocorrelation_lags=None,
         p_outlier=1e-12,
         verbose=False,
+        autocorrelation_lags=None,
     ):
         """Drift diffusion model (DDM) of binary decision making.
 
@@ -56,14 +56,14 @@ class DriftDiffusionModel(BaseEstimator):
         cov_estimator : str
             {"sample-hessian", "outer-product", "misspecification-robust",
              "autocorrelation-robust", "all"}, by default "sample-hessian"
-        autocorrelation_lags : int or None, default None
-            Bartlett lag cutoff for autocorrelation-robust covariance. None uses
-            floor(4 * (n_samples / 100) ** (2 / 9)); zero gives the MR covariance.
         p_outlier : float
             mixture probability (`0-1`) that a trial is drawn from a uniform outlier
             distribution rather than the DDM, by default 1e-12
         verbose : bool
             whether to display a progress bar
+        autocorrelation_lags : int or None, default None
+            Bartlett lag cutoff for autocorrelation-robust covariance. None uses
+            floor(4 * (n_samples / 100) ** (2 / 9)); zero gives the MR covariance.
 
         Attributes
         ----------

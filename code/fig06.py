@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Figure 06 C, D: Application to Rat Decision Making"""
+"""figure 06c,d: application to rat decision making"""
 
 import argparse
 import json
@@ -26,17 +26,17 @@ with open("./config.json") as f:
 
 
 def spline_formula(trial):
-    """quadratic B-spline in trial (df=3) with knots and bounds fixed by the pooled trials, so every fit and
-    prediction shares one basis; beyond the bounds the basis is held at its boundary value."""
+    """build a quadratic B-spline in trial (df=3) with knots and bounds fixed by the pooled trials"""
 
+    # share one basis across fits; clip extrapolation at the bounds
     lower, knot, upper = np.percentile(trial, [0, 50, 100])
     return f"bs(trial, knots=[{knot:g}], degree=2, lower_bound={lower:g}, upper_bound={upper:g}, extrapolation='clip')"
 
 
 def fit_ddm_pooled(df, spline, path=Path("../data/fig06.npy")):
-    """estimate a, t0, z, and the coherence slope of v as spline functions of trial in day;
-    warm-started from a previous fit saved at path (delete it to fit from the defaults)"""
+    """estimate a, t0, z, and the coherence slope of v as spline functions of trial in day"""
 
+    # delete the saved fit to start from defaults
     params0 = np.load(path) if path.exists() else None
     if params0 is not None and len(params0) != 16:  # 4 coefficients per parameter; else stale
         params0 = None
@@ -56,7 +56,7 @@ def fit_ddm_splines(df, spline, params):
     """estimate DDM parameters at trial 400 by day + 95% CI under the CLT, fixing the pooled spline coefficients"""
 
     param_names = ["a", "t0", "beta_v", "z"]
-    param_slices = np.split(params, 4)  # (intercept or coherence slope, 3 spline coefficients) per parameter
+    param_slices = np.split(params, 4)  # intercept or coherence slope + 3 spline coefficients per parameter
 
     X_ref = model_matrix(spline, pd.DataFrame({"trial": [400]}), output="pandas")
     spline_cols = [col for col in X_ref.columns if col != "Intercept"]
@@ -92,9 +92,9 @@ def fit_ddm_splines(df, spline, params):
 
 
 def main(subset=False):
-    """fig06"""
+    """plot and save fig06c,d"""
 
-    # load + preprocess
+    # load and preprocess
     df195 = fig05to06.preproc_df()
 
     if subset:
@@ -106,12 +106,12 @@ def main(subset=False):
     ddm_cols = ["a", "t0", "beta_v", "z"]
     spline = spline_formula(df195.query(trial_q)["trial"])
 
-    # pooled spline fit (fig06d), whose spline coefficients are fixed in the by-day fits (fig06c)
+    # fix pooled fig06d spline coefficients in the fig06c day fits
     ddm = fit_ddm_pooled(df195.query(trial_q), spline)
     if not subset:
         np.save("../data/fig06.npy", ddm.params_)
 
-    # fig 06c
+    # fig06c
     label_map = {"a": r"$a$", "t0": r"$t_0$", "beta_v": r"$\beta_v$", "v": r"$\beta_v$", "z": r"$z$"}
     ddm_fitby_day = fit_ddm_splines(df195.query(day_q), spline, ddm.params_)
     fig, axs = plt.subplots(nrows=4, ncols=3, figsize=(7, 4.4), width_ratios=[10, 0.6, 1.5], sharex="col")
@@ -124,13 +124,13 @@ def main(subset=False):
     axs[3, 2].set(xlabel="Lag(Day)")
     fig.savefig("../results/fig06c")
 
-    # fig 06d: v at coherence 1 is the coherence slope beta_v
+    # fig06d: beta_v is v at coherence 1
     trial = np.arange(20, 801, 10)
     idx_400 = np.where(trial == 400)[0][0]
     coherence = np.repeat(1, len(trial))
     X = pd.DataFrame({"coherence": coherence, "trial": trial})
     y_limits = fig05to06.get_y_limits()
-    # bonferroni correction for simultaneous confidence bands
+    # simultaneous bands via Bonferroni correction
     g = ddm.g(X, alpha=0.05 / df195.query(trial_q)["trial"].nunique())
     fig, axs = plt.subplots(nrows=4, figsize=(5.45, 4.4), sharex=True)
     for row, col in enumerate(["a", "t0", "v", "z"]):
@@ -145,7 +145,7 @@ def main(subset=False):
 
 
 if __name__ == "__main__":
-    """set script defaults"""
+    # set script defaults
 
     parser = argparse.ArgumentParser(description="Figure 06 C, D: Application to Rat Decision Making")
     parser.add_argument("--subset", action="store_true", help="use subset of data for testing")

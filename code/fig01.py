@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Figure 01: Drift Diffusion Model"""
+"""figure 01: drift diffusion model"""
 
 import argparse
 import json
@@ -50,14 +50,14 @@ def fig01b(params, path):
 
 
 def main(params):
-    """fig01a,b"""
+    """plot and save fig01a,b"""
 
     fig01a(params, "../results/fig01a")
     fig01b(params, "../results/fig01b")
 
 
 if __name__ == "__main__":
-    """set script defaults"""
+    # set script defaults
 
     parser = argparse.ArgumentParser(description="Figures 02-04: Simulation Results")
     parser.add_argument("--params", nargs=4, type=float, default=[1, 0.3, 1, 0.3], help="a, t0, v, z parameter values")

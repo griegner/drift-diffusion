@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Figures 05-06: Application to Rat Decision Making"""
+"""figures 05-06: application to rat decision making"""
 
 import argparse
 import json
@@ -46,9 +46,9 @@ def preproc_df(path="../data/Rat195Vectors_290426.csv"):
     day_map = {day: i + 1 for i, day in enumerate(all_days)}
 
     df = df.assign(
-        LR=lambda x: x["dotDirection"].map({R: +1, L: -1}) * x["correct"].map({1: 1, 0: -1}),  # +1 R, -1 L choice
+        LR=lambda x: x["dotDirection"].map({R: +1, L: -1}) * x["correct"].map({1: 1, 0: -1}),  # choice: +1 R, -1 L
         y=lambda x: x["RT"] * x["LR"],  # signed RT
-        coherence=lambda x: x["dotDirection"].map({R: +1, L: -1}) * 0.85,  # +coh R, -coh L dot movement, fixed at 0.85
+        coherence=lambda x: x["dotDirection"].map({R: +1, L: -1}) * 0.85,  # motion: +coh R, -coh L
         day=shifted_index.map(day_map),  # 6pm-to-6pm day
         hour=lambda x: x.index.hour + 1,  # 1 to 24
         trial=lambda x: (x.groupby("day").cumcount() // 20) * 20,  # trials in day
@@ -64,7 +64,7 @@ def fit_beh(df, fitby):
 
     rt_mean = g["RT"].mean()
     rt_sem = g["RT"].sem()
-    rt_ci = 1.96 * rt_sem  # CLT for RT mean
+    rt_ci = 1.96 * rt_sem  # normal CI for mean RT (CLT)
 
     n_correct = g["correct"].sum()
     n_trials = g["correct"].count()
@@ -84,7 +84,7 @@ def fit_beh(df, fitby):
 
 
 def fit_ddm(df, fitby, prefer="threads"):
-    """estimates DDM parameters + 95% CI under the CLT"""
+    """estimate DDM parameters + 95% CI under the CLT"""
 
     ddm = DriftDiffusionModel(a="+1", t0="+1", v="-1 + coherence", z="+1", cov_estimator="autocorrelation-robust")
     param_names = ["a", "t0", "beta_v", "z"]
@@ -152,8 +152,7 @@ def plot_estimates(axs, df, fitby, col, formula=None):
         acf_input = residuals
         n_lags = len(df) // 3
     else:
-        # Keep gaps in the calendar so lag one means one day, and exclude the
-        # entire practice period rather than a fixed number of observed days.
+        # exclude practice days; preserve calendar gaps for daily lags
         acf_input = df[col].reindex(range(36, int(df.index.max()) + 1))
         n_lags = len(acf_input) // 3
     acf_, confint = acf(acf_input, nlags=n_lags, fft=True, bartlett_confint=True, missing="conservative", alpha=0.05)
@@ -165,9 +164,9 @@ def plot_estimates(axs, df, fitby, col, formula=None):
 
 
 def main(prefer="threads", subset=False):
-    """fig05,06"""
+    """plot and save fig05,06"""
 
-    # load + preprocess
+    # load and preprocess
     df195 = preproc_df()
 
     if subset:
@@ -180,7 +179,7 @@ def main(prefer="threads", subset=False):
     trial_q = "day > 35 and trial <= 800"
     ddm_cols = ["a", "t0", "beta_v", "z"]
 
-    # figure 05a
+    # fig05a
     hm_fitby_day = df195.query(day_q).groupby(["day", "hour"], as_index=False)["RT"].count()
     fig, ax = plt.subplots(figsize=(5.8, 1.1))
     ax.set(ylabel="Hour in Day", yticks=[0, 6, 12, 18, 24], yticklabels=["18", "24", "6", "12", "18"], xticklabels=[])
@@ -203,7 +202,7 @@ def main(prefer="threads", subset=False):
     )
     fig.savefig("../results/fig05a2")
 
-    # figure 05b
+    # fig05b
     wsf_fitby_trial = df195.query(trial_q).groupby("trial")["proposedReward"].mean().cumsum()
     fig, axs = plt.subplots(nrows=2, figsize=(5.8, 2.4), sharex=True)
     fig.align_ylabels(axs)
@@ -219,7 +218,7 @@ def main(prefer="threads", subset=False):
     axs[1].axhline(500, ls="--", lw=1, c="k")
     fig.savefig("../results/fig05b")
 
-    # figure 05c
+    # fig05c
     beh_fitby_day = fit_beh(df=df195.query(day_q), fitby="day")
     fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(7, 2.5), width_ratios=[10, 0.6, 1.5], sharex="col")
     fig.align_ylabels(axs)
@@ -231,7 +230,7 @@ def main(prefer="threads", subset=False):
     axs[1, 2].set(xlabel="Lag(Day)")
     fig.savefig("../results/fig05c")
 
-    # figure 05d
+    # fig05d
     formula = "bs(x, df=3, degree=2)"
     beh_fitby_trial = fit_beh(df=df195.query(trial_q), fitby="trial")
     fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(6.6, 2.5), width_ratios=[10, 0.6, 1.5], sharex="col")
@@ -243,7 +242,7 @@ def main(prefer="threads", subset=False):
     axs[1, 2].set(xlabel="Lag(Trial)", xticks=[-10, 0], xticklabels=[-200, 0])
     fig.savefig("../results/fig05d")
 
-    # fig 06a
+    # fig06a
     label_map = {"a": r"$a$", "t0": r"$t_0$", "beta_v": r"$\beta_v$", "z": r"$z$"}
     ddm_fitby_day = fit_ddm(df=df195.query(day_q), fitby="day", prefer=prefer)
     fig, axs = plt.subplots(nrows=4, ncols=3, figsize=(7, 4.4), width_ratios=[10, 0.6, 1.5], sharex="col")
@@ -269,7 +268,7 @@ def main(prefer="threads", subset=False):
 
 
 if __name__ == "__main__":
-    """set script defaults"""
+    # set script defaults
 
     parser = argparse.ArgumentParser(description="Figures 05-06: Application to Rat Decision Making")
     parser.add_argument("--prefer", choices=["processes", "threads"], default="threads", help="joblib parallel backend")

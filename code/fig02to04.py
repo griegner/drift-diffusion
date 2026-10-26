@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Figures 02-04: Simulation Results"""
+"""figures 02-04: simulation results"""
 
 import argparse
 import json
@@ -26,11 +26,11 @@ with (Path(__file__).resolve().parent / "config.json").open() as f:
 
 
 def persistent_parameters():
-    """Matzke Table 3 scales: near-neutral engagement and persistent right bias."""
+    """return Matzke Table 3 scales with near-neutral engagement and persistent right bias"""
 
-    # Matzke means converted to noise SD 1 and bounds +/-a (a rounded to 0.63, as in all settings).
+    # rescale Matzke means to noise SD 1 and bounds +/-a (a rounded to 0.63)
     params = dict(a=0.63, t0=0.435, v=2.23, z=0.008)
-    # eta is an SD; st and sz are full uniform widths (DMAT convention).
+    # eta: SD; st, sz: full uniform widths (DMAT)
     sd_t0, sd_v, sd_z = 0.183 / np.sqrt(12), 0.133 / 0.1, (2 * 0.037 / 0.125) / np.sqrt(12)
     engaged = {**params, "t0": params["t0"] - sd_t0, "v": params["v"] + sd_v}
     disengaged = {
@@ -39,13 +39,12 @@ def persistent_parameters():
         "v": params["v"] - sd_v,
         "z": params["z"] + 2 * sd_z,
     }
-    # Equal state weights preserve all three source variances. The z mean shifts
-    # rightward because the engaged state, rather than the pooled mean, is near zero.
+    # equal weights preserve variances; near-neutral engaged z shifts the pooled mean rightward
     return engaged, disengaged
 
 
 def persistent_states(n_samples, rng):
-    """stationary shared binary state with P(stay)=0.95 and mean runs of 20 trials."""
+    """sample a stationary shared binary state with P(stay)=0.95 and mean runs of 20 trials"""
 
     state = np.empty(n_samples, dtype=int)
     state[0] = rng.integers(2)
@@ -54,9 +53,9 @@ def persistent_states(n_samples, rng):
 
 
 def persistent_pseudotrue():
-    """continuous-DDM (a, t0, abs_v, z) maximizing the expected working likelihood, averaged over the
-    equally weighted hidden states and both stimulus directions on the sampler's RT grid."""
+    """find continuous-DDM (a, t0, abs_v, z) maximizing the expected working likelihood"""
 
+    # average both states and stimulus directions equally on the sampler's RT grid
     states = persistent_parameters()
     y = sampler_grid([state["t0"] for state in states])
     ys, weights, stims = [], [], []
@@ -72,7 +71,7 @@ def persistent_pseudotrue():
 
 
 def sample_persistent(n_samples, rep, seed=0):
-    """sample RTs with persistent engagement states and independent stimuli."""
+    """sample RTs with persistent engagement states and independent stimuli"""
 
     rng = np.random.default_rng(np.random.SeedSequence([seed, rep]))
     state = persistent_states(n_samples, rng)
@@ -85,7 +84,7 @@ def sample_persistent(n_samples, rep, seed=0):
 
 
 def cov_to_corr(cov):
-    "ii to standard errors, ij to correlations"
+    """convert diagonal covariance entries to standard errors and off-diagonal entries to correlations"""
 
     stderr = np.sqrt(np.diag(cov))
     corr = cov / np.outer(stderr, stderr)
@@ -179,7 +178,7 @@ def plot_covariance_distributions(covs_df, params_df):
 
 
 def main(setting, n_samples, n_repeats, n_jobs, prefer):
-    "fig02,03,04"
+    """plot and save fig02,03,04"""
 
     kwargs = dict(n_samples=n_samples, n_repeats=n_repeats, random_state=720261019 if setting == "persistent" else 0)
     figure_paths = {
@@ -189,11 +188,11 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
     }
     path_a, path_b = figure_paths[setting]
 
-    # DDM parameters, from Matzke 2009, Table 3 (Mean)
+    # mean DDM parameters from Matzke 2009, Table 3
     params = dict(a=0.63, t0=0.435, v=2.23, z=0.008)
 
     def setup_constant():
-        """setup constant DDM parameters"""
+        """set up constant DDM parameters"""
 
         param_names = ["a", "t0", "v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
@@ -206,7 +205,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
     def setup_time():
-        """setup a as linear function of normalized time in session"""
+        """set up a as a linear function of normalized time in session"""
 
         param_names = ["beta_a", "t0", "v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
@@ -222,7 +221,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         return X, ys, ddm, param_names, cov_names, pseudotrue_params
 
     def setup_persistent():
-        """unmodeled engagement state; fit a, t0, drift magnitude, and side bias."""
+        """set up an unmodeled engagement state; fit a, t0, drift magnitude, and side bias"""
 
         param_names = ["a", "t0", "abs_v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
@@ -246,7 +245,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         ddm_cp = clone(ddm)
         if setting == "persistent":
             stim, y = sample_persistent(n_samples, rep, seed=kwargs["random_state"])
-            # The hidden state is omitted; only observed stimulus direction enters.
+            # fit observed stimulus direction; omit the hidden state
             ddm_cp.fit(pd.DataFrame({"stim": stim}), y)
         else:
             ddm_cp.fit(X, ys[:, rep])
@@ -270,7 +269,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
 
 
 if __name__ == "__main__":
-    """set script defaults"""
+    # set script defaults
 
     parser = argparse.ArgumentParser(description="Figures 02-04: Simulation Results")
     parser.add_argument(

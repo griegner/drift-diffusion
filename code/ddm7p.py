@@ -1,9 +1,8 @@
-"""seven-parameter HSSM full_ddm, shared by fig07 and fig08.
+"""seven-parameter HSSM full_ddm, shared by fig07 and fig08"""
 
-HSSM's full_ddm has only a black-box likelihood (no gradients). Defaults here were
-piloted on fig08 at n=1000: a looser sz/st integration tolerance (~70x faster) and
-DEMetropolisZ chains started near the MLE (~6x the ESS/s of HSSM's default Slice).
-"""
+# full_ddm has no gradients; defaults piloted on fig08 (n=1000)
+# sz/st tolerance 1e-4 vs 1e-8: ~70x faster
+# chains start near the MLE; DEMetropolisZ gives ~6x the ESS/s of HSSM's default Slice
 
 import sys
 
@@ -14,17 +13,19 @@ from hddm_wfpt import wfpt
 from hssm.likelihoods.blackbox import hddm_to_hssm
 
 if sys.platform == "darwin":
-    pytensor.config.cxx = ""  # macOS clang rejects pytensor's -ld64 link flag; use the python backend
+    pytensor.config.cxx = ""  # avoid macOS clang's unsupported -ld64 flag
 
 
 @hddm_to_hssm
 def logp_full_ddm(data, v, a, z, t, sz, sv, st):
-    """hssm's full_ddm likelihood with simps_err=1e-4 instead of 1e-8; data columns are (rt, response)."""
+    """evaluate HSSM's full_ddm likelihood with simps_err=1e-4 and data columns (rt, response)"""
+
     return wfpt.wiener_logp_array(x=data, v=v, sv=sv, a=a * 2, z=z, sz=sz, t=t, st=st, err=1e-8, simps_err=1e-4)
 
 
 def sample_full_ddm(data, initvals, chains=4, tune=1000, draws=12000, seed=None, include=None):
-    """fit full_ddm to data (rt, response, covariates) with chains sampling in parallel; returns the HSSM model."""
+    """fit full_ddm to data (rt, response, covariates) with parallel chains and return the HSSM model"""
+
     model = hssm.HSSM(
         data=data,
         model="full_ddm",

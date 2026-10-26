@@ -26,11 +26,11 @@ if [[ "$mode" == "test" ]]; then
     echo "-> fig05-06"
     python fig05to06.py --subset
 
-    # fig 06
+    # fig06
     echo "-> fig06"
     python fig06.py --subset
 
-    # fig 07
+    # fig07
     echo "-> fig07"
     python fig07.py --n-trials 200 --tune 100 --draws 200
 
@@ -57,11 +57,11 @@ elif [[ "$mode" == "paper" ]]; then
     echo "-> fig05-06"
     python fig05to06.py
 
-    # fig 06
+    # fig06
     echo "-> fig06"
     python fig06.py
 
-    # fig 07
+    # fig07
     echo "-> fig07"
     python fig07.py
 
