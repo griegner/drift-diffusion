@@ -19,7 +19,7 @@ import pandas as pd
 from ddm7p import sample_full_ddm
 from joblib import Parallel, delayed, effective_n_jobs
 from matplotlib.lines import Line2D
-from matplotlib.ticker import FuncFormatter, NullFormatter
+from matplotlib.ticker import StrMethodFormatter
 from scipy.ndimage import gaussian_filter1d
 
 from drift_diffusion.model import DriftDiffusionModel
@@ -29,8 +29,11 @@ ROOT = Path(__file__).resolve().parents[1]
 SEED = 20261020
 CHECKPOINTS = ROOT / "data/fig08-mcmc"
 METHODS = ["sample-hessian", "autocorrelation-robust"]
-COLORS = ["#a88140", "#cf3e40"]
-MCMC_COLOR = "#3b6fb6"
+# 4p-DDM MLE in blues (light SH, dark AR), 7p-DDM MCMC in red
+MLE_COLOR = "#3b6fb6"
+COLORS = ["#9dbde3", "#1c3f73"]
+MCMC_COLOR = "#cf3e40"
+METHOD_LABELS = ["4p-DDM MLE, SH", "4p-DDM MLE, AR", "7p-DDM MCMC"]
 PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
 # rescale HSSM z -> 2*z - 1 and sz -> 2*sz
 MCMC_NAMES = ["a", "t", "v_stim", "z", "sz", "sv", "st"]
@@ -40,6 +43,11 @@ MCMC_FIELDS = ["runtime", "params", "sd", "r_hat", "ess", "valid"]
 QUANTITIES = ["a_mid", "t0", "v_avg", "z"]
 QUANTITY_LABELS = [r"$a$: mid-session", r"$t_0$", r"$v$: at mean pupil", r"$z$"]
 MARKERS = ["o", "^", "D", "P"]
+MARKER_AREA = 60  # scatter size of the circles
+# triangles and plusses enclose less area than circles at the same s, diamonds more; sizes are
+# scaled by the square root of that area ratio so the symbols look alike
+MARKER_SIZES = {"o": 60, "^": 76, "D": 53, "P": 72}
+
 
 with (ROOT / "code/config.json").open() as f:
     plt.rcParams.update(json.load(f)["rc-params"])
@@ -252,38 +260,27 @@ def plot_benchmark(df):
     x = np.arange(len(sizes))
     offsets = np.linspace(-0.24, 0.24, len(QUANTITIES))
     runtime = df.groupby(["method", "n"]).runtime.first()
-    axes[0].plot(x, runtime[METHODS[0]].loc[sizes], "o-", color="0.72", markerfacecolor="0.3", markeredgecolor="0.3")
-    axes[0].plot(x, runtime.get("mcmc", pd.Series()).reindex(sizes), "o-", color=MCMC_COLOR)
-    axes[0].set_yscale("log")
-    axes[0].yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:g}"))
-    axes[0].yaxis.set_minor_formatter(NullFormatter())
+    axes[0].plot(x, runtime[METHODS[0]].loc[sizes], "o-", color=MLE_COLOR, ms=np.sqrt(MARKER_AREA))
+    axes[0].plot(x, runtime.get("mcmc", pd.Series()).reindex(sizes), "o-", color=MCMC_COLOR, ms=np.sqrt(MARKER_AREA))
+    axes[0].yaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
     for name, marker, offset in zip(QUANTITIES, MARKERS, offsets):
         group = df[df.param == name]
         xx = x + offset
+        size = MARKER_SIZES[marker]
         point = group[(group.method == METHODS[0]) & (group.estimate == "param")].set_index("n").loc[sizes]
-        axes[1].plot(
-            xx, point.rrmse, marker=marker, color="0.72", markerfacecolor="0.3", markeredgecolor="0.3", lw=1.05
-        )
+        axes[1].plot(x, point.rrmse, color=MLE_COLOR, alpha=0.45, lw=1.05, zorder=1)
+        axes[1].scatter(x, point.rrmse, color=MLE_COLOR, marker=marker, s=size, edgecolor="white", lw=0.35, zorder=2)
         paired = []
         for method, color in zip(METHODS + ["mcmc"], COLORS + [MCMC_COLOR]):
             unc = group[(group.method == method) & (group.estimate == "unc")].set_index("n").reindex(sizes)
             paired.append(unc.rrmse.to_numpy())
-            axes[2].scatter(xx, unc.rrmse, color=color, marker=marker, s=46, edgecolor="white", lw=0.35, zorder=3)
+            axes[2].scatter(xx, unc.rrmse, color=color, marker=marker, s=size, edgecolor="white", lw=0.35, zorder=3)
         axes[2].vlines(xx, np.nanmin(paired, axis=0), np.nanmax(paired, axis=0), color="0.72", lw=1.1)
         point = group[(group.method == "mcmc") & (group.estimate == "param")].set_index("n").reindex(sizes)
-        axes[1].scatter(xx, point.rrmse, color=MCMC_COLOR, marker=marker, s=46, edgecolor="white", lw=0.35)
+        axes[1].plot(x, point.rrmse, color=MCMC_COLOR, alpha=0.45, lw=1.05, zorder=1)
+        axes[1].scatter(x, point.rrmse, color=MCMC_COLOR, marker=marker, s=size, edgecolor="white", lw=0.35, zorder=3)
     for ax, reference in zip(axes[1:], [10, 20]):
         ax.axhline(reference, color="0.35", ls="--", lw=1, zorder=0)
-        ax.text(
-            0.98,
-            reference,
-            f"{reference}% reference",
-            transform=ax.get_yaxis_transform(),
-            ha="right",
-            va="bottom",
-            fontsize=9,
-            color="0.35",
-        )
     for ax, panel, label in zip(axes, "ABC", ["Seconds per fit", "Point rRMSE (%)", "SE rRMSE (%)"]):
         ax.set(xlabel="n Trials", ylabel=label, xticks=x, xticklabels=[f"{n:,}" for n in sizes])
         ax.set(xlim=(-0.45, len(sizes) - 0.55))
@@ -292,14 +289,13 @@ def plot_benchmark(df):
         ax.set_title(panel, loc="left", fontweight="bold")
         ax.spines[["top", "right"]].set_visible(False)
         ax.grid(axis="y", alpha=0.15)
-    handles = [
-        Line2D([], [], color=color, marker="o", ls="none", label=label)
-        for color, label in zip(
-            COLORS + [MCMC_COLOR], ["Sample Hessian", "Autocorrelation robust (60 lags)", "full_ddm MCMC"]
-        )
+    handles = [Line2D([], [], color=MLE_COLOR, marker="o", ms=np.sqrt(MARKER_AREA), ls="none", label="4p-DDM MLE")]
+    handles += [
+        Line2D([], [], color=color, marker="o", ms=np.sqrt(MARKER_AREA), ls="none", label=label)
+        for color, label in zip(COLORS + [MCMC_COLOR], METHOD_LABELS)
     ]
     handles += [
-        Line2D([], [], color="0.3", marker=marker, ls="none", label=label)
+        Line2D([], [], color="0.3", marker=marker, ms=np.sqrt(MARKER_SIZES[marker]), ls="none", label=label)
         for marker, label in zip(MARKERS, QUANTITY_LABELS)
     ]
     fig.legend(handles=handles, loc="outside lower center", ncol=4, fontsize=9, frameon=False)
