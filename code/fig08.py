@@ -46,9 +46,9 @@ MCMC_FIELDS = ["runtime", "params", "sd", "r_hat", "ess", "valid"]
 # shared targets: first four MCMC_NAMES and contrasts of MLE coefficients
 QUANTITIES = ["a_mid", "t0", "v_avg", "z"]
 QUANTITY_LABELS = [r"$\bar{a}$", r"$t_0$", r"$\bar{v}$", r"$z$"]
-# fig07 palette: 4p-DDM in reds (dark for point estimates and AR, light for SH), 7p-DDM in green
-COLORS = {"sample-hessian": "#f19c9d", "autocorrelation-robust": "#8c1515", "mcmc": "#2ca02c"}
-PALE = {key: 0.3 * np.array(to_rgb(color)) + 0.7 for key, color in [("mle", "r"), ("mcmc", "g")]}
+# fig07 palette: 4p-DDM in reds (dark for point estimates and AR, light for SH), 7p-DDM in blue
+COLORS = {"sample-hessian": "#f19c9d", "autocorrelation-robust": "#8c1515", "mcmc": "#3b6fb6"}
+PALE = {key: 0.3 * np.array(to_rgb(color)) + 0.7 for key, color in [("mle", "r"), ("mcmc", "#3b6fb6")]}
 
 
 def simulation_design():
@@ -317,7 +317,7 @@ def plot_example(fig, spec, fits, design, targets):
     axes[-1].step(trial, design["z"][simulate(design, rep)[2]], color="0.25", lw=0.6, where="post", zorder=3)
     axes[1].set_ylim(0.33, 0.53)
     axes[-1].set_xlabel("Trial")
-    axes[0].set_title("A", loc="left", fontweight="bold")
+    axes[0].set_title("A. Example Simulation and Model Fits", pad=40)  # room for the legend
     handles = [
         Line2D([], [], color="k", ls="--", lw=1.6, label="Pseudo-true 4p-DDM"),
         Line2D([], [], color="0.25", lw=0.8, label="True hidden state"),
@@ -368,8 +368,9 @@ def plot(fits, design, targets):
         ax.set(ylabel=label, ylim=ylim, xticks=x, xticklabels=QUANTITY_LABELS, xlim=(-0.5, len(x) - 0.5))
     half = 196 * np.sqrt(0.95 * 0.05 / fits["mcmc_valid"].sum())  # 95% Monte Carlo band around nominal coverage
     axes[7].axhspan(95 - half, 95 + half, color="0.92", zorder=0)
-    for ax, panel in zip(axes[4:], "BCDE"):
-        ax.set_title(panel, loc="left", fontweight="bold")
+    titles = ["B. Runtime", "C. Point Estimate Bias", "D. Standard Error Bias", "E. Confidence Interval Coverage"]
+    for ax, title in zip(axes[4:], titles):
+        ax.set_title(title)
         ax.grid(axis="y", alpha=0.15)
     for ax in axes:
         ax.spines[["top", "right"]].set_visible(False)

@@ -15,6 +15,7 @@ import pandas as pd
 from ddm7p import logp_full_ddm, sample_full_ddm
 from matplotlib.colors import to_rgb
 from scipy.ndimage import gaussian_filter1d
+from scipy.stats import binomtest
 
 from drift_diffusion.model import DriftDiffusionModel, pdf
 from drift_diffusion.sim import sample_from_pdf
@@ -56,6 +57,7 @@ def conditional_accuracy_full(rt, v_coherence, a, z, t, sz, sv, st, *, coherence
 
 
 ROOT = Path(__file__).resolve().parents[1]
+HSSM_CACHE = ROOT / "data/fig07-hssm.json"
 
 
 def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
@@ -110,32 +112,45 @@ def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
     )
 
     # stimulus coding matches 4p fits and fig08; start chains at the constant 4p MLE
-    a0, t0, v0, z0 = constant.params_
-    ddm_hssm = sample_full_ddm(
-        pd.DataFrame({"rt": rts, "response": choices.astype(int), "coherence": coherence}),
-        initvals=dict(a=a0, t=t0 - 0.01, v_coherence=v0, z=(z0 + 1) / 2, sz=0.3, sv=0.8, st=0.02),
-        chains=chains,
-        tune=tune,
-        draws=draws,
-        seed=seed,
-        include=[
-            dict(
-                name="v",
-                formula="v ~ 0 + coherence",
-                link="identity",
-                prior={"coherence": {"name": "Normal", "mu": 0.0, "sigma": 3.0}},
-            )
-        ],
-    )
-
+    # posterior means are cached per setting so replots skip MCMC
     names = ("v_coherence", "a", "z", "t", "sz", "sv", "st")
-    print(az.summary(ddm_hssm.traces, var_names=list(names), round_to=3)[["mean", "sd", "r_hat", "ess_bulk"]])
-    params_hssm = {name: float(ddm_hssm.traces.posterior[name].mean()) for name in names}
+    cache_key = f"n{n_trials}-seed{seed}-c{chains}-t{tune}-d{draws}"
+    cache = json.loads(HSSM_CACHE.read_text()) if HSSM_CACHE.exists() else {}
+    if cache_key not in cache:
+        a0, t0, v0, z0 = constant.params_
+        ddm_hssm = sample_full_ddm(
+            pd.DataFrame({"rt": rts, "response": choices.astype(int), "coherence": coherence}),
+            initvals=dict(a=a0, t=t0 - 0.01, v_coherence=v0, z=(z0 + 1) / 2, sz=0.3, sv=0.8, st=0.02),
+            chains=chains,
+            tune=tune,
+            draws=draws,
+            seed=seed,
+            include=[
+                dict(
+                    name="v",
+                    formula="v ~ 0 + coherence",
+                    link="identity",
+                    prior={"coherence": {"name": "Normal", "mu": 0.0, "sigma": 3.0}},
+                )
+            ],
+        )
+        print(az.summary(ddm_hssm.traces, var_names=list(names), round_to=3)[["mean", "sd", "r_hat", "ess_bulk"]])
+        cache[cache_key] = {name: float(ddm_hssm.traces.posterior[name].mean()) for name in names}
+        HSSM_CACHE.write_text(json.dumps(cache, indent=2))
+    params_hssm = cache[cache_key]
     trial = np.arange(1, n_trials + 1)
-    rt_grid = np.linspace(max(params["t0"], params_hssm["t"] + params_hssm["st"] / 2) + 0.1, params["t0"] + 5, 100)
+    rt_grid = np.linspace(max(params["t0"], params_hssm["t"] + params_hssm["st"] / 2) + 0.1, 2, 100)
     v_example = rng.normal(params_hssm["v_coherence"], params_hssm["sv"], n_trials)
     accuracy_sim = conditional_accuracy(rt_grid, **params, correct_boundary=coherence)
     accuracy_hssm = conditional_accuracy_full(rt_grid, **params_hssm, coherence=coherence)
+
+    # simulated data: accuracy in RT decile bins with 95% Wilson intervals
+    decile = np.digitize(rts, np.quantile(rts, np.linspace(0, 1, 11))[1:-1])
+    correct = choices == coherence
+    tests = [binomtest(correct[decile == b].sum(), np.sum(decile == b)) for b in range(10)]
+    rt_bins = [rts[decile == b].mean() for b in range(10)]
+    accuracy_bins = np.array([test.statistic for test in tests])
+    ci_lower, ci_upper = np.array([test.proportion_ci(method="wilson") for test in tests]).T
 
     fits = {}
     for key, ddm in models.items():
@@ -158,7 +173,7 @@ def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
     strength = 0.3
     colors = {
         key: strength * np.array(to_rgb(color)) + (1 - strength)
-        for key, color in [("constant", "b"), ("covariate", "r"), ("variable", "g")]
+        for key, color in [("constant", "k"), ("covariate", "r"), ("variable", "#3b6fb6")]
     }
 
     fig, axs = plt.subplots(1, 2, figsize=(12, 3.4), width_ratios=[2, 1], layout="constrained")
@@ -172,10 +187,21 @@ def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
         axs[0].fill_between(trial, abs_lower, abs_upper, color=colors[key], zorder=2)
         axs[1].plot(rt_grid, accuracy, color=colors[key], lw=2, label=labels[key])
     axs[1].plot(rt_grid, accuracy_hssm, color=colors["variable"], lw=2, label=labels["variable"])
+    axs[1].errorbar(
+        rt_bins,
+        accuracy_bins,
+        yerr=[accuracy_bins - ci_lower, ci_upper - accuracy_bins],
+        fmt="o",
+        color="k",
+        ms=4,
+        elinewidth=1,
+        zorder=0,
+        label="Simulated Data, 95% CI",
+    )
     for ax, text in zip(axs, axes_labels):
         ax.set(**text)
     axs[1].set_ylim(0.5, 1.0)
-    axs[1].legend(loc="best")
+    axs[1].legend(loc="lower left", fontsize=9, frameon=False)
 
     fig.savefig(ROOT / "results/fig07.svg")
     plt.close(fig)
