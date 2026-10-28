@@ -14,13 +14,13 @@ Dear \emph{Neural Computation} Editor and Reviewer,
 
 \vspace{0.5cm}
 
-We thank the reviewer for the thoughtful comments, which prompted us to clarify the contribution and strengthen the simulations and discussion. The main changes are:
+We thank the reviewer for their thoughtful comments, which prompted us to clarify the contribution and strengthen the simulations and discussion. The main changes are:
 
 \begin{itemize}
     \item Clarified how the framework relates to Bayesian inference and could be adapted to existing methods, while making its large-sample assumptions explicit.
     \item Revised Figure 4 to include persistent unmodeled decision states, demonstrating the importance of accounting for temporal dependence in uncertainty estimates.
     \item Added Figure 7 to illustrate how a covariate-dependent four-parameter DDM can reproduce slow errors and track drift changes, with a seven-parameter DDM included for comparison.
-    \item Expanded the discussion of existing covariate, latent-state, and learning models to clarify the contribution and scope of our method.
+    \item Expanded the discussion of existing covariate, latent-state, and learning models to clarify our contribution.
 \end{itemize}
 
 Below, the reviewer's comments appear in \textbf{bold}, our responses in plain text, and excerpts from the revised manuscript in indented \textit{italics}. We provide both clean and tracked versions of the manuscript; all page and line numbers refer to the tracked version. The original Figure 7 comparison is now Figure 8.
@@ -36,7 +36,7 @@ I should be transparent that I am not in a position to verify the correctness of
 
 \reviewercomment{- Uncertainty quantification: MCMC provides full posterior distributions;}
 
-We agree that Bayesian MCMC already quantifies uncertainty. However, posterior uncertainty depends on the fitted model and may be misleading when parameter variability or temporal dependence remains unmodeled. We have revised the introduction to explain how sandwich covariance adjustments could also be incorporated into Bayesian methods, with our pseudo-MLE implementation providing a computationally efficient starting point for these extensions.
+We agree that Bayesian MCMC already quantifies uncertainty. However, posterior uncertainty depends on the fitted model and may be underestimated when parameter variability or temporal dependence remains unmodeled. We have revised the introduction to explain how sandwich covariance adjustments could also be incorporated into Bayesian methods, with our pseudo-MLE implementation providing a computationally efficient starting point for these extensions.
 
 \begin{samepage}
 \noindent\emph{Uncertainty under unmodeled variability --- Abstract, unnumbered title page, lines~3--7:}

@@ -36,7 +36,7 @@ if [[ "$mode" == "test" ]]; then
 
     # fig08
     echo "-> fig08"
-    python fig08.py --n-samples 500 1000 --n-repeats 3 --n-repeats-mcmc 3 --tune 100 --draws 200
+    python fig08.py --n-repeats 3 --tune 100 --draws 200
 
 elif [[ "$mode" == "paper" ]]; then
     echo "\nrunning PAPER mode ...\n"
@@ -67,7 +67,7 @@ elif [[ "$mode" == "paper" ]]; then
 
     # fig08
     echo "-> fig08"
-    python fig08.py --csv
+    python fig08.py --replot
 
 else
     echo "Usage: ./run.sh [test|paper]"
