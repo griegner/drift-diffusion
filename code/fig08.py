@@ -348,7 +348,7 @@ def plot(fits, design, targets):
     axes[4].set_xlim(-0.45, 2.45)
 
     panels = [
-        ("bias", ["autocorrelation-robust", "mcmc"], "Point relative bias (%)", (-5, 5)),
+        ("bias", ["autocorrelation-robust", "mcmc"], "Point relative bias (%)", (-3, 3)),
         ("se_bias", METHODS + ["mcmc"], "SE relative bias (%)", (-45, 45)),
         ("coverage", METHODS + ["mcmc"], "95% CI coverage (%)", (60, 101)),
     ]
@@ -379,6 +379,7 @@ def main(n_repeats, n_jobs, chains, tune, draws, replot):
     """fit all repeats and save them to data/, then plot"""
 
     design = simulation_design()
+    print(design)
     if not replot:
 
         @delayed
