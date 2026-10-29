@@ -245,17 +245,25 @@ def run_mcmc(params_mle, n_jobs, chains, tune, draws):
     return dict(zip(["rep", *MCMC_FIELDS], map(np.array, zip(*records))))
 
 
-def scores(fits, L, targets, n_boot=2000):
-    """point and SE relative bias and 95% CI coverage (%), with 95% Monte Carlo half-widths from resampled repeats"""
+def scores(fits, L, targets):
+    """point and SE relative bias and 95% CI coverage (%), with 95% Monte Carlo half-widths from the CLT"""
 
     def metrics(params_, uncs_, reference):
-        # repeats on axis -2; the empirical SD of the point estimates serves as the true SE
-        error, sd = params_ - reference, params_.std(ddof=1, axis=-2)
-        return {
-            "bias": 100 * error.mean(axis=-2) / reference,
-            "se_bias": 100 * (uncs_.mean(axis=-2) - sd) / sd,
-            "coverage": 100 * np.mean(abs(error) <= 1.96 * uncs_, axis=-2),
+        # the empirical SD of the point estimates serves as the true SE; each metric's Monte Carlo SE is the SD of
+        # its per-repeat influence over sqrt(repeats), by the delta method for the SE ratio
+        error, sd, unc = params_ - reference, params_.std(ddof=1, axis=0), uncs_.mean(axis=0)
+        covered = abs(error) <= 1.96 * uncs_
+        influence = {
+            "bias": 100 * error / reference,
+            "se_bias": 100 * ((uncs_ - unc) / sd - unc * ((params_ - params_.mean(axis=0)) ** 2 - sd**2) / (2 * sd**3)),
+            "coverage": 100 * covered,
         }
+        values = {
+            "bias": 100 * error.mean(axis=0) / reference,
+            "se_bias": 100 * (unc - sd) / sd,
+            "coverage": 100 * covered.mean(axis=0),
+        }
+        return {key: (values[key], 1.96 * influence[key].std(ddof=1, axis=0) / np.sqrt(len(params_))) for key in values}
 
     mle, mcmc = fits["valid"], fits["mcmc_valid"]
     params_ = fits["params"][mle] @ L.T
@@ -264,14 +272,9 @@ def scores(fits, L, targets, n_boot=2000):
         for m, method in enumerate(METHODS)
     }
     estimates["mcmc"] = fits["mcmc_params"][mcmc, :4], fits["mcmc_sd"][mcmc, :4], targets["mcmc"][:4]
-    rng = np.random.default_rng(0)
     result = {}
     for method, (params_, uncs_, reference) in estimates.items():
-        boot = rng.integers(0, len(params_), (n_boot, len(params_)))
-        resampled = metrics(params_[boot], uncs_[boot], reference)
-        result[method] = {
-            key: (value, 1.96 * resampled[key].std(axis=0)) for key, value in metrics(params_, uncs_, reference).items()
-        }
+        result[method] = metrics(params_, uncs_, reference)
         print(
             f"{method} ({len(params_)} repeats):", {key: np.round(value[0], 1) for key, value in result[method].items()}
         )
