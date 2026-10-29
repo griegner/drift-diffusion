@@ -7,7 +7,6 @@
 \newcommand{\reviewercomment}[1]{\vspace{0.3cm}\noindent\textbf{#1}\vspace{0.15cm}}
 \newcommand{\manuscriptquote}[1]{\begin{quote}\textit{#1}\end{quote}}
 
-\newcommand{\pendingfigureeight}[1]{\par\noindent\textcolor{red}{\textbf{Pending Figure 8:} #1}\par}
 \begin{document}
 
 Dear \emph{Neural Computation} Editor and Reviewer,
@@ -17,17 +16,18 @@ Dear \emph{Neural Computation} Editor and Reviewer,
 We thank the reviewer for their thoughtful comments, which prompted us to clarify the contribution and strengthen the simulations and discussion. The main changes are:
 
 \begin{itemize}
-    \item Clarified how the framework relates to Bayesian inference and could be adapted to existing methods, while making its large-sample assumptions explicit.
-    \item Revised Figure 4 to include persistent unmodeled decision states, demonstrating the importance of accounting for temporal dependence in uncertainty estimates.
-    \item Added Figure 7 to illustrate how a covariate-dependent four-parameter DDM can reproduce slow errors and track drift changes, with a seven-parameter DDM included for comparison.
-    \item Expanded the discussion of existing covariate, latent-state, and learning models to clarify our contribution.
+    \item Clarified our contribution: formalizing and evaluating pseudo-MLE for covariate-dependent DDMs through large-sample theory, realistic simulations, and an application to rat decision making. We also expanded the discussion of existing covariate, latent-state, and learning models.
+    \item Clarified how the framework relates to Bayesian inference and could be adapted to existing methods.
+    \item Revised Figure 4 to include persistent unmodeled decision states, showing that uncertainty estimates must account for temporal dependence.
+    \item Added Figure 7 to illustrate how a covariate-dependent four-parameter DDM can reproduce slow errors and track drift changes, compared with a seven-parameter DDM.
+    \item Replaced the original MLE--MCMC comparison (the reviewer's Figure~7) with Figure 8, which compares uncertainty estimates and runtimes with a seven-parameter DDM fitted by MCMC under misspecification and temporal dependence.
 \end{itemize}
 
-Below, the reviewer's comments appear in \textbf{bold}, our responses in plain text, and excerpts from the revised manuscript in indented \textit{italics}. We provide both clean and tracked versions of the manuscript; all page and line numbers refer to the tracked version. The original Figure 7 comparison is now Figure 8.
+Below, the reviewer's comments appear in \textbf{bold}, our responses in plain text, and excerpts from the revised manuscript in indented \textit{italics}. We provide clean and tracked versions of the manuscript; page and line numbers refer to the clean version.
 
 \subsubsection*{Reviewer's comments}
 
-\reviewercomment{In "Quantifying uncertainty in drift diffusion models of decision making under temporal dependence and parameter variability", the authors propose an analytical method to derive uncertainty estimates from the diffusion model without between-trial variability parameters. They argue that unmodeled parameter variability can be robustly captured in uncertainty estimates while explicitly accounting for temporal structure using covariates.}
+\reviewercomment{In ``Quantifying uncertainty in drift diffusion models of decision making under temporal dependence and parameter variability'', the authors propose an analytical method to derive uncertainty estimates from the diffusion model without between-trial variability parameters. They argue that unmodeled parameter variability can be robustly captured in uncertainty estimates while explicitly accounting for temporal structure using covariates.}
 
 \reviewercomment{The paper addresses a timely topic. However, I am not convinced that the proposed methods substantially advance the field, nor that they are preferable to existing MCMC-based approaches.
 I should be transparent that I am not in a position to verify the correctness of the theoretical derivations. My assessment therefore focuses on the conceptual contributions, empirical validation, and positioning relative to the existing literature. I raise three major concerns.}
@@ -36,131 +36,139 @@ I should be transparent that I am not in a position to verify the correctness of
 
 \reviewercomment{- Uncertainty quantification: MCMC provides full posterior distributions;}
 
-We agree that Bayesian MCMC already quantifies uncertainty. However, posterior uncertainty depends on the fitted model and may be underestimated when parameter variability or temporal dependence remains unmodeled. We have revised the introduction to explain how sandwich covariance adjustments could also be incorporated into Bayesian methods, with our pseudo-MLE implementation providing a computationally efficient starting point for these extensions.
+Bayesian MCMC does quantify uncertainty through the full posterior. However, the posterior describes uncertainty under the fitted model, and can underestimate it when parameter variability or temporal dependence remains unmodeled. The new Figure~8 shows this directly: when the starting point switches between persistent states omitted from the fit, the posterior standard deviations of a seven-parameter DDM fitted by MCMC underestimate its standard error by 37\%, giving 79\% coverage of 95\% credible intervals (Practical considerations, p.~23, lines~585--594; see also our response on robustness below). The introduction now explains how sandwich covariance adjustments could be incorporated into Bayesian methods.
 
 \begin{samepage}
-\noindent\emph{Uncertainty under unmodeled variability --- Abstract, unnumbered title page, lines~3--7:}
+\noindent\emph{Uncertainty under unmodeled variability --- Abstract, unnumbered title page, lines~3--6:}
 
-\manuscriptquote{Existing drift diffusion model (DDM) fitting methods often omit uncertainty estimates or rely on restrictive assumptions that decisions are independent and parameters remain constant over time, potentially underestimating uncertainty when parameter variability or temporal dependence remains unmodeled.}
+\manuscriptquote{Existing drift diffusion model (DDM) fitting methods often omit uncertainty estimates or rely on restrictive assumptions that decisions are independent and parameters remain constant over time, tending to underestimate uncertainty when parameter variability or temporal dependence remains unmodeled.}
 \end{samepage}\par\penalty0
 
 \begin{samepage}
-\noindent\emph{Extension to Bayesian methods --- Introduction, p.~4, lines~136--141:}
+\noindent\emph{Extension to Bayesian methods --- Introduction, p.~3, lines~107--111:}
 
 \manuscriptquote{This working-likelihood and sandwich-covariance framework could extend to Bayesian and other DDM inference methods, including sandwich-adjusted MCMC \citep{shaby_open-faced_2014}, with long-run score covariance accounting for dependent trials \citep{newey_simple_1987}. Our frequentist implementation provides fast inference under the stated large-sample assumptions, and a starting point for other methods to adapt.}
 \end{samepage}\par\penalty0
 
-\begin{samepage}
-\noindent\emph{Consequences for statistical inference --- Conclusions, p.~27, lines~705--708:}
-
-\manuscriptquote{Unmodeled parameter variability and temporal dependence can compromise uncertainty estimates from DDMs fitted with an independent-trial working likelihood, resulting in incorrect frequentist coverage and potentially invalid inference \citep{urai_structure_2025, moens_recurrent_2018}.}
-\end{samepage}\par\penalty0
-
 \reviewercomment{- Asymptotic approximations: This seems to be an issue of model misspecification (i.e., the lack of temporal dependencies in the model), which applies to any estimation method as far as I know;}
 
-We agree that misspecification can affect inference with either Bayesian or maximum likelihood methods. We have revised the introduction to acknowledge that our method also relies on large-sample approximations, while allowing for misspecification and temporal dependence under the assumptions stated in Section 2.
+Misspecification does affect every estimation method, so we have merged the second and fourth limitations of the original introduction (Introduction, p.~2, lines~80--83). Under a misspecified model, both the pseudo-MLE and the posterior concentrate around pseudo-true parameters, the values that best approximate the data within the model. They differ in how they quantify uncertainty around these values: the sandwich covariance of the pseudo-MLE (Section~2.3), estimated by $\widehat{V}_\text{AR}$ (Equation~10a), accounts for misspecification and temporal dependence, whereas the posterior covariance accounts for neither (Section~5; Figures~4 and~8). Our uncertainty estimates do rely on large-sample approximations, which we now state explicitly (Introduction, p.~3, lines~110--111).
 
 \begin{samepage}
-\noindent\emph{Large-sample assumptions --- Introduction, p.~4, lines~139--141:}
+\noindent\emph{Sandwich covariance under misspecification and dependence --- Methods, p.~11, lines~324--325:}
 
-\manuscriptquote{Our frequentist implementation provides fast inference under the stated large-sample assumptions, and a starting point for other methods to adapt.}
+\manuscriptquote{This result accommodates both misspecification, via the failure of the information equality, and serial dependence, via the nonzero-lag autocovariances in $\tilde{\mathscr{I}}_{\bm\beta}$.}
+\end{samepage}\par\penalty0
+
+\begin{samepage}
+\noindent\emph{Posterior uncertainty under misspecification --- Practical considerations, p.~23, lines~581--583:}
+
+\manuscriptquote{Under misspecification, however, the posterior covariance approaches the inverse Hessian, estimated for the pseudo-MLE by $\widehat{V}_\text{SH}$ (10d), rather than the sandwich covariance estimated by $\widehat{V}_\text{AR}$ (10a), and so accounts for neither misspecification nor serial dependence \citep{shaby_open-faced_2014}.}
 \end{samepage}\par\penalty0
 
 \reviewercomment{- Computational cost: The authors' own Figure 7A shows that the worst-case MCMC runtime in their comparison was approximately 15 minutes. This doesn't seem like a meaningful bottleneck. The computational advantage of pseudo-MLE would be more compelling in settings with very large datasets;}
 
-\pendingfigureeight{Complete this response using the final Figure 8 timings and fitting details, including the cost of the seven-parameter model.}
+For the four-parameter model at moderate sample sizes, a single MCMC fit is not a meaningful bottleneck. The cost becomes limiting for the seven-parameter model the reviewer recommends (Figure~8B): our 500-replication simulation at $n=1000$ required a runtime of about 1.6 days. The same simulation experiment at $n=10{,}000$ would require a runtime of 15 days, so we restricted it to $n=1000$. This constraint also applies to large datasets and to analyses that refit models across many windows, such as the between-day and within-day fits in Section~4.
+
+\begin{samepage}
+\noindent\emph{Runtime of the seven-parameter model --- Practical considerations, pp.~23--24, lines~595--602:}
+
+\manuscriptquote{The cost of MCMC limited this comparison to $n=1000$ trials (Figure~8B). On an 11-core macOS machine, a seven-parameter fit took on average 9 minutes at $n=1000$ and 86 minutes at $n=10{,}000$, whereas the four-parameter pseudo-MLE took 3 and 114 seconds ($180\times$ and $45\times$ faster). The same simulation experiment at $n=10{,}000$ would require a runtime of 15 days with MCMC, compared with under two hours with pseudo-MLE. Unlike the closed-form four-parameter density (3), the seven-parameter likelihood must be integrated numerically over across-trial variability at every evaluation. This cost also limits analyses of experiments with many subjects, sessions, or trials.}
+\end{samepage}\par\penalty0
 
 \reviewercomment{- Robustness to misspecification and temporal correlattions: This is the most substantive claim. The authors show in Figure 4 that sandwich estimators outperform non-robust estimators under misspecification. However, given that the data-generating process includes trial-by-trial variability in t0, v, and z, it would make sense to compare their pseudo-ML method to fitting the full 7-parameter DDM that includes these trial-by-trial variabilities. If the seven-parameter DDM recovers parameters and uncertainties accurately in this setting, the case for the sandwich correction is considerably weakened. Furthermore, the comparison in Figure 7 is conducted under correct specification and iid conditions. A more informative comparison would evaluate MCMC versus pseudo-MLE under the misspecified, temporally dependent conditions that motivate the paper. Without this, the robustness advantage of pseudo-MLE over MCMC remains undemonstrated.}
 
-We have revised Figure 4 to examine the temporal dependence raised by the reviewer. Instead of varying independently across trials, nondecision time, drift magnitude, and starting point now switch together between persistent decision states that are omitted from the fit. Accounting for this dependence reduces drift standard-error underestimation from 54\% to about 8\%. The comparison with the seven-parameter model remains pending Figure 8.
+We have revised Figure 4 so that, instead of varying independently across trials, non-decision time, drift magnitude, and starting point switch together between persistent decision states that are omitted from the fit, introducing temporal dependence in choices and reaction times. Accounting for this dependence reduces drift standard-error underestimation from 54\% to about 8\%.
 
 \begin{samepage}
-\noindent\emph{Remaining variability and dependence --- Introduction, p.~3, lines~103--106:}
-
-\manuscriptquote{Both asymptotic confidence intervals and Bayesian credible intervals can have incorrect coverage under model misspecification and temporal dependence \citep{white_maximum_1982, shaby_open-faced_2014, newey_simple_1987}. This can occur even when some sources of variability are explicitly modeled.}
-\end{samepage}\par\penalty0
-
-\begin{samepage}
-\noindent\emph{Unmodeled state switching --- Simulation settings, p.~14, lines~407--411:}
+\noindent\emph{Unmodeled state switching --- Simulation settings, p.~12, lines~365--368:}
 
 \manuscriptquote{\emph{Misspecification and temporal dependence} ($f_0 \neq f^*$): a misspecified setting where $a$ is fixed and $t_0,|v|,z$ switch jointly under one stationary two-state Markov chain. The working model includes stimulus direction but omits the state, estimating four constant coefficients $a,t_0,|v|,z$.}
 \end{samepage}\par\penalty0
 
 \begin{samepage}
-\noindent\emph{Measured indicators of engagement --- Simulation settings, p.~14, lines~428--431:}
+\noindent\emph{Pseudo-true coefficients --- Simulation settings, p.~13, lines~389--392:}
 
-\manuscriptquote{Measured indicators of engagement, such as pupil diameter or features extracted from behavioral videos, could help model these persistent unmodeled decision states. Such indicators are often unavailable or omitted from the fitted model.}
+\manuscriptquote{Pseudo-true coefficients (7a), which need not equal generating means, were computed independently of the Monte Carlo samples by maximizing the expected working log-likelihood (6a), with the expectation taken over both states and stimulus directions. Fits in this setting used the model's default initialization, with all four coefficients freely estimated.}
 \end{samepage}\par\penalty0
 
 \begin{samepage}
-\noindent\emph{Pseudo-true coefficients --- Simulation settings, p.~15, lines~439--442:}
-
-\manuscriptquote{Pseudo-true coefficients, which need not equal generating means, were computed independently of the Monte Carlo samples by integrating the expected working log-likelihood over both states and stimulus directions. Fits in this setting used the model's default initialization, with all four coefficients freely estimated.}
-\end{samepage}\par\penalty0
-
-\begin{samepage}
-\noindent\emph{Effect of the autocorrelation correction --- Simulation results, p.~17, lines~484--491 and~497:}
+\noindent\emph{Effect of the autocorrelation correction --- Simulation results, p.~15, lines~423--426 and~428--429:}
 
 \manuscriptquote{Analytic standard errors (B; diagonals) show that correcting marginal misspecification alone is insufficient: $\widehat{V}_\text{MR}$ underestimates standard errors for $|v|$ by 54\%, compared with 8\% for $\widehat{V}_\text{AR}$ and 56--57\% for the non-robust estimators. \ldots{} Across coefficients, $\widehat{V}_\text{AR}$ underestimates standard errors by 1.9--8.7\%.}
 \end{samepage}\par\penalty0
 
-\pendingfigureeight{Complete the direct seven-parameter uncertainty comparison under misspecification and temporal dependence once Figure 8 is final.}
-
-\reviewercomment{2. The proposed method is restricted to the four-parameter DDM. This is a notable constraint. The four-parameter DDM is known to systematically misfit the relative speed of error responses observed in human reaction time data (e.g., Ratcliff \& McKoon, 2008; Ratcliff et al., 2016). This motivated the development of the 6-parameter (and later 7-parameter) DDM in the first place (Ratcliff, 1978). Adopting the proposed method therefore requires accepting a model that is known to be empirically inadequate for a large class of paradigms (at least those involving human participants).}
-
-A four-parameter DDM with constant parameters can indeed fail to reproduce the relative speeds of correct and error responses. We have added Figure 7 to illustrate how measured covariates can account for slow errors. Both the pupil-dependent four-parameter fit and the seven-parameter fit approximate the simulated accuracy--RT relationship, with the pupil-dependent fit also capturing how drift varies across trials. The covariate fit allows effects on all four parameters, although only drift varies in the generating model.
+We have also added the requested comparison (Figure~8), in which both fitted models are misspecified and trials are temporally dependent. Both models give nearly unbiased point estimates, but for the state-dependent starting point, the seven-parameter posterior standard deviations underestimate the standard error by 37\%, similar to non-robust pseudo-MLE standard errors (39\%), whereas autocorrelation-robust pseudo-MLE standard errors are underestimated by only 9\%. Thus, the seven-parameter model recovers the parameters but not their uncertainty when across-trial variability persists over many trials.
 
 \begin{samepage}
-\noindent\emph{Covariate-dependent parameters --- Practical considerations, p.~24, lines~612--621:}
+\noindent\emph{Realistic setting --- Practical considerations, p.~23, lines~559--565:}
 
-\manuscriptquote{The four-parameter DDM allows parameters to vary across trials. \ldots{} Here we illustrate how the four-parameter DDM can capture slow errors when parameters vary systematically with measured covariates through $\bm{\theta}_i = g(\bm{X}_i,\bm{\beta})$. Across-trial variability parameters describe a mixture of trial-level values, whereas covariates specify how those values change across trials.}
+\manuscriptquote{Figure~7 shows that the seven-parameter model can reproduce slow errors, but it treats parameter variability as independent across trials. We therefore compare the uncertainty estimates of both models in a simulation that combines the sources of variability considered so far in the present paper (Figure~8A). The decision boundary increases linearly over the session as in Figure~3, drift magnitude varies with pupil diameter as in Figure~7, and the starting point switches between two persistent states as in Figure~4, with switching probability 0.05 per trial. The state is omitted from both fitted models, introducing misspecification and temporal dependence.}
 \end{samepage}\par\penalty0
 
 \begin{samepage}
-\noindent\emph{Covariate effects and slow errors --- Practical considerations, p.~24, lines~626--631:}
+\noindent\emph{Seven-parameter uncertainty --- Practical considerations, p.~23, lines~585--594:}
+
+\manuscriptquote{Point estimates from both models are nearly unbiased, within 0.4\% (Figure~8C), but their standard errors differ (Figure~8D,E). For the starting point $z$, which switches with the unmodeled state, $\widehat{V}_\text{SH}$ underestimates the standard error of the pseudo-MLE by 39\%, giving 77\% coverage of 95\% confidence intervals. $\widehat{V}_\text{AR}$ reduces this bias to 9\% and raises coverage to 93\%; across all four parameters, it underestimates standard errors by 3--10\%, with 91--93\% coverage. Consistent with the theory above, the seven-parameter posterior standard deviations, like $\widehat{V}_\text{SH}$, underestimate the standard error of $z$ by 37\%, giving 79\% coverage of 95\% credible intervals, and overestimate that of $t_0$ by 21\%. Thus, although the seven-parameter model accounts for across-trial variability, its uncertainty estimates remain biased when that variability persists over many trials rather than varying independently from trial to trial.}
+\end{samepage}\par\penalty0
+
+\reviewercomment{2. The proposed method is restricted to the four-parameter DDM. This is a notable constraint. The four-parameter DDM is known to systematically misfit the relative speed of error responses observed in human reaction time data (e.g., Ratcliff \& McKoon, 2008; Ratcliff et al., 2016). This motivated the development of the 6-parameter (and later 7-parameter) DDM in the first place (Ratcliff, 1978). Adopting the proposed method therefore requires accepting a model that is known to be empirically inadequate for a large class of paradigms (at least those involving human participants).}
+
+A four-parameter DDM with constant parameters can indeed fail to reproduce the relative speeds of correct and error responses. The new Figure~7 illustrates how measured covariates can account for slow errors while also capturing how drift varies across trials.
+
+\begin{samepage}
+\noindent\emph{Covariate-dependent parameters --- Practical considerations, p.~21, lines~522--534:}
+
+\manuscriptquote{The four-parameter DDM allows parameters to vary across trials through covariates (4). When parameters are assumed constant, the model can fail to reproduce differences in the relative speeds of correct and error responses observed in empirical human, monkey, and rat reaction time data \ldots{} Across-trial variability parameters describe a mixture of trial-level values, whereas covariates specify how those values change across trials.}
+\end{samepage}\par\penalty0
+
+\begin{samepage}
+\noindent\emph{Covariate effects and slow errors --- Practical considerations, p.~21, lines~538--543:}
 
 \manuscriptquote{Although only drift rate depends on pupil diameter in the generating model, the covariate-dependent fit allows pupil effects on all four DDM parameters, reflecting the realistic setting in which the source of parameter variability is unknown. As pupil-linked drift magnitude decreases, responses become slower and less accurate. Consequently, longer reaction times contain a greater proportion of low-drift trials, producing a declining conditional accuracy function.}
 \end{samepage}\par\penalty0
 
 \begin{samepage}
-\noindent\emph{Conditional accuracy and drift variation --- Figure~7 caption, p.~25:}
+\noindent\emph{Conditional accuracy and drift variation --- Figure~7 caption, p.~22:}
 
-\manuscriptquote{Both the pupil-dependent and seven-parameter fits approximate the true declining conditional accuracy function (although the pupil-dependent fit is closer), whereas the constant four-parameter fit does not. Only the pupil-dependent fit captures the generating temporal structure of the drift rate.}
+\manuscriptquote{Both the pupil-dependent and seven-parameter fits approximate the true declining conditional accuracy function (the pupil-dependent fit more closely), whereas the constant four-parameter fit does not. Only the pupil-dependent fit captures the generating temporal structure of the drift rate.}
 \end{samepage}\par\penalty0
 
 \reviewercomment{The authors acknowledge that MCMC-based approaches (e.g., HSSM) can accommodate approximate likelihoods and thus extend to the seven-parameter DDM, collapsing-bound models, and other variants. This flexibility is central to whether a method is practically useful across the range of experimental designs in the field. The authors should more explicitly discuss the conditions under which the four-parameter restriction is acceptable, and for which research questions the proposed method is and is not appropriate.}
 
-We have clarified that the method is useful when the question concerns how measured covariates relate to changes in decision-making parameters. In Figure 7, for example, pupil diameter explains the simulated drift variability. The discussion now states this assumption explicitly and explains why covariance correction cannot substitute for modeling unobserved variability or additional within-trial mechanisms. We also discuss HSSM's ability to accommodate such mechanisms and hierarchical structure.
+We now state explicitly when the four-parameter restriction is acceptable and when richer DDMs fitted by MCMC are preferable, and explain why covariance correction cannot substitute for modeling unobserved variability or additional within-trial mechanisms.
 
 \begin{samepage}
-\noindent\emph{Research questions addressed by covariate modeling --- Practical considerations, p.~25, lines~641--648:}
+\noindent\emph{Assumptions and limitations --- Practical considerations, p.~21, lines~554--557:}
 
-\manuscriptquote{When parameter variability is systematically related to measured covariates, a conditional four-parameter model can reproduce the same qualitative reaction-time pattern while quantifying how those covariates relate to the underlying decision-making state. \ldots{} Covariate modeling is useful when variability can be linked to measured quantities such as arousal, fatigue, learning, or experimental conditions.}
+\manuscriptquote{Here, measured pupil diameter fully explains drift variability through the link function (4). Robust covariance estimates such as $\widehat{V}_\text{AR}$ (10a) account for misspecification in the standard errors but do not remove it, so unmodeled variability, latent states, or alternative within-trial mechanisms may require models that explicitly represent these features.}
 \end{samepage}\par\penalty0
 
 \begin{samepage}
-\noindent\emph{Assumptions and limitations --- Practical considerations, p.~25, lines~648--651:}
+\noindent\emph{When to use each method --- Practical considerations, p.~25, lines~610--616:}
 
-\manuscriptquote{Here, measured pupil diameter fully explains drift variability through the specified link function. However, robust covariance estimates do not resolve model misspecification, so unmodeled variability, latent states, or alternative within-trial mechanisms may require models that explicitly represent these features.}
+\manuscriptquote{Overall, the covariate-dependent four-parameter DDM fitted by pseudo-MLE is appropriate when the research question concerns how measured covariates relate to decision-making parameters, particularly when trials are temporally dependent or many fits are required, as in simulation studies or analyses of many subjects, sessions, or time windows. Richer DDMs fitted by MCMC are preferable when across-trial variability or alternative within-trial mechanisms, such as collapsing bounds, are themselves of interest, or when sparse individual data require hierarchical pooling.}
 \end{samepage}\par\penalty0
 
 \reviewercomment{3. Empirical novelty. Many of the ideas put forward - modelling parameters as a function of covariates - have already been described and applied succesfully in the literature, including in combination with MCMC sampling to estimate uncertainty. E.g., the cited Cochrane et al. (2023) paper used time-on-task as covariates; the Gunawan et al. (2020) paper used both Hidden Markov models and time on task as covariates; the Kucharský et al. (2021) paper also used Hidden Markov models; Alister \& Evans (2025) use time on task; Miletić et al. (2025) do something similar, and also use delta rules borrowed from reinforcement learning. The latter is often done in the RL-DDM tradition (e.g., Pedersen et al., 2017; Fontanesi et al., 2019), which also uses covariates (in that case, reward) to define latent trajectories of trial-by-trial parameters.}
 
 \reviewercomment{The authors cite some of these works but do not adequately differentiate their contribution from them. The paper would benefit from a clearer explanation of what the pseudo-MLE framework offers that these approaches do not.}
 
-Covariate-based DDM modeling is well established, and we have revised the introduction to give these approaches appropriate credit, including the time-on-task, latent-state, and reinforcement-learning models identified by the reviewer. We have also clarified that our contribution lies in combining covariate modeling with computationally efficient uncertainty estimates that account for remaining model misspecification and temporal dependence.
+Covariate-based DDM modeling is well established, and the introduction now credits the time-on-task, latent-state, and reinforcement-learning models identified by the reviewer. We have also clarified that our contribution is not covariate modeling itself, but formalizing and evaluating pseudo-MLE for covariate-dependent DDMs: we establish its large-sample properties under misspecification and temporal dependence (Section~2), assess parameter and uncertainty recovery in realistic simulations, including a comparison with a seven-parameter DDM fitted by MCMC (Sections~3 and~5), and apply it to rat decision making (Section~4). The approaches cited by the reviewer quantify uncertainty assuming that the fitted model, including its covariates, latent states, or learning rules, is correctly specified. Our uncertainty estimates remain valid when some variability and temporal dependence are left unmodeled, and are fast to compute.
 
 \begin{samepage}
-\noindent\emph{Established covariate, latent-state, and learning approaches --- Introduction, p.~3, lines~90--92:}
+\noindent\emph{Established covariate, latent-state, and learning approaches --- Introduction, p.~2, lines~72--75:}
 
 \manuscriptquote{Other approaches explicitly model systematic changes through covariates \citep{cochrane_multiple_2023, alister_diffusion_2026}, latent states \citep{gunawan_time-evolving_2022, kucharsky_hidden_2021}, or history-dependent learning \citep{miletic_explaining_2025, pedersen_drift_2017, fontanesi_reinforcement_2019}.}
 \end{samepage}\par\penalty0
 
 \begin{samepage}
-\noindent\emph{Contribution relative to existing covariate models --- Introduction, pp.~3--4, lines~123--128:}
+\noindent\emph{Contribution relative to existing covariate models --- Introduction, p.~3, lines~94--96 and~102--104:}
 
-\manuscriptquote{Building on existing covariate-based DDM approaches, we model DDM parameters as functions of observed covariates (such as stimulus strength or trial-in-session) via link functions. Our contribution combines covariate modeling with computationally efficient uncertainty estimates that account for misspecification and unmodeled temporal dependence under the stated assumptions.}
+\manuscriptquote{Building on existing covariate-based DDM approaches, we model DDM parameters as functions of observed covariates (such as stimulus strength or trial-in-session) via link functions. \ldots{} Our contribution is to formalize and evaluate a computationally efficient pseudo-maximum likelihood estimation (pseudo-MLE) method for DDM parameters and covariate effects, with analytical uncertainty estimates that remain valid under model misspecification and temporal dependence.}
 \end{samepage}\par\penalty0
+
+We thank the editor and reviewer for their time and hope that these revisions address the reviewer's concerns.
 
 \nobibliography{docs/references}
 
