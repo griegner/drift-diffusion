@@ -22,7 +22,6 @@ from hddm_wfpt import wfpt
 from joblib import Parallel, delayed, effective_n_jobs
 from matplotlib.colors import to_rgb
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 from matplotlib.ticker import StrMethodFormatter
 from pseudotrue import pseudotrue, sampler_grid
 from scipy.ndimage import gaussian_filter1d
@@ -310,21 +309,14 @@ def plot_example(fig, spec, fits, design, targets):
         mean, half = X[key] @ beta, 1.96 * np.sqrt(np.einsum("ij,jk,ik->i", X[key], cov, X[key]))
         ax.plot(trial, draws[key], color=PALE["mcmc"], lw=0.65, zorder=1)
         ax.fill_between(trial, mean - half, mean + half, color=PALE["mle"], zorder=2)
-        ax.plot(trial, X[key] @ targets["mle"], "--", color="k", lw=1.6, zorder=4)
-        ax.set_ylabel(label, rotation=0, ha="right", va="center")
+        ax.plot(trial, X[key] @ targets["mle"], "--", color="k", lw=1.2, zorder=4)
+        ax.set_ylabel(label, rotation=0, ha="right", va="center", fontsize=18)
         ax.set_xlim(1, N)
         ax.tick_params(labelbottom=ax is axes[-1])
     axes[-1].step(trial, design["z"][simulate(design, rep)[2]], color="0.25", lw=0.6, where="post", zorder=3)
     axes[1].set_ylim(0.33, 0.53)
     axes[-1].set_xlabel("Trial")
-    axes[0].set_title("A. Example Simulation and Model Fits", pad=40)  # room for the legend
-    handles = [
-        Line2D([], [], color="k", ls="--", lw=1.6, label="Pseudo-true 4p-DDM"),
-        Line2D([], [], color="0.25", lw=0.8, label="True hidden state"),
-        Patch(color=PALE["mle"], label="Covariate 4p-DDM, 95% AR band"),
-        Line2D([], [], color=PALE["mcmc"], lw=1.5, label="Across-trial variability 7p-DDM, iid draws"),
-    ]
-    axes[0].legend(handles=handles, loc="lower left", bbox_to_anchor=(0, 1.05), ncol=2, fontsize=10, frameon=False)
+    axes[0].set_title("A. Example Simulation and Model Fits")
     return axes
 
 
@@ -333,9 +325,10 @@ def plot(fits, design, targets):
 
     with (ROOT / "code/config.json").open() as f:
         plt.rcParams.update(json.load(f)["rc-params"])
+    plt.rcParams["font.size"] = 12
     L, _ = comparable(design)
     result = scores(fits, L, targets)
-    fig = plt.figure(figsize=(16, 10), layout="constrained")
+    fig = plt.figure(figsize=(12, 7.5), layout="constrained")
     grid = fig.add_gridspec(2, 3, height_ratios=[1.15, 1])
     axes = plot_example(fig, grid[0, :2], fits, design, targets)
     axes += [fig.add_subplot(grid[0, 2])] + [fig.add_subplot(grid[1, k]) for k in range(3)]
@@ -348,8 +341,8 @@ def plot(fits, design, targets):
             "mcmc": [old["mcmc_runtime"][(old["mcmc_n"] == n) & old["mcmc_valid"]].mean() for n in sizes],
         }
     for method, runtime in runtimes.items():
-        axes[4].plot(range(3), runtime, "o-", color=COLORS[method], ms=8, alpha=0.3)
-        axes[4].plot(0, runtime[0], "o", color=COLORS[method], ms=8)
+        axes[4].plot(range(3), runtime, "o-", color=COLORS[method], ms=6, alpha=0.3)
+        axes[4].plot(0, runtime[0], "o", color=COLORS[method], ms=6)
     axes[4].yaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
     axes[4].set(xlabel="n Trials", ylabel="Seconds per fit", xticks=range(3), xticklabels=[f"{n:,}" for n in sizes])
     axes[4].set_xlim(-0.45, 2.45)
@@ -363,22 +356,21 @@ def plot(fits, design, targets):
     for ax, (key, methods, label, ylim) in zip(axes[5:], panels):
         for method, offset in zip(methods, np.linspace(-0.2, 0.2, len(methods))):
             value, mcse = result[method][key]
-            ax.errorbar(x + offset, value, yerr=mcse, fmt="o", color=COLORS[method], ms=8, mec="white", mew=0.5)
+            ax.errorbar(x + offset, value, yerr=mcse, fmt="o", color=COLORS[method], ms=6, mec="white", mew=0.5)
         ax.axhline(95 if key == "coverage" else 0, color="0.35", ls="--" if key == "coverage" else "-", lw=1, zorder=1)
         ax.set(ylabel=label, ylim=ylim, xticks=x, xticklabels=QUANTITY_LABELS, xlim=(-0.5, len(x) - 0.5))
+        ax.tick_params(axis="x", labelsize=18)
     half = 196 * np.sqrt(0.95 * 0.05 / fits["mcmc_valid"].sum())  # 95% Monte Carlo band around nominal coverage
     axes[7].axhspan(95 - half, 95 + half, color="0.92", zorder=0)
     titles = ["B. Runtime", "C. Point Estimate Bias", "D. Standard Error Bias", "E. Confidence Interval Coverage"]
     for ax, title in zip(axes[4:], titles):
         ax.set_title(title)
         ax.grid(axis="y", alpha=0.15)
-    for ax in axes:
-        ax.spines[["top", "right"]].set_visible(False)
     labels = ["4p-DDM MLE (SH SE)", "4p-DDM MLE (point, AR SE)", "7p-DDM MCMC"]
     handles = [
-        Line2D([], [], color=color, marker="o", ms=8, ls="none", label=l) for color, l in zip(COLORS.values(), labels)
+        Line2D([], [], color=color, marker="o", ms=6, ls="none", label=l) for color, l in zip(COLORS.values(), labels)
     ]
-    fig.legend(handles=handles, loc="outside lower center", ncol=3, fontsize=11, frameon=False)
+    fig.legend(handles=handles, loc="outside lower center", ncol=3, frameon=False)
     fig.savefig(ROOT / "results/fig08.svg")
     plt.close(fig)
 
