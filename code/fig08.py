@@ -2,7 +2,7 @@
 
 """figure 08: MLE with session trends, pupil effects, and hidden engagement states"""
 
-# simulate one 1000-trial session per repeat: the pupil trace is fixed, hidden states and stimuli are redrawn
+# simulate n trials per repeat as n/1000 fixed sessions: pupil traces are fixed, hidden states and stimuli are redrawn
 # fit the covariate 4p-DDM MLE (sample-Hessian and autocorrelation-robust SEs) and the seven-parameter HSSM
 # full_ddm MCMC to every repeat; score both against pseudo-true targets; --replot replots saved fits
 
@@ -32,10 +32,8 @@ from drift_diffusion.sim import sample_from_pdf
 
 ROOT = Path(__file__).resolve().parents[1]
 SEED = 20261020
-N = 1000  # trials per repeat (one session)
-FITS = ROOT / f"data/fig08-n{N}.npz"
-TARGETS = ROOT / f"data/fig08-n{N}-pseudotrue.npz"
-CHECKPOINTS = ROOT / "data/fig08-mcmc"  # MCMC ignores pupil, so fits from the five-session calibration still apply
+SESSION = 1000  # trials per session
+CHECKPOINTS = ROOT / "data/fig08-mcmc"  # designs match the earlier across-n run, so its n1000 and n5000 fits apply
 METHODS = ["sample-hessian", "autocorrelation-robust"]
 PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
 # rescale HSSM z -> 2*z - 1 and sz -> 2*sz
@@ -50,16 +48,17 @@ COLORS = {"sample-hessian": "#f19c9d", "autocorrelation-robust": "#8c1515", "mcm
 PALE = {key: 0.3 * np.array(to_rgb(color)) + 0.7 for key, color in [("mle", "r"), ("mcmc", "#3b6fb6")]}
 
 
-def simulation_design():
-    """fixed pupil trace for one session, with drift calibrated to span 0.1 to the fig07 maximum"""
+def simulation_design(n):
+    """fixed pupil traces for n/1000 sessions, with drift calibrated over all trials to span 0.1 to the fig07 maximum"""
 
+    # calibrate, center and set targets on the full n-trial design, never a subset, so each n has one pseudo-true target
     rng = np.random.default_rng(np.random.SeedSequence([SEED, 17]))
-    pupil = gaussian_filter1d(rng.normal(size=N), 20, mode="wrap")
-    pupil = 0.5 + 0.15 * pupil / pupil.std()
+    pupil = gaussian_filter1d(rng.normal(size=(n // SESSION, SESSION)), 20, axis=1, mode="wrap")
+    pupil = (0.5 + 0.15 * pupil / pupil.std(axis=1, keepdims=True)).ravel()
     centered = pupil - pupil.mean()
     beta_p = (2.23 + 1.33 * np.sqrt(3) - 0.1) / np.ptp(pupil)
     beta_v = 0.1 - beta_p * centered.min()
-    session_time = np.linspace(-0.5, 0.5, N)
+    session_time = np.tile(np.linspace(-0.5, 0.5, SESSION), n // SESSION)
     z = 0.008 + np.array([0, 2]) * (2 * 0.037 / 0.125) / np.sqrt(12)
     return dict(
         time=session_time,
@@ -86,17 +85,18 @@ def comparable(design):
 def simulate(design, rep):
     """sample RTs with persistent states and independent stimulus directions"""
 
-    rng = np.random.default_rng(np.random.SeedSequence([SEED, 2, N, rep]))
-    state = np.empty(N, dtype=int)
+    n = len(design["time"])
+    rng = np.random.default_rng(np.random.SeedSequence([SEED, 2, n, rep]))
+    state = np.empty(n, dtype=int)
     state[0] = rng.integers(2)
-    state[1:] = (state[0] + np.cumsum(rng.random(N - 1) < 0.05)) % 2
-    stim = 2 * rng.integers(2, size=N) - 1
+    state[1:] = (state[0] + np.cumsum(rng.random(n - 1) < 0.05)) % 2
+    stim = 2 * rng.integers(2, size=n) - 1
     y = sample_from_pdf(
         a=design["a"],
         t0=design["t0"],
         v=stim * design["magnitude"],
         z=design["z"][state],
-        n_samples=N,
+        n_samples=n,
         random_state=int(rng.integers(2**32)),
     )
     X = pd.DataFrame(dict(time=design["time"], pupil_centered=design["pupil_centered"], stim=stim))
@@ -107,12 +107,13 @@ def pseudotrue_targets(design, cut=1e-12):
     """4p coefficients and 7p parameters maximizing each expected working log-likelihood under the sampler pmf"""
 
     # sampler pmf per stimulus and trial on the RT grid, averaged over the two equally likely states
+    n = len(design["time"])
     y = sampler_grid([design["t0"]])
-    a, magnitude, yy = np.repeat(design["a"], len(y)), np.repeat(design["magnitude"], len(y)), np.tile(y, N)
-    w = np.zeros((2, N, len(y)))
+    a, magnitude, yy = np.repeat(design["a"], len(y)), np.repeat(design["magnitude"], len(y)), np.tile(y, n)
+    w = np.zeros((2, n, len(y)))
     for s, stim in enumerate((-1, 1)):
         for z in design["z"]:
-            p = pdf(yy, a, design["t0"], stim * magnitude, z).reshape(N, -1)
+            p = pdf(yy, a, design["t0"], stim * magnitude, z).reshape(n, -1)
             w[s] += 0.25 * p / p.sum(axis=1, keepdims=True)
 
     s, i, j = np.nonzero(w > cut)
@@ -141,7 +142,7 @@ def pseudotrue_targets(design, cut=1e-12):
                 st=st * one, err=1e-8, simps_err=1e-4,
             )  # fmt: skip
             total -= pooled[s][keep] @ np.where(np.isfinite(logp), logp, -66.1)
-        return total / N
+        return total / n
 
     q = np.array([0.63, 0.43, 2.27, 0.59, 0.15, 0.4, 0.02])
     for xatol, fatol in [(1e-7, 1e-12), (1e-8, 1e-13)]:
@@ -215,13 +216,13 @@ def fit_mcmc(X, y, params_mle, chains, tune, draws, seed):
     return runtime, mean, sd, r_hat, ess, valid
 
 
-def run_mcmc_checkpoint(rep, params_mle, chains, tune, draws):
+def run_mcmc_checkpoint(n, rep, params_mle, chains, tune, draws):
     """save one MCMC fit to CHECKPOINTS so an interrupted run resumes where it stopped"""
 
-    path = CHECKPOINTS / f"n{N}-rep{rep}-c{chains}-t{tune}-d{draws}.npz"
+    path = CHECKPOINTS / f"n{n}-rep{rep}-c{chains}-t{tune}-d{draws}.npz"
     if not path.exists():
-        X, y, _ = simulate(simulation_design(), rep)
-        seed = int(np.random.SeedSequence([SEED, 3, N, rep]).generate_state(1)[0])
+        X, y, _ = simulate(simulation_design(n), rep)
+        seed = int(np.random.SeedSequence([SEED, 3, n, rep]).generate_state(1)[0])
         fit = fit_mcmc(X, y, params_mle, chains, tune, draws, seed)
         np.savez(path, **dict(zip(MCMC_FIELDS, fit)))
         print(f"MCMC rep={rep}: {fit[0]:.0f} s, converged={fit[-1]}", flush=True)
@@ -229,16 +230,16 @@ def run_mcmc_checkpoint(rep, params_mle, chains, tune, draws):
         return rep, *(saved[name] for name in MCMC_FIELDS)
 
 
-def run_mcmc(params_mle, n_jobs, chains, tune, draws):
+def run_mcmc(n, params_mle, n_jobs, chains, tune, draws):
     """run chains in parallel within a fit and fits in parallel across the remaining CPUs"""
 
-    # spawn fits: chain processes cannot nest in loky workers or threads
+    # spawn fits: chain processes cannot nest in loky workers or threads; spawned workers get n as an argument
     CHECKPOINTS.mkdir(exist_ok=True)
     n_fits = max(1, effective_n_jobs(n_jobs) // chains)
     print(f"MCMC: {len(params_mle)} fits, {n_fits} at a time with {chains} chains each", flush=True)
     with ProcessPoolExecutor(n_fits, mp_context=get_context("spawn")) as pool:
         futures = [
-            pool.submit(run_mcmc_checkpoint, rep, params_mle[rep], chains, tune, draws)
+            pool.submit(run_mcmc_checkpoint, n, rep, params_mle[rep], chains, tune, draws)
             for rep in range(len(params_mle))
         ]
         records = [future.result() for future in futures]
@@ -292,7 +293,7 @@ def plot_example(fig, spec, fits, design, targets):
     beta, cov = fits["params"][rep], fits["cov"][rep, METHODS.index("autocorrelation-robust")]
     a, t0, v, z, sz, sv, st = fits["mcmc_params"][rep]
 
-    one, zero = np.ones(N), np.zeros(N)
+    one, zero = np.ones(len(design["time"])), np.zeros(len(design["time"]))
     X = {
         "a": np.column_stack([one, design["time"], zero, zero, zero, zero]),
         "t0": np.column_stack([zero, zero, one, zero, zero, zero]),
@@ -301,12 +302,13 @@ def plot_example(fig, spec, fits, design, targets):
     }
     rng = np.random.default_rng(0)
     draws = {
-        "a": np.full(N, a),
-        "t0": rng.uniform(t0 - st / 2, t0 + st / 2, N),
-        "v": np.abs(rng.normal(v, sv, N)),
-        "z": rng.uniform(z - sz / 2, z + sz / 2, N),
+        "a": np.full(len(one), a),
+        "t0": rng.uniform(t0 - st / 2, t0 + st / 2, len(one)),
+        "v": np.abs(rng.normal(v, sv, len(one))),
+        "z": rng.uniform(z - sz / 2, z + sz / 2, len(one)),
     }
-    trial = np.arange(1, N + 1)
+    n = len(design["time"])
+    trial = np.arange(1, n + 1)
     axes = [fig.add_subplot(row) for row in spec.subgridspec(4, 1)]
     for ax, key, label in zip(axes, X, [r"$a$", r"$t_0$", r"$|v|$", r"$z$"]):
         mean, half = X[key] @ beta, 1.96 * np.sqrt(np.einsum("ij,jk,ik->i", X[key], cov, X[key]))
@@ -314,7 +316,7 @@ def plot_example(fig, spec, fits, design, targets):
         ax.fill_between(trial, mean - half, mean + half, color=PALE["mle"], zorder=2)
         ax.plot(trial, X[key] @ targets["mle"], "--", color="k", lw=1.2, zorder=4)
         ax.set_ylabel(label, rotation=0, ha="right", va="center", fontsize=18)
-        ax.set_xlim(1, N)
+        ax.set_xlim(1, n)
         ax.tick_params(labelbottom=ax is axes[-1])
     axes[-1].step(trial, design["z"][simulate(design, rep)[2]], color="0.25", lw=0.6, where="post", zorder=3)
     axes[1].set_ylim(0.33, 0.53)
@@ -374,14 +376,17 @@ def plot(fits, design, targets):
         Line2D([], [], color=color, marker="o", ms=6, ls="none", label=l) for color, l in zip(COLORS.values(), labels)
     ]
     fig.legend(handles=handles, loc="outside lower center", ncol=3, frameon=False)
-    fig.savefig(ROOT / "results/fig08.svg")
+    n = len(design["time"])
+    fig.savefig(ROOT / ("results/fig08.svg" if n == SESSION else f"results/fig08-n{n}.svg"))
     plt.close(fig)
 
 
-def main(n_repeats, n_jobs, chains, tune, draws, replot):
+def main(n_trials, n_repeats, n_jobs, chains, tune, draws, replot):
     """fit all repeats and save them to data/, then plot"""
 
-    design = simulation_design()
+    fits_path = ROOT / f"data/fig08-n{n_trials}.npz"
+    targets_path = ROOT / f"data/fig08-n{n_trials}-pseudotrue.npz"
+    design = simulation_design(n_trials)
     print(design)
     if not replot:
 
@@ -394,12 +399,12 @@ def main(n_repeats, n_jobs, chains, tune, draws, replot):
             records = parallel(run_simulation(rep) for rep in range(n_repeats))
         fits = dict(zip(["rep", "runtime", "params", "cov", "valid"], map(np.array, zip(*records))))
         print(f"MLE: {fits['valid'].sum()}/{n_repeats} valid fits", flush=True)
-        mcmc = run_mcmc(fits["params"], n_jobs, chains, tune, draws)
+        mcmc = run_mcmc(n_trials, fits["params"], n_jobs, chains, tune, draws)
         print(f"MCMC: {mcmc['valid'].sum()}/{n_repeats} converged fits")
-        np.savez_compressed(FITS, **fits, **{f"mcmc_{key}": value for key, value in mcmc.items()})
-    if not TARGETS.exists():
-        np.savez(TARGETS, **dict(zip(["mle", "mcmc"], pseudotrue_targets(design))))  # ~15 min
-    with np.load(FITS) as saved, np.load(TARGETS) as targets:
+        np.savez_compressed(fits_path, **fits, **{f"mcmc_{key}": value for key, value in mcmc.items()})
+    if not targets_path.exists():
+        np.savez(targets_path, **dict(zip(["mle", "mcmc"], pseudotrue_targets(design))))  # ~15 min per 1000 trials
+    with np.load(fits_path) as saved, np.load(targets_path) as targets:
         plot({key: saved[key] for key in saved}, design, dict(targets))
 
 
@@ -408,14 +413,17 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--n-trials", type=int, default=SESSION, help=f"trials per repeat, a multiple of {SESSION} (one session each)"
+    )
+    parser.add_argument(
         "--n-repeats", type=int, default=500, help="number of simulation repeats, each fit by MLE and MCMC"
     )
     parser.add_argument("--n-jobs", type=int, default=-1, help="number of parallel jobs (cpus)")
     parser.add_argument("--chains", type=int, default=4, help="MCMC chains per fit, run in parallel")
     parser.add_argument("--tune", type=int, default=1000, help="MCMC tuning iterations per chain")
     parser.add_argument("--draws", type=int, default=12000, help="MCMC draws per chain")
-    parser.add_argument("--replot", action="store_true", help="replot saved data/fig08-n1000.npz")
+    parser.add_argument("--replot", action="store_true", help="replot saved data/fig08-n{n-trials}.npz")
     args = parser.parse_args()
-    if args.n_repeats < 3 or args.n_jobs == 0 or args.chains < 2:
-        parser.error("need at least three repeats, nonzero n-jobs and at least two chains")
-    main(args.n_repeats, args.n_jobs, args.chains, args.tune, args.draws, args.replot)
+    if args.n_repeats < 3 or args.n_jobs == 0 or args.chains < 2 or args.n_trials < 1 or args.n_trials % SESSION:
+        parser.error(f"need at least three repeats, nonzero n-jobs, two chains and n-trials a multiple of {SESSION}")
+    main(args.n_trials, args.n_repeats, args.n_jobs, args.chains, args.tune, args.draws, args.replot)
