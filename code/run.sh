@@ -67,7 +67,7 @@ elif [[ "$mode" == "paper" ]]; then
 
     # fig08
     echo "-> fig08"
-    python fig08.py --replot
+    python fig08.py --plot
 
 else
     echo "Usage: ./run.sh [test|paper]"

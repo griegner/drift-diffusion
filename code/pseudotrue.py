@@ -1,35 +1,40 @@
-"""analytic pseudo-true parameters for fig02-04"""
+"""Monte Carlo pseudo-true parameters for fig04 and fig08"""
 
-# sample_from_pdf's discrete RT pmf makes expected working log-likelihood an exact weighted sum
-# its maximizer gives pseudo-true parameters without Monte Carlo error
+# the pseudo-true parameter maximizes the working model's expected log-likelihood under the simulated process;
+# estimate it by maximum likelihood on one large simulated sample of N_TRIALS, whose Monte Carlo error is about
+# SE(n) / sqrt(N_TRIALS / n), ~0.14 SE at n=1000
 
-import autograd.numpy as anp
 import numpy as np
-from autograd import grad
+from hddm_wfpt import wfpt
 from scipy.optimize import minimize
+from sklearn.base import clone
 
-from drift_diffusion.model import pdf
-
-
-def sampler_grid(t0s):
-    """return signed RT support used by sample_from_pdf for trials with nondecision times t0s"""
-
-    grid = np.linspace(1e-5 + np.min(t0s), 5 + np.max(t0s), 1000)
-    return np.concatenate([-grid, grid])
+N_TRIALS = 50_000
+REP = 10**6  # repeat index of the pseudo-true sample, beyond any simulation repeat
 
 
-def pmf(y, a, t0, v, z):
-    """return sample_from_pdf's per-trial probabilities on grid y"""
+def pseudotrue_4p(ddm, X, y):
+    """return the 4p-DDM coefficients of ddm fit to the pseudo-true sample (X, y)"""
 
-    p = pdf(y, a, t0, v, z)
-    return p / p.sum()
+    # sample-Hessian covariance is cheapest; only the coefficients are used
+    return clone(ddm).set_params(cov_estimator="sample-hessian").fit(X, y).params_
 
 
-def pseudotrue(y, weights, f_theta, x0):
-    """minimize -sum(weights * log f_theta(theta, y)) over theta, starting from x0"""
+def pseudotrue_7p(y, stim, q0):
+    """return HSSM full_ddm parameters (a, t, v_stim, z, sz, sv, st) maximizing the likelihood of (y, stim)"""
 
-    def loss(theta):
-        return -anp.sum(weights * anp.log(anp.maximum(f_theta(theta, y), 1e-300)))
+    # same likelihood as ddm7p.logp_full_ddm; Nelder-Mead since full_ddm has no gradients
+    one = np.ones(len(y))
 
-    fit = minimize(loss, np.asarray(x0, dtype=float), jac=grad(loss), method="BFGS", options=dict(gtol=1e-10))
-    return fit.x
+    def loss(q):
+        a, t, v, z, sz, sv, st = q
+        if min(a, sv, sz, st) < 0 or not 0 < z - sz / 2 < z + sz / 2 < 1 or st / 2 >= t:
+            return 1e10
+        logp = wfpt.wiener_logp_array(
+            x=y, v=stim * v, sv=sv * one, a=2 * a * one, z=z * one, sz=sz * one, t=t * one, st=st * one,
+            err=1e-8, simps_err=1e-4,
+        )  # fmt: skip
+        return -np.sum(np.where(np.isfinite(logp), logp, -66.1)) / len(y)
+
+    options = dict(xatol=1e-5, fatol=1e-9, maxiter=5000, maxfev=5000, adaptive=True)
+    return minimize(loss, np.asarray(q0, dtype=float), method="Nelder-Mead", options=options).x

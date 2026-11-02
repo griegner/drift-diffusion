@@ -12,7 +12,7 @@ import arviz as az
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from ddm7p import logp_full_ddm, sample_full_ddm
+from ddm7p import CHAINS, DRAWS, TUNE, logp_full_ddm, sample_full_ddm
 from matplotlib.colors import to_rgb
 from scipy.ndimage import gaussian_filter1d
 from scipy.stats import binomtest
@@ -60,7 +60,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HSSM_CACHE = ROOT / "data/fig07-hssm.json"
 
 
-def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
+def main(n_trials=1000, seed=7, chains=CHAINS, tune=TUNE, draws=DRAWS):
     """plot and save fig07"""
 
     with (ROOT / "code/config.json").open() as f:
@@ -111,28 +111,19 @@ def main(n_trials=1000, seed=7, chains=4, tune=1000, draws=12000):
         f"fitted={constant.params_[2]:.3f} +/- {np.sqrt(constant.covariance_[2, 2]):.3f}"
     )
 
-    # stimulus coding matches 4p fits and fig08; start chains at the constant 4p MLE
+    # stimulus coding matches 4p fits; sampler settings shared with fig08 (ddm7p)
     # posterior means are cached per setting so replots skip MCMC
     names = ("v_coherence", "a", "z", "t", "sz", "sv", "st")
     cache_key = f"n{n_trials}-seed{seed}-c{chains}-t{tune}-d{draws}"
     cache = json.loads(HSSM_CACHE.read_text()) if HSSM_CACHE.exists() else {}
     if cache_key not in cache:
-        a0, t0, v0, z0 = constant.params_
         ddm_hssm = sample_full_ddm(
             pd.DataFrame({"rt": rts, "response": choices.astype(int), "coherence": coherence}),
-            initvals=dict(a=a0, t=t0 - 0.01, v_coherence=v0, z=(z0 + 1) / 2, sz=0.3, sv=0.8, st=0.02),
+            "coherence",
             chains=chains,
             tune=tune,
             draws=draws,
             seed=seed,
-            include=[
-                dict(
-                    name="v",
-                    formula="v ~ 0 + coherence",
-                    link="identity",
-                    prior={"coherence": {"name": "Normal", "mu": 0.0, "sigma": 3.0}},
-                )
-            ],
         )
         print(az.summary(ddm_hssm.traces, var_names=list(names), round_to=3)[["mean", "sd", "r_hat", "ess_bulk"]])
         cache[cache_key] = {name: float(ddm_hssm.traces.posterior[name].mean()) for name in names}
@@ -213,9 +204,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-trials", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--chains", type=int, default=4, help="MCMC chains, run in parallel")
-    parser.add_argument("--tune", type=int, default=1000, help="MCMC tuning iterations per chain")
-    parser.add_argument("--draws", type=int, default=12000, help="MCMC draws per chain")
+    parser.add_argument("--chains", type=int, default=CHAINS, help="MCMC chains, run in parallel")
+    parser.add_argument("--tune", type=int, default=TUNE, help="MCMC (Slice) tuning iterations per chain")
+    parser.add_argument("--draws", type=int, default=DRAWS, help="MCMC (Slice) draws per chain")
     args = parser.parse_args()
     if args.n_trials < 2:
         parser.error("--n-trials must be at least 2")
