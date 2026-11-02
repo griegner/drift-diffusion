@@ -31,9 +31,17 @@ def pseudotrue_7p(y, stim, q0):
         if min(a, sv, sz, st) < 0 or not 0 < z - sz / 2 < z + sz / 2 < 1 or st / 2 >= t:
             return 1e10
         logp = wfpt.wiener_logp_array(
-            x=y, v=stim * v, sv=sv * one, a=2 * a * one, z=z * one, sz=sz * one, t=t * one, st=st * one,
-            err=1e-8, simps_err=1e-4,
-        )  # fmt: skip
+            x=y,
+            v=stim * v,
+            sv=sv * one,
+            a=2 * a * one,
+            z=z * one,
+            sz=sz * one,
+            t=t * one,
+            st=st * one,
+            err=1e-8,
+            simps_err=1e-4,
+        )
         return -np.sum(np.where(np.isfinite(logp), logp, -66.1)) / len(y)
 
     options = dict(xatol=1e-5, fatol=1e-9, maxiter=5000, maxfev=5000, adaptive=True)

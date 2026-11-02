@@ -2,6 +2,7 @@
 
 # full_ddm has no gradients, so PyMC samples it with Slice (HSSM's default for blackbox likelihoods)
 # sz/st tolerance 1e-4 vs 1e-8: ~70x faster
+# Slice updates parameters in sorted order: HSSM's order varies with Python's hash seed, so seeds would not reproduce
 # chains start at a generic point independent of the data; HSSM's own (sz = st = 2) has zero likelihood
 # piloted on fig08 (n=1000, state-switching t0): 4 chains x (100 tune + 300 draws) passed R-hat < 1.05 and
 # ESS >= 100 for all seven parameters in 20/20 repeats; DEMetropolisZ did not converge in sz, sv, st
@@ -48,7 +49,7 @@ def sample_full_ddm(data, stimulus, chains=CHAINS, tune=TUNE, draws=DRAWS, seed=
     )
     model.sample(
         sampler="pymc",
-        step=pm.Slice(model=model.pymc_model),
+        step=pm.Slice(vars=sorted(model.pymc_model.value_vars, key=lambda var: var.name), model=model.pymc_model),
         chains=chains,
         cores=chains,
         tune=tune,

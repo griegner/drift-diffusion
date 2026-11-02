@@ -178,15 +178,15 @@ def run_mcmc_checkpoint(n, rep, chains, tune, draws):
         return rep, *(saved[name] for name in MCMC_FIELDS)
 
 
-def run_mcmc(n, n_repeats, n_jobs, chains, tune, draws):
+def run_mcmc(n, reps, n_jobs, chains, tune, draws):
     """run chains in parallel within a fit and fits in parallel across the remaining CPUs"""
 
     # spawn fits: chain processes cannot nest in loky workers or threads; spawned workers get n as an argument
     CHECKPOINTS.mkdir(exist_ok=True)
     n_fits = max(1, effective_n_jobs(n_jobs) // chains)
-    print(f"MCMC: {n_repeats} fits, {n_fits} at a time with {chains} chains each", flush=True)
+    print(f"MCMC: {len(reps)} fits, {n_fits} at a time with {chains} chains each", flush=True)
     with ProcessPoolExecutor(n_fits, mp_context=get_context("spawn")) as pool:
-        futures = [pool.submit(run_mcmc_checkpoint, n, rep, chains, tune, draws) for rep in range(n_repeats)]
+        futures = [pool.submit(run_mcmc_checkpoint, n, rep, chains, tune, draws) for rep in reps]
         records = [future.result() for future in futures]
     return dict(zip(["rep", *MCMC_FIELDS], map(np.array, zip(*records))))
 
@@ -230,11 +230,12 @@ def scores(fits, L, targets):
 def plot_example(fig, spec, fits, n, targets):
     """panel A: one repeat's generating states, pseudo-true 4p trace, 4p fit with 95% AR band, and 7p iid draws"""
 
-    # converged repeat whose 4p and 7p estimates lie jointly closest to their targets
+    # converged repeat whose 4p and 7p estimates lie jointly closest to their targets; MCMC extras have no MLE fit
     L, _ = comparable(simulation_design(n, 0))
-    estimates = [(fits["params"] @ L.T, L @ targets["mle"]), (fits["mcmc_params"][:, :4], targets["mcmc"][:4])]
+    m = len(fits["rep"])
+    estimates = [(fits["params"] @ L.T, L @ targets["mle"]), (fits["mcmc_params"][:m, :4], targets["mcmc"][:4])]
     distance = sum(np.sum(((e - ref) / np.nanstd(e, axis=0)) ** 2, axis=1) for e, ref in estimates)
-    rep = int(np.argmin(np.where(fits["valid"] & fits["mcmc_valid"], distance, np.inf)))
+    rep = int(np.argmin(np.where(fits["valid"] & fits["mcmc_valid"][:m], distance, np.inf)))
     design = simulation_design(n, rep)
     beta, cov = fits["params"][rep], fits["cov"][rep, METHODS.index("autocorrelation-robust")]
     a, t0, v, z, sz, sv, st = fits["mcmc_params"][rep]
@@ -328,13 +329,18 @@ def plot(fits, n, targets):
     plt.close(fig)
 
 
-def main(n_trials, n_repeats, n_jobs, chains, tune, draws, plot_only):
+def main(n_trials, n_repeats, n_jobs, chains, tune, draws, plot_only, reps=None):
     """save the pseudo-true targets if missing, then fit all repeats to data/, or with --plot plot the saved fits"""
 
+    if reps is not None:
+        # one machine's share: MCMC checkpoints only; a later full run collects them and fits the MLE
+        run_mcmc(n_trials, reps, n_jobs, chains, tune, draws)
+        return
     if not TARGETS.exists():
         np.savez(TARGETS, **dict(zip(["mle", "mcmc"], pseudotrue_targets())))
         print(f"saved pseudo-true targets to {TARGETS}", flush=True)
     fits_path = ROOT / f"data/fig08-n{n_trials}.npz"
+    mle_path = ROOT / f"data/fig08-mle-n{n_trials}.npz"  # saved before MCMC so an interrupted run keeps the MLE fits
     if not plot_only:
 
         @delayed
@@ -342,12 +348,23 @@ def main(n_trials, n_repeats, n_jobs, chains, tune, draws, plot_only):
             X, y, _ = simulate(simulation_design(n_trials, rep), rep)
             return rep, *fit_mle(X, y)
 
-        with Parallel(n_jobs=n_jobs) as parallel:
-            records = parallel(run_simulation(rep) for rep in range(n_repeats))
-        fits = dict(zip(["rep", "runtime", "params", "cov", "valid"], map(np.array, zip(*records))))
+        fits = None
+        if mle_path.exists():
+            with np.load(mle_path) as saved:
+                if len(saved["rep"]) == n_repeats:
+                    fits = dict(saved)
+        if fits is None:
+            with Parallel(n_jobs=n_jobs) as parallel:
+                records = parallel(run_simulation(rep) for rep in range(n_repeats))
+            fits = dict(zip(["rep", "runtime", "params", "cov", "valid"], map(np.array, zip(*records))))
+            np.savez_compressed(mle_path, **fits)
         print(f"MLE: {fits['valid'].sum()}/{n_repeats} valid fits", flush=True)
-        mcmc = run_mcmc(n_trials, n_repeats, n_jobs, chains, tune, draws)
-        print(f"MCMC: {mcmc['valid'].sum()}/{n_repeats} converged fits")
+        mcmc = run_mcmc(n_trials, range(n_repeats), n_jobs, chains, tune, draws)
+        # fit the next repeats until exactly n_repeats converge; non-converged fits are kept as extras
+        while (missing := n_repeats - mcmc["valid"].sum()) > 0:
+            extra = run_mcmc(n_trials, range(len(mcmc["rep"]), len(mcmc["rep"]) + missing), n_jobs, chains, tune, draws)
+            mcmc = {key: np.concatenate([mcmc[key], extra[key]]) for key in mcmc}
+        print(f"MCMC: {n_repeats} converged fits from {len(mcmc['rep'])} repeats")
         np.savez_compressed(fits_path, **fits, **{f"mcmc_{key}": value for key, value in mcmc.items()})
         return
     if not fits_path.exists():
@@ -370,8 +387,20 @@ if __name__ == "__main__":
     parser.add_argument("--chains", type=int, default=CHAINS, help="MCMC chains per fit, run in parallel")
     parser.add_argument("--tune", type=int, default=TUNE, help="MCMC (Slice) tuning iterations per chain")
     parser.add_argument("--draws", type=int, default=DRAWS, help="MCMC (Slice) draws per chain")
+    parser.add_argument(
+        "--repeats", help="START:STOP: only fit these repeats' MCMC checkpoints, to split a run across machines"
+    )
     parser.add_argument("--plot", action="store_true", help="plot saved data/fig08-n{n-trials}.npz instead of fitting")
     args = parser.parse_args()
     if args.n_repeats < 3 or args.n_jobs == 0 or args.chains < 2 or args.n_trials < 1 or args.n_trials % SESSION:
         parser.error(f"need at least three repeats, nonzero n-jobs, two chains and n-trials a multiple of {SESSION}")
-    main(args.n_trials, args.n_repeats, args.n_jobs, args.chains, args.tune, args.draws, args.plot)
+    reps = None
+    if args.repeats:
+        try:
+            start, stop = map(int, args.repeats.split(":"))
+        except ValueError:
+            parser.error("--repeats must be START:STOP")
+        reps = range(start, stop)
+        if not 0 <= reps.start < reps.stop or args.plot:
+            parser.error("--repeats needs 0 <= START < STOP and no --plot")
+    main(args.n_trials, args.n_repeats, args.n_jobs, args.chains, args.tune, args.draws, args.plot, reps)
