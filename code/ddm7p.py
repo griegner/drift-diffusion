@@ -1,9 +1,7 @@
 """seven-parameter HSSM full_ddm, shared by fig07 and fig08"""
 
 # full_ddm has no gradients, so PyMC samples it with Slice (HSSM's default for blackbox likelihoods)
-# sz/st tolerance 1e-4 vs 1e-8: ~70x faster
-# Slice updates parameters in sorted order: HSSM's order varies with Python's hash seed, so seeds would not reproduce
-# chains start at a generic point independent of the data; HSSM's own (sz = st = 2) has zero likelihood
+# chains start at a generic point independent of the data
 # piloted on fig08 (n=1000, state-switching t0): 4 chains x (100 tune + 300 draws) passed R-hat < 1.05 and
 # ESS >= 100 for all seven parameters in 20/20 repeats; DEMetropolisZ did not converge in sz, sv, st
 
@@ -35,30 +33,28 @@ def sample_full_ddm(data, stimulus, chains=CHAINS, tune=TUNE, draws=DRAWS, seed=
     model = hssm.HSSM(
         data=data,
         model="full_ddm",
-        loglik_kind="blackbox",
-        loglik=logp_full_ddm,
-        p_outlier=0,
+        loglik_kind="blackbox",  # explicit with a custom loglik
+        loglik=logp_full_ddm,  # HSSM's own uses simps_err=1e-8, ~70x slower
+        p_outlier=0,  # default 0.05 adds a lapse mixture
         include=[
             dict(
                 name="v",
-                formula=f"v ~ 0 + {stimulus}",
-                link="identity",
-                prior={stimulus: {"name": "Normal", "mu": 0.0, "sigma": 3.0}},
+                formula=f"v ~ 0 + {stimulus}",  # default is v ~ 1
+                prior={stimulus: {"name": "Normal", "mu": 0.0, "sigma": 3.0}},  # default N(0, 0.25) too tight for |v|
             )
         ],
     )
     model.sample(
-        sampler="pymc",
-        step=pm.Slice(vars=sorted(model.pymc_model.value_vars, key=lambda var: var.name), model=model.pymc_model),
+        step=pm.Slice(  # HSSM's default Slice orders parameters by hash, so seeds would not reproduce
+            vars=sorted(model.pymc_model.value_vars, key=lambda var: var.name), model=model.pymc_model
+        ),
         chains=chains,
-        cores=chains,
         tune=tune,
         draws=draws,
-        blas_cores=1,
-        mp_ctx="spawn",
-        initvals={**INITVALS, f"v_{stimulus}": 0.0},
+        mp_ctx="spawn",  # PyMC's default on Apple Silicon is fork, which can deadlock
+        initvals={**INITVALS, f"v_{stimulus}": 0.0},  # HSSM's default (sz = st = 2) has zero likelihood
         random_seed=seed,
-        progressbar=False,
-        idata_kwargs={"log_likelihood": False},
+        progressbar=False,  # keeps logs readable across many fits
+        idata_kwargs={"log_likelihood": False},  # skip per-trial log-likelihood after sampling
     )
     return model
