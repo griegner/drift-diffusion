@@ -1,0 +1,43 @@
+{
+  "likelihood": "HSSM 0.5 rt-t guard; wfpt simps_err=1e-4",
+  "n_trials": 50000,
+  "repeat": 1000000,
+  "simulation_seed": 20261020,
+  "minimum_rt": 0.3924039620793829,
+  "hssm": "0.5.0",
+  "hddm_wfpt": "0.1.7",
+  "parameter_order": [
+    "a",
+    "t",
+    "v_stim",
+    "z",
+    "sz",
+    "sv",
+    "st"
+  ],
+  "npz_scale": "fig08: z -> 2*z-1; sz -> 2*sz",
+  "created_utc": "2026-11-03T20:43:12.443502+00:00",
+  "optimization": {
+    "method": "Nelder-Mead",
+    "xatol": 1e-05,
+    "fatol": 1e-09,
+    "maxiter": 5000,
+    "maxfev": 5000,
+    "adaptive": true,
+    "initial_starts": 3,
+    "refinement": "six parameters with t fixed at the best full-search value"
+  },
+  "parameter_scale": "native HSSM",
+  "params": [
+    0.6450499292021389,
+    0.40262547377629077,
+    2.0255004335653535,
+    0.5424719407224392,
+    0.0009951819049470716,
+    0.3267722428696287,
+    0.11014857269049377
+  ],
+  "mean_negative_log_likelihood": -0.1649733156242696,
+  "success": true,
+  "penalized_trials": 2
+}
