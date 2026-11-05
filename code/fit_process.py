@@ -136,10 +136,11 @@ def bounded_fits(function, tasks, workers, timeout):
                     process.join()
                     receive.close()
                     raise
-                active.append((key, process, tree, receive, began))
+                # keep gate alive: dropping it unlinks its semaphore before the spawned child reopens it
+                active.append((key, process, tree, receive, began, gate))
                 gate.set()
             for entry in active[:]:
-                key, process, tree, pipe, began = entry
+                key, process, tree, pipe, began, _ = entry
                 elapsed = time.monotonic() - began
                 outcome = None
                 if pipe.poll():
@@ -159,6 +160,6 @@ def bounded_fits(function, tasks, workers, timeout):
             if active:
                 time.sleep(0.1)
     finally:
-        for _, _, tree, pipe, _ in active:
+        for _, _, tree, pipe, _, _ in active:
             tree.close()
             pipe.close()
