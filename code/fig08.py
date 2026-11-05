@@ -43,6 +43,8 @@ TARGET_LIKELIHOOD = "hssm-0.5-guard-simps-1e-4"
 CHECKPOINTS = ROOT / "data/fig08-mcmc"
 # |v| spans 0.1 to the fig07 maximum over +-3.5 SD of pupil, fixed across repeats so every repeat shares one target
 V_MID, V_SLOPE = (0.1 + 2.23 + 1.33 * np.sqrt(3)) / 2, (2.23 + 1.33 * np.sqrt(3) - 0.1) / (7 * 0.15)
+A_MEAN, T0_MEAN = 0.63, 0.435
+Z_MEAN = 0.008 + (2 * 0.037 / 0.125) / np.sqrt(12)
 METHODS = ["sample-hessian", "autocorrelation-robust"]
 MLE = DriftDiffusionModel(
     a="1 + time",
@@ -76,12 +78,12 @@ def simulation_design(n, rep):
     centered = (0.15 * (pupil - pupil.mean(axis=1, keepdims=True)) / pupil.std(axis=1, keepdims=True)).ravel()
     session_time = np.tile(np.linspace(-0.5, 0.5, SESSION), n // SESSION)
     # engaged (state 0) and disengaged (state 1) t0 and z, Matzke st and sz scales as in fig02to04
-    t0 = 0.435 + np.array([-1, 1]) * 0.183 / np.sqrt(12)
-    z = 0.008 + np.array([0, 2]) * (2 * 0.037 / 0.125) / np.sqrt(12)
+    t0 = T0_MEAN + np.array([-1, 1]) * 0.183 / np.sqrt(12)
+    z = Z_MEAN + np.array([-1, 1]) * (2 * 0.037 / 0.125) / np.sqrt(12)
     return dict(
         time=session_time,
         pupil_centered=centered,
-        a=0.63 + 0.252 * session_time,
+        a=A_MEAN + 0.252 * session_time,
         t0=t0,
         magnitude=V_MID + V_SLOPE * centered,
         z=z,
@@ -89,14 +91,14 @@ def simulation_design(n, rep):
 
 
 def comparable(design):
-    """contrasts from the MLE coefficients to QUANTITIES, and their generating values"""
+    """contrasts from the MLE coefficients to QUANTITIES, and fixed generative means"""
 
     L = np.zeros((len(QUANTITIES), len(PARAM_NAMES)))
     L[0, [0, 1]] = 1, design["time"].mean()  # a at mean session time
     L[1, 2] = 1
     L[2, [3, 4]] = 1, design["pupil_centered"].mean()  # drift at mean pupil
     L[3, 5] = 1
-    truth = [design["a"].mean(), design["t0"].mean(), design["magnitude"].mean(), design["z"].mean()]
+    truth = [A_MEAN, T0_MEAN, V_MID, Z_MEAN]
     return L, np.array(truth)
 
 
