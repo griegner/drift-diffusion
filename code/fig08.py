@@ -71,11 +71,13 @@ PALE = {key: 0.3 * np.array(to_rgb(color)) + 0.7 for key, color in [("mle", "r")
 def simulation_design(n, rep):
     """pupil traces for n/1000 sessions, drawn per repeat"""
 
-    # standardize each session to mean 0.5 and SD 0.15 so the pupil mean and spread, and with them the targets, are
-    # the same in every repeat; centering at the population mean keeps the covariate free of the data
+    # Population mean 0 and SD 0.15; session means and spreads fluctuate across repeats.
     rng = np.random.default_rng(np.random.SeedSequence([SEED, 17, n, rep]))
     pupil = gaussian_filter1d(rng.normal(size=(n // SESSION, SESSION)), 20, axis=1, mode="wrap")
-    centered = (0.15 * (pupil - pupil.mean(axis=1, keepdims=True)) / pupil.std(axis=1, keepdims=True)).ravel()
+    impulse = np.zeros(SESSION)
+    impulse[0] = 1
+    population_sd = np.linalg.norm(gaussian_filter1d(impulse, 20, mode="wrap"))
+    centered = (0.15 * pupil / population_sd).ravel()
     session_time = np.tile(np.linspace(-0.5, 0.5, SESSION), n // SESSION)
     # engaged (state 0) and disengaged (state 1) t0 and z, Matzke st and sz scales as in fig02to04
     t0 = T0_MEAN + np.array([-1, 1]) * 0.183 / np.sqrt(12)
@@ -96,7 +98,7 @@ def comparable(design):
     L = np.zeros((len(QUANTITIES), len(PARAM_NAMES)))
     L[0, [0, 1]] = 1, design["time"].mean()  # a at mean session time
     L[1, 2] = 1
-    L[2, [3, 4]] = 1, design["pupil_centered"].mean()  # drift at mean pupil
+    L[2, 3] = 1  # drift at the population pupil mean, shared across repeats
     L[3, 5] = 1
     truth = [A_MEAN, T0_MEAN, V_MID, Z_MEAN]
     return L, np.array(truth)
@@ -376,7 +378,7 @@ def plot(fits, n, targets):
     with (ROOT / "code/config.json").open() as f:
         plt.rcParams.update(json.load(f)["rc-params"])
     plt.rcParams["font.size"] = 12
-    L, _ = comparable(simulation_design(n, 0))  # session time and pupil means, hence L, are the same in every repeat
+    L, _ = comparable(simulation_design(n, 0))  # fixed population contrasts for every repeat
     result = scores(fits, L, targets)
     fig = plt.figure(figsize=(12, 7.5), layout="constrained")
     fig.suptitle(
@@ -442,7 +444,7 @@ def plot(fits, n, targets):
 def main(
     n_trials, n_repeats, n_jobs, chains, tune, draws, plot_only, reps=None, timeout_per_1000=1200, max_attempts=None
 ):
-    """save the pseudo-true targets if missing, then fit all repeats to data/, or with --plot plot the saved fits"""
+    """Run checkpointed fits, or plot saved fits against the large-sample reference."""
 
     if reps is not None:
         # one machine's share: MCMC checkpoints only; a later full run collects them and fits the MLE
@@ -454,48 +456,48 @@ def main(
     with np.load(TARGETS) as saved:
         if "likelihood" not in saved or str(saved["likelihood"]) != TARGET_LIKELIHOOD:
             raise ValueError("Pseudo-true target likelihood does not match the current analysis")
+        targets = dict(saved)
+    if plot_only:
+        plot(collect_results(n_trials, chains, tune, draws), n_trials, targets)
+        return
+
     fits_path = ROOT / f"data/fig08-n{n_trials}.npz"
     mle_path = ROOT / f"data/fig08-mle-n{n_trials}.npz"  # saved before MCMC so an interrupted run keeps the MLE fits
-    if not plot_only:
 
-        @delayed
-        def run_simulation(rep):
-            X, y, _ = simulate(simulation_design(n_trials, rep), rep)
-            return rep, *fit_mle(X, y)
+    @delayed
+    def run_simulation(rep):
+        X, y, _ = simulate(simulation_design(n_trials, rep), rep)
+        return rep, *fit_mle(X, y)
 
-        fits = None
-        if mle_path.exists():
-            with np.load(mle_path) as saved:
-                if len(saved["rep"]) == n_repeats:
-                    fits = dict(saved)
-        if fits is None:
-            with Parallel(n_jobs=n_jobs) as parallel:
-                records = parallel(run_simulation(rep) for rep in range(n_repeats))
-            fits = dict(zip(["rep", "runtime", "params", "cov", "valid"], map(np.array, zip(*records))))
-            np.savez_compressed(mle_path, **fits)
-        print(f"MLE: {fits['valid'].sum()}/{n_repeats} valid fits", flush=True)
-        max_attempts = max_attempts or 3 * n_repeats
-        if max_attempts < n_repeats:
-            raise ValueError("max_attempts must be at least n_repeats")
-        mcmc = run_mcmc(n_trials, range(n_repeats), n_jobs, chains, tune, draws, timeout_per_1000)
-        # fit the next repeats until exactly n_repeats converge; non-converged fits are kept as extras
-        while (missing := n_repeats - mcmc["valid"].sum()) > 0:
-            stop = min(len(mcmc["rep"]) + missing, max_attempts)
-            if stop == len(mcmc["rep"]):
-                break
-            extra = run_mcmc(n_trials, range(len(mcmc["rep"]), stop), n_jobs, chains, tune, draws, timeout_per_1000)
-            mcmc = {key: np.concatenate([mcmc[key], extra[key]]) for key in mcmc}
-        print(
-            f"MCMC: {mcmc['valid'].sum()} converged fits from {len(mcmc['rep'])} attempts; "
-            f"statuses={dict(zip(*np.unique(mcmc['status'], return_counts=True)))}"
-        )
-        np.savez_compressed(fits_path, **fits, **{f"mcmc_{key}": value for key, value in mcmc.items()})
-        if mcmc["valid"].sum() < n_repeats:
-            raise RuntimeError(f"Attempt limit {max_attempts} reached; partial results saved to {fits_path}")
-        return
-    fits = collect_results(n_trials, chains, tune, draws)
-    with np.load(TARGETS) as targets:
-        plot(fits, n_trials, dict(targets))
+    fits = None
+    if mle_path.exists():
+        with np.load(mle_path) as saved:
+            if len(saved["rep"]) == n_repeats:
+                fits = dict(saved)
+    if fits is None:
+        with Parallel(n_jobs=n_jobs) as parallel:
+            records = parallel(run_simulation(rep) for rep in range(n_repeats))
+        fits = dict(zip(["rep", "runtime", "params", "cov", "valid"], map(np.array, zip(*records))))
+        np.savez_compressed(mle_path, **fits)
+    print(f"MLE: {fits['valid'].sum()}/{n_repeats} valid fits", flush=True)
+    max_attempts = max_attempts or 3 * n_repeats
+    if max_attempts < n_repeats:
+        raise ValueError("max_attempts must be at least n_repeats")
+    mcmc = run_mcmc(n_trials, range(n_repeats), n_jobs, chains, tune, draws, timeout_per_1000)
+    # fit the next repeats until exactly n_repeats converge; non-converged fits are kept as extras
+    while (missing := n_repeats - mcmc["valid"].sum()) > 0:
+        stop = min(len(mcmc["rep"]) + missing, max_attempts)
+        if stop == len(mcmc["rep"]):
+            break
+        extra = run_mcmc(n_trials, range(len(mcmc["rep"]), stop), n_jobs, chains, tune, draws, timeout_per_1000)
+        mcmc = {key: np.concatenate([mcmc[key], extra[key]]) for key in mcmc}
+    print(
+        f"MCMC: {mcmc['valid'].sum()} converged fits from {len(mcmc['rep'])} attempts; "
+        f"statuses={dict(zip(*np.unique(mcmc['status'], return_counts=True)))}"
+    )
+    np.savez_compressed(fits_path, **fits, **{f"mcmc_{key}": value for key, value in mcmc.items()})
+    if mcmc["valid"].sum() < n_repeats:
+        raise RuntimeError(f"Attempt limit {max_attempts} reached; partial results saved to {fits_path}")
 
 
 if __name__ == "__main__":
@@ -520,12 +522,12 @@ if __name__ == "__main__":
         "--timeout-per-1000",
         type=float,
         default=1200,
-        help="hard fit timeout in seconds per 1000 trials, including startup (default 1200)",
+        help="seconds per 1000 trials (default 1200); inf disables the timeout",
     )
     parser.add_argument("--max-attempts", type=int, help="total MCMC attempt ceiling (default 3*n-repeats)")
     args = parser.parse_args()
-    if not np.isfinite(args.timeout_per_1000) or args.timeout_per_1000 <= 0:
-        parser.error("--timeout-per-1000 must be finite and positive")
+    if np.isnan(args.timeout_per_1000) or args.timeout_per_1000 <= 0:
+        parser.error("--timeout-per-1000 must be positive (or inf for no timeout)")
     if args.max_attempts is not None and args.max_attempts < args.n_repeats:
         parser.error("--max-attempts must be at least --n-repeats")
     if args.n_repeats < 3 or args.n_jobs == 0 or args.chains < 2 or args.n_trials < 1 or args.n_trials % SESSION:
