@@ -11,7 +11,7 @@ import seaborn as sns
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = ["a", "t0", "v", "z"]
-TRUE = [0.63, 0.435, (0.1 + 2.23 + 1.33 * np.sqrt(3)) / 2, 0.008 + (2 * 0.037 / 0.125) / np.sqrt(12)]  # fig08 means
+TRUE = [0.630, 0.435, 2.317, 0.179]  # fig08 means
 MLE_COLS = [0, 2, 3, 5]  # a_intercept, t0, v_stim, z: session time and pupil have mean 0, so these are the quantities
 COLORS = {"MLE (SH)": "#f19c9d", "MLE (AR)": "#8c1515", "MCMC": "#3b6fb6"}
 
@@ -67,6 +67,6 @@ for r, (value, n) in enumerate([("point", 1000), ("point", 5000), ("se", 1000), 
         else:  # empirical SD of the point estimates as the true SE
             for method in ["MLE (AR)", "MCMC"]:
                 ax.axvline(data.loc[data.method == method, "point"].std(), color=COLORS[method], ls="--", lw=1.5)
-        ax.set(xlabel=f"{name} {'estimate' if value == 'point' else 'SE'}", ylabel=f"n={n}" if k == 0 else "")
+        ax.set(xlabel=f"{name} {'point estimate' if value == 'point' else 'SE'}", ylabel=f"n={n}" if k == 0 else "")
 fig.suptitle("solid: true; dashed: pseudo-true (point rows) or empirical SD of point estimates (SE rows)")
 fig.savefig(ROOT / "results/fig08-distributions.png", dpi=150)

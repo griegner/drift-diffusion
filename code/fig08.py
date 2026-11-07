@@ -387,14 +387,17 @@ def plot(fits, n, targets):
     axes = plot_example(fig, grid[0, :2], fits, n, targets)
     axes += [fig.add_subplot(grid[0, 2])] + [fig.add_subplot(grid[1, k]) for k in range(3)]
 
-    # B: every valid fit's runtime from each saved data/fig08-n{n}.npz, jittered in n
+    # B: valid fit runtimes, explicitly excluding timeouts, jittered in n
     paths = {int(path.stem.removeprefix("fig08-n")): path for path in (ROOT / "data").glob("fig08-n*.npz")}
     sizes = sorted(paths)
     rng = np.random.default_rng(0)
     for size in sizes:
         with np.load(paths[size]) as saved:
             runtimes = [("autocorrelation-robust", saved["runtime"][saved["valid"]])]
-            runtimes += [("mcmc", saved["mcmc_runtime"][saved["mcmc_valid"]])]
+            runtime_valid = saved["mcmc_valid"].copy()
+            if "mcmc_status" in saved:
+                runtime_valid &= saved["mcmc_status"] != "timeout"
+            runtimes += [("mcmc", saved["mcmc_runtime"][runtime_valid])]
         for method, runtime in runtimes:
             jitter = rng.uniform(-250, 250, len(runtime))
             axes[4].plot(size + jitter, runtime, "o", color=COLORS[method], ms=3, mec="white", mew=0.3)
