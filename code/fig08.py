@@ -206,7 +206,7 @@ def mcmc_task(n, rep, chains, tune, draws):
     return fit_mcmc(X, y, chains, tune, draws, seed)
 
 
-def run_mcmc(n, reps, n_jobs, chains, tune, draws, timeout_per_1000=1200):
+def run_mcmc(n, reps, n_jobs, chains, tune, draws, timeout_per_1000=3600):
     """run chains in parallel within a fit and fits in parallel across the remaining CPUs"""
 
     # spawn fits: chain processes cannot nest in loky workers or threads; spawned workers get n as an argument
@@ -442,7 +442,7 @@ def plot(fits, n, targets):
 
 
 def main(
-    n_trials, n_repeats, n_jobs, chains, tune, draws, plot_only, reps=None, timeout_per_1000=1200, max_attempts=None
+    n_trials, n_repeats, n_jobs, chains, tune, draws, plot_only, reps=None, timeout_per_1000=3600, max_attempts=None
 ):
     """Run checkpointed fits, or plot saved fits against the large-sample reference."""
 
@@ -521,8 +521,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--timeout-per-1000",
         type=float,
-        default=1200,
-        help="seconds per 1000 trials (default 1200); inf disables the timeout",
+        default=3600,
+        help="seconds per 1000 trials (default 3600); inf disables the timeout",
     )
     parser.add_argument("--max-attempts", type=int, help="total MCMC attempt ceiling (default 3*n-repeats)")
     args = parser.parse_args()
