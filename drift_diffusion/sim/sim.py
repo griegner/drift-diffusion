@@ -44,7 +44,7 @@ def sample_from_pdf(a=1, t0=0, v=0, z=0, n_samples=1000, n_repeats=1, random_sta
         if param.size != n_samples:
             raise ValueError(f"'{name}' must be a ndarray of shape (n_samples,)")
 
-    num = 10_000
+    num = 1000
     rt_lo, rt_hi = 1e-5 + params["t0"].min(), 5 + params["t0"].max()
     grid = np.linspace(rt_lo, rt_hi, num)
     y = np.concatenate([-grid, grid])

@@ -191,10 +191,9 @@ def checkpoint_path(n, rep, chains, tune, draws):
 def load_checkpoint(path, chains):
     with np.load(path) as saved:
         fit = {name: saved[name] for name in MCMC_FIELDS[:6]}
-        status = str(saved["status"]) if "status" in saved else "completed"
-        fit["error"] = str(saved["error"]) if "error" in saved else ""
+        status, fit["error"] = str(saved["status"]), str(saved["error"])
     # Evaluate saved diagnostics using the current acceptance thresholds.
-    completed = status in ("completed", "converged", "diagnostic_failure")
+    completed = status in ("converged", "diagnostic_failure")
     fit["valid"] = completed and mcmc_converged(fit["r_hat"], fit["ess"], chains)
     fit["status"] = ("converged" if fit["valid"] else "diagnostic_failure") if completed else status
     return fit
@@ -291,7 +290,7 @@ def scores(fits, L, targets):
         return {key: (values[key], 1.96 * influence[key].std(ddof=1, axis=0) / np.sqrt(len(params_))) for key in values}
 
     mle, mcmc = fits["valid"], fits["mcmc_valid"]
-    status = fits.get("mcmc_status", np.where(mcmc, "converged", "diagnostic_failure"))
+    status = fits["mcmc_status"]
     print(
         "MCMC attempts:",
         {
@@ -396,9 +395,7 @@ def plot(fits, n, targets):
     for size in sizes:
         with np.load(paths[size]) as saved:
             runtimes = [("autocorrelation-robust", saved["runtime"][saved["valid"]])]
-            runtime_valid = saved["mcmc_valid"].copy()
-            if "mcmc_status" in saved:
-                runtime_valid &= saved["mcmc_status"] != "timeout"
+            runtime_valid = saved["mcmc_valid"] & (saved["mcmc_status"] != "timeout")
             runtimes += [("mcmc", saved["mcmc_runtime"][runtime_valid])]
         for method, runtime in runtimes:
             jitter = rng.uniform(-250, 250, len(runtime))
