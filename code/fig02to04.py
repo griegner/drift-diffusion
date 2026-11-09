@@ -13,6 +13,7 @@ import seaborn as sns
 from joblib import Parallel, delayed
 from matplotlib.ticker import FuncFormatter
 from pseudotrue import N_TRIALS, REP, pseudotrue_4p
+from settings import A_TREND, T0, T0_STATES, V_STATES, Z_STATES, A, V, Z, engagement_states
 from sklearn.base import clone
 from tqdm import tqdm
 
@@ -25,48 +26,20 @@ with (Path(__file__).resolve().parent / "config.json").open() as f:
     plt.rcParams.update(rc_params)
 
 
-def persistent_parameters():
-    """return Matzke Table 3 scales with near-neutral engagement and persistent right bias"""
-
-    # rescale Matzke means to noise SD 1 and bounds +/-a (a rounded to 0.63)
-    params = dict(a=0.63, t0=0.435, v=2.23, z=0.008)
-    # eta: SD; st, sz: full uniform widths (DMAT)
-    sd_t0, sd_v, sd_z = 0.183 / np.sqrt(12), 0.133 / 0.1, (2 * 0.037 / 0.125) / np.sqrt(12)
-    engaged = {**params, "t0": params["t0"] - sd_t0, "v": params["v"] + sd_v}
-    disengaged = {
-        **params,
-        "t0": params["t0"] + sd_t0,
-        "v": params["v"] - sd_v,
-        "z": params["z"] + 2 * sd_z,
-    }
-    # equal weights preserve variances; near-neutral engaged z shifts the pooled mean rightward
-    return engaged, disengaged
-
-
-def persistent_states(n_samples, rng):
-    """sample a stationary shared binary state with P(stay)=0.95 and mean runs of 20 trials"""
-
-    state = np.empty(n_samples, dtype=int)
-    state[0] = rng.integers(2)
-    state[1:] = (state[0] + np.cumsum(rng.random(n_samples - 1) < 1 - 0.95)) % 2
-    return state
-
-
 def sample_persistent(n_samples, rep, seed=0):
     """sample RTs with persistent engagement states and independent stimuli"""
 
     rng = np.random.default_rng(np.random.SeedSequence([seed, rep]))
-    state = persistent_states(n_samples, rng)
+    state = engagement_states(rng, n_samples)
     stim = 2 * rng.integers(2, size=n_samples) - 1
-    states = persistent_parameters()
-    params = {name: np.array([p[name] for p in states])[state] for name in ["a", "t0", "v", "z"]}
-    params["v"] *= stim
+    # state-dependent t0, drift, and starting point from settings.py
+    params = dict(a=A, t0=T0_STATES[state], v=stim * V_STATES[state], z=Z_STATES[state])
     y = sample_from_pdf(**params, n_samples=n_samples, random_state=int(rng.integers(2**32)))
     return stim, y
 
 
 def sample_stimulus(n_samples, rep, a, t0, v, z, seed=0):
-    """sample RTs with independent stimuli setting the drift sign"""
+    """sample RTs with independent stimuli and stimulus-coded drift"""
 
     rng = np.random.default_rng(np.random.SeedSequence([seed, rep]))
     stim = 2 * rng.integers(2, size=n_samples) - 1
@@ -75,7 +48,7 @@ def sample_stimulus(n_samples, rep, a, t0, v, z, seed=0):
 
 
 def cov_to_corr(cov):
-    """convert diagonal covariance entries to standard errors and off-diagonal entries to correlations"""
+    """replace diagonal variances with SEs and off-diagonal covariances with correlations"""
 
     stderr = np.sqrt(np.diag(cov))
     corr = cov / np.outer(stderr, stderr)
@@ -179,8 +152,8 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
     }
     path_a, path_b = figure_paths[setting]
 
-    # mean DDM parameters from Matzke 2009, Table 3
-    params = dict(a=0.63, t0=0.435, v=2.23, z=0.008)
+    # shared Table 3 means in package units
+    params = dict(a=A, t0=T0, v=V, z=Z)
 
     def setup_constant():
         """set up constant DDM parameters"""
@@ -191,7 +164,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         pseudotrue_params = {"a": params["a"], "t0": params["t0"], "abs_v": params["v"], "z": params["z"]}
 
         def sample(rep):
-            # fit observed stimulus direction; estimate drift magnitude and side bias
+            # estimate drift magnitude and side bias from stimulus direction
             stim, y = sample_stimulus(n_samples, rep, **params, seed=kwargs["random_state"])
             return pd.DataFrame({"stim": stim}), y
 
@@ -199,13 +172,13 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         return sample, ddm, param_names, cov_names, pseudotrue_params
 
     def setup_time():
-        """set up a as a linear function of normalized time in session"""
+        """set up a linear boundary trend within each session"""
 
         param_names = ["beta_a", "t0", "abs_v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 
         beta_a = params["a"]
-        time = np.linspace(0.8, 1.2, kwargs["n_samples"])
+        time = np.linspace(1 - A_TREND, 1 + A_TREND, kwargs["n_samples"])
         a_time = beta_a * time
         pseudotrue_params = {"beta_a": beta_a, "t0": params["t0"], "abs_v": params["v"], "z": params["z"]}
 
@@ -217,14 +190,14 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         return sample, ddm, param_names, cov_names, pseudotrue_params
 
     def setup_persistent():
-        """set up an unmodeled engagement state; fit a, t0, drift magnitude, and side bias"""
+        """fit stimulus effects while omitting the hidden engagement state"""
 
         param_names = ["a", "t0", "abs_v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 
         ddm = DriftDiffusionModel(v="-1+stim", cov_estimator="all", autocorrelation_lags=40, p_outlier=0)
 
-        # Monte Carlo pseudo-true (pseudotrue.py), computed once and saved before the repeats
+        # compute and cache the large-sample reference before repeats
         path = Path(__file__).resolve().parents[1] / "data/fig04-pseudotrue.json"
         if not path.exists():
             stim, y = sample_persistent(N_TRIALS, REP, seed=kwargs["random_state"])
@@ -234,7 +207,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         print("pseudo-true:", {name: round(value, 6) for name, value in pseudotrue_params.items()})
 
         def sample(rep):
-            # fit observed stimulus direction; omit the hidden state
+            # fit stimulus direction only
             stim, y = sample_persistent(n_samples, rep, seed=kwargs["random_state"])
             return pd.DataFrame({"stim": stim}), y
 

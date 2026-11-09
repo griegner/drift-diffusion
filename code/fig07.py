@@ -2,7 +2,7 @@
 
 """figure 07: pupil-dependent drift and conditional accuracy"""
 
-# compare covariate and constant 4p DDMs with a 7p DDM (iid variability in v, z, t0)
+# compare covariate/constant 4p fits with a 7p model of iid variability
 
 import argparse
 import json
@@ -14,17 +14,17 @@ import numpy as np
 import pandas as pd
 from ddm7p import CHAINS, DRAWS, TUNE, logp_full_ddm, sample_full_ddm
 from matplotlib.colors import to_rgb
-from scipy.ndimage import gaussian_filter1d
 from scipy.stats import binomtest
+from settings import T0, V_PUPIL, A, V, Z, pupil_trace
 
 from drift_diffusion.model import DriftDiffusionModel, pdf
 from drift_diffusion.sim import sample_from_pdf
 
 
 def conditional_accuracy(rt, a, t0, v, z, err=1e-3, *, correct_boundary=1):
-    """compute model-implied accuracy with correct_boundary +1 (R) or -1 (L) per trial"""
+    """compute accuracy by RT, with correct_boundary=+1 (R) or -1 (L) per trial"""
 
-    # task-defined correct boundaries are independent of drift
+    # use task-defined correct boundaries
     a, t0, v, z, correct_boundary = np.broadcast_arrays(*[np.atleast_1d(p) for p in (a, t0, v, z, correct_boundary)])
     if not np.isin(correct_boundary, [-1, 1]).all():
         raise ValueError("correct_boundary must contain only -1 or +1")
@@ -41,9 +41,9 @@ def conditional_accuracy(rt, a, t0, v, z, err=1e-3, *, correct_boundary=1):
 
 
 def conditional_accuracy_full(rt, v_coherence, a, z, t, sz, sv, st, *, coherence):
-    """compute CAF integrated over iid variability in v, z, and t0"""
+    """compute accuracy by RT over iid v, z, and t0 variability"""
 
-    # drift = v_coherence * coherence; pool by correct boundary as in conditional_accuracy
+    # stimulus-coded drift; weight each stimulus direction by its frequency
     rt = np.asarray(rt, dtype=float)
 
     def density(response, c):
@@ -66,27 +66,23 @@ def main(n_trials=1000, seed=7, chains=CHAINS, tune=TUNE, draws=DRAWS):
     with (ROOT / "code/config.json").open() as f:
         plt.rcParams.update(json.load(f)["rc-params"])
     plt.rcParams["font.size"] = 12
-    trial_dur, pupil_tau = 1.0, 20.0
     rng = np.random.default_rng(seed)
 
-    # one slow pupil trace shared across trials
-    pupil = gaussian_filter1d(rng.normal(size=n_trials), pupil_tau / trial_dur, mode="wrap")
-    pupil = 0.5 + 0.15 * (pupil / pupil.std())
-    pupil_centered = pupil - pupil.mean()
+    # population-scaled pupil, as in fig08; session means vary
+    pupil_centered = pupil_trace(rng, 1, n_trials)[0]
     coherence = rng.choice([-1, 1], n_trials)
 
-    # positive coherence means R is correct; positive drift favors R
-    v_min, v_max = 0.1, 2.23 + 1.33 * np.sqrt(3)
-    beta_pupil = (v_max - v_min) / np.ptp(pupil)
-    beta_coherence = v_min + beta_pupil * (pupil.mean() - pupil.min())
-    v_pupil = coherence * (beta_coherence + beta_pupil * pupil_centered)
-    params = dict(a=0.63, t0=0.435, v=v_pupil, z=0.008)
+    # positive coherence makes R correct; positive drift favors R
+    beta_pupil = V_PUPIL
+    beta_coherence = V + beta_pupil * pupil_centered.mean()  # constant model's session drift
+    v_pupil = coherence * (V + beta_pupil * pupil_centered)
+    params = dict(a=A, t0=T0, v=v_pupil, z=Z)
 
-    # fixed RT sampling seed; --seed varies pupil and stimuli
+    # --seed varies pupil and stimuli; RT sampling uses a fixed seed
     ys = sample_from_pdf(**params, n_samples=n_trials, random_state=0)
     choices, rts = np.sign(ys), np.abs(ys)
 
-    print(f"v range: {v_pupil.min():.3f} to {v_pupil.max():.3f}")
+    print(f"|v| range: {np.abs(v_pupil).min():.3f} to {np.abs(v_pupil).max():.3f}")
     print(f"accuracy: {(choices == coherence).mean():.3f}")
 
     X = pd.DataFrame({"coherence": coherence, "pupil_centered": pupil_centered})
@@ -111,8 +107,7 @@ def main(n_trials=1000, seed=7, chains=CHAINS, tune=TUNE, draws=DRAWS):
         f"fitted={constant.params_[2]:.3f} +/- {np.sqrt(constant.covariance_[2, 2]):.3f}"
     )
 
-    # stimulus coding matches 4p fits; sampler settings shared with fig08 (ddm7p)
-    # posterior means are cached per setting so replots skip MCMC
+    # reuse 7p posterior means for matching run settings
     names = ("v_coherence", "a", "z", "t", "sz", "sv", "st")
     cache_key = f"n{n_trials}-seed{seed}-c{chains}-t{tune}-d{draws}"
     cache = json.loads(HSSM_CACHE.read_text()) if HSSM_CACHE.exists() else {}
@@ -135,7 +130,7 @@ def main(n_trials=1000, seed=7, chains=CHAINS, tune=TUNE, draws=DRAWS):
     accuracy_sim = conditional_accuracy(rt_grid, **params, correct_boundary=coherence)
     accuracy_hssm = conditional_accuracy_full(rt_grid, **params_hssm, coherence=coherence)
 
-    # simulated data: accuracy in RT decile bins with 95% Wilson intervals
+    # RT deciles: accuracy and 95% Wilson intervals
     decile = np.digitize(rts, np.quantile(rts, np.linspace(0, 1, 11))[1:-1])
     correct = choices == coherence
     tests = [binomtest(correct[decile == b].sum(), np.sum(decile == b)) for b in range(10)]
@@ -145,7 +140,7 @@ def main(n_trials=1000, seed=7, chains=CHAINS, tune=TUNE, draws=DRAWS):
 
     fits = {}
     for key, ddm in models.items():
-        bands = ddm.g(X, alpha=0.05)  # pointwise 95% intervals
+        bands = ddm.g(X, alpha=0.05)  # pointwise 95% CIs
         accuracy = conditional_accuracy(
             rt_grid, **{name: band["g"] for name, band in bands.items()}, correct_boundary=coherence
         )

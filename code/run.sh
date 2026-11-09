@@ -5,7 +5,7 @@ start_seconds=$SECONDS
 
 mode=${1:-paper}
 
-# download csv from dryad DOI: 10.5061/dryad.hhmgqnkxb
+# source data: Dryad DOI 10.5061/dryad.hhmgqnkxb
 
 if [[ "$mode" == "test" ]]; then
     echo "\nrunning TEST mode ...\n"
@@ -36,7 +36,7 @@ if [[ "$mode" == "test" ]]; then
 
     # fig08
     echo "-> fig08"
-    python fig08.py --n-repeats 3 --tune 100 --draws 200
+    python fig08-run.py --repeats 0:3 --tune 100 --draws 200 --output ../data/fig08-test
 
 elif [[ "$mode" == "paper" ]]; then
     echo "\nrunning PAPER mode ...\n"
@@ -67,7 +67,7 @@ elif [[ "$mode" == "paper" ]]; then
 
     # fig08
     echo "-> fig08"
-    python fig08.py --plot
+    # !!! python fig08-plot.py ... !!!
 
 else
     echo "Usage: ./run.sh [test|paper]"

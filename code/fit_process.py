@@ -1,4 +1,4 @@
-"""Bounded spawned fits, including their chain processes (Windows Job Objects)."""
+"""spawned fits with timeouts and child-process cleanup"""
 
 import ctypes
 import os
@@ -9,7 +9,7 @@ from multiprocessing import get_context
 
 
 class ProcessTree:
-    """Own all descendants of a fit; closing the Windows job kills stragglers."""
+    """terminate a fit and all descendants on close"""
 
     def __init__(self, process):
         self.process = process
@@ -64,8 +64,7 @@ class ProcessTree:
 
     def close(self):
         if self.handle:
-            # Basic accounting: four time counters followed by four DWORDs;
-            # active process count is DWORD index 10 (byte offset 40).
+            # active-process count is the DWORD at byte offset 40
             accounting = (ctypes.c_uint64 * 6)()
             try:
                 if not self.kernel.TerminateJobObject(self.handle, 1):
@@ -100,7 +99,7 @@ class ProcessTree:
 def _worker(gate, pipe, function, args):
     if os.name != "nt":
         os.setsid()
-    gate.wait()  # parent assigns job before any sampling children can start
+    gate.wait()  # assign the Windows job before spawning chains
     try:
         pipe.send(("completed", function(*args)))
     except BaseException:
@@ -110,18 +109,18 @@ def _worker(gate, pipe, function, args):
 
 
 def bounded_fits(function, tasks, workers, timeout):
-    """Yield (task key, outcome, result/error, wall seconds); refill freed slots."""
+    """yield (key, outcome, result/error, seconds) as fits finish"""
+
     context = get_context("spawn")
     pending = iter(tasks)
     active = []
-    exhausted = False
     try:
-        while active or not exhausted:
-            while len(active) < workers and not exhausted:
+        while active or pending is not None:
+            while len(active) < workers and pending is not None:
                 try:
                     key, args = next(pending)
                 except StopIteration:
-                    exhausted = True
+                    pending = None
                     break
                 receive, send = context.Pipe(duplex=False)
                 gate = context.Event()
@@ -134,9 +133,10 @@ def bounded_fits(function, tasks, workers, timeout):
                 except BaseException:
                     process.kill()
                     process.join()
+                    process.close()
                     receive.close()
                     raise
-                # keep gate alive: dropping it unlinks its semaphore before the spawned child reopens it
+                # retain the gate so spawn can reopen its semaphore
                 active.append((key, process, tree, receive, began, gate))
                 gate.set()
             for entry in active[:]:

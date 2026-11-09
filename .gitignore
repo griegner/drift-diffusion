@@ -1,37 +1,35 @@
-# general
-.vscode
+# editor and operating system
+.vscode/
 .DS_Store
+
+# python and tooling
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+/.pixi/
+/pixi.lock
+
+# temporary files
 *tmp*
 
-# packaging
-__pycache__/
-*.egg-info
+# generated results
+/results/
+/data/fig08*.npz
+/data/fig08*/
 
-# pixi
-.pixi
-pixi.lock
-
-# profiling
-*pyspy
-
-# code ocean
-results/*.svg
-
-# revisions
-revisions.md
-osync.sh
-docs-v0
-tracked-changes.md
-reviewer-response-assessment.md
-docs/manuscript/00-main-clean.tex
-docs/manuscript/00-main-clean.pdf
-docs/manuscript/00-main-clean-numbered.tex
-docs/manuscript/00-main-clean-numbered.pdf
-docs/manuscript/00-main-tracked.tex
-docs/manuscript/00-main-tracked.pdf
-docs/manuscript/neural-comp-response-draft.pdf
-
-# fig08 checkpoints
-data/fig08*npz
-data/fig08-mcmc/
-fig08.md
+# local notes and manuscript drafts
+/notes/
+/docs-v0/
+/fig08.md
+/osync.sh
+/revisions.md
+/reviewer-response-assessment.md
+/tracked-changes.md
+/docs/manuscript/00-main-clean*.pdf
+/docs/manuscript/00-main-clean*.tex
+/docs/manuscript/00-main-tracked.pdf
+/docs/manuscript/00-main-tracked.tex
+/docs/manuscript/neural-comp-response-draft.pdf
