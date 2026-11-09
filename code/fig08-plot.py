@@ -23,6 +23,14 @@ from matplotlib.colors import to_rgb
 from matplotlib.lines import Line2D
 from matplotlib.ticker import StrMethodFormatter
 
+LABELS = {
+    "sample-hessian": "(10d) Sample Hessian",
+    "outer-product": "(10c) Outer Product",
+    "misspecification-robust": "(10b) Misspec. Robust",
+    "autocorrelation-robust": "(10a) Autocorr. Robust",
+    "mcmc": "7p-DDM MCMC",
+}
+
 
 def fits_for(records, n, method, valid=False):
     return [
@@ -36,7 +44,7 @@ def estimates(records, n, targets):
     L = contrasts(n)
     mle, mcmc = (fits_for(records, n, method, valid=True) for method in ("mle", "mcmc"))
     points = np.array([f["params"] for f in mle]).reshape(-1, 6) @ L.T
-    cov = np.array([f["cov"] for f in mle]).reshape(-1, 2, 6, 6)
+    cov = np.array([f["cov"] for f in mle]).reshape(-1, len(METHODS), 6, 6)
     result = {
         method: (points, np.sqrt(np.einsum("ij,rjk,ik->ri", L, cov[:, m], L)), L @ targets["mle"])
         for m, method in enumerate(METHODS)
@@ -182,11 +190,10 @@ def plot_composite(records, n, rep, sizes, config, targets, estimates, output):
         ax.set(ylabel=label, ylim=ylim, xticks=np.arange(4), xticklabels=QUANTITY_LABELS, xlim=(-0.5, 3.5), title=title)
         ax.tick_params(axis="x", labelsize=18)
         ax.grid(axis="y", alpha=0.15)
-    labels = ["4p-DDM MLE (SH SE)", "4p-DDM MLE (point, AR SE)", "7p-DDM MCMC"]
     fig.legend(
         handles=[
-            Line2D([], [], color=c, marker="o", ms=6, ls="none", label=label)
-            for c, label in zip(COLORS.values(), labels)
+            Line2D([], [], color=color, marker="o", ms=6, ls="none", label=LABELS[method])
+            for method, color in COLORS.items()
         ],
         loc="outside lower center",
         ncol=3,
@@ -203,7 +210,6 @@ def plot_composite(records, n, rep, sizes, config, targets, estimates, output):
 
 def plot_distributions(groups, config, output):
     sizes = sorted(groups)
-    labels = dict(zip(COLORS, ["MLE (SH)", "MLE (AR)", "MCMC"]))
     s = config["simulation"]
     truth = [s["A"], s["T0"], s["V"], np.mean(s["Z_STATES"])]
     fig, axes = plt.subplots(2 * len(sizes), 4, figsize=(14, 5 * len(sizes)), layout="constrained", squeeze=False)
@@ -224,7 +230,7 @@ def plot_distributions(groups, config, output):
                             density=True,
                             histtype="step",
                             color=COLORS[method],
-                            label=labels[method],
+                            label=LABELS[method],
                         )
                     line = reference[k] if index == 0 else points[:, k].std(ddof=1) if len(points) > 1 else np.nan
                     if np.isfinite(line):

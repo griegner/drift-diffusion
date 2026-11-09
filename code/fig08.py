@@ -10,13 +10,14 @@ import settings as sim
 ROOT = Path(__file__).resolve().parents[1]
 SESSION, SEED = 1000, 20261020
 REFERENCE_N, REFERENCE_REP = 50_000, 10**6
-METHODS = ["sample-hessian", "autocorrelation-robust"]
+METHODS = ["sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust"]
 PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
 MCMC_NAMES = ["a", "t", "v_stim", "z", "sz", "sv", "st"]
 # convert HSSM units: z -> 2z - 1, sz -> 2sz
 MCMC_SCALE, MCMC_OFFSET = np.array([1, 1, 1, 2, 2, 1, 1]), np.array([0, 0, 0, -1, 0, 0, 0])
 QUANTITY_LABELS = [r"$\bar{a}$", r"$t_0$", r"$\bar{v}$", r"$\bar{z}$"]
-COLORS = {"sample-hessian": "#f19c9d", "autocorrelation-robust": "#8c1515", "mcmc": "#3b6fb6"}
+COLORS = {method: (1, 0, 0, alpha) for method, alpha in zip(METHODS, [0.2, 0.4, 0.6, 0.8])}
+COLORS["mcmc"] = "#3b6fb6"
 PATTERN = re.compile(r"(?:n\d+-rep\d+|pseudo-true)-(?:mle|mcmc)\.npz")
 
 
@@ -96,7 +97,11 @@ def save_fit(path, **record):
 
 def load_fit(path):
     with np.load(path, allow_pickle=False) as saved:
-        return dict(saved)
+        fit = dict(saved)
+    if str(fit["method"]) == "mle" and not fit["reference"] and "cov" in fit:
+        if fit["cov"].shape != (len(METHODS), len(PARAM_NAMES), len(PARAM_NAMES)):
+            raise ValueError(f"{path} lacks all four MLE covariances; remove this MLE record and rerun it")
+    return fit
 
 
 def prepare_folder(folder, config):
