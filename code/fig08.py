@@ -37,7 +37,6 @@ def scientific_settings(seed, chains, tune, draws):
         ar_lags=60,
         gradient_tolerance=0.01,
         mcmc=dict(chains=chains, tune=tune, draws=draws),
-        likelihood="hssm-0.5-guard-simps-1e-4",
         max_r_hat=1.01,
         ess_per_chain=100,
         param_names=PARAM_NAMES,

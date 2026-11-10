@@ -5,11 +5,13 @@ from hddm_wfpt import wfpt
 from hssm.likelihoods.blackbox import hddm_to_hssm
 
 CHAINS, TUNE, DRAWS = 4, 300, 1000
+# density and simpson tolerance defaults: https://hddm.readthedocs.io/en/latest/hddm.models.html#hddm.models.hddm_info.HDDM
+ERR, SIMPS_ERR = 1e-4, 1e-3
 
 
 @hddm_to_hssm
 def logp_full_ddm(data, v, a, z, t, sz, sv, st):
-    return wfpt.wiener_logp_array(x=data, v=v, sv=sv, a=a * 2, z=z, sz=sz, t=t, st=st, err=1e-8, simps_err=1e-4)
+    return wfpt.wiener_logp_array(x=data, v=v, sv=sv, a=a * 2, z=z, sz=sz, t=t, st=st, err=ERR, simps_err=SIMPS_ERR)
 
 
 def sample_full_ddm(data, stimulus, chains=CHAINS, tune=TUNE, draws=DRAWS, seed=None, **kwargs):

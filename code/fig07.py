@@ -12,7 +12,7 @@ import arviz as az
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from ddm7p import CHAINS, logp_full_ddm, sample_full_ddm
+from ddm7p import CHAINS, ERR, SIMPS_ERR, logp_full_ddm, sample_full_ddm
 from matplotlib.colors import to_rgb
 from scipy.stats import binomtest
 from settings import T0, V_PUPIL, V_PUPIL_MEAN, A, Z, pupil_trace
@@ -111,7 +111,7 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
 
     # reuse 7p posterior means for matching run settings
     names = ("v_coherence", "a", "z", "t", "sz", "sv", "st")
-    cache_key = f"n{n_trials}-seed{seed}-c{chains}-t{tune}-d{draws}"
+    cache_key = f"n{n_trials}-seed{seed}-c{chains}-t{tune}-d{draws}-err{ERR:g}-simps{SIMPS_ERR:g}"
     cache = json.loads(HSSM_CACHE.read_text()) if HSSM_CACHE.exists() else {}
     if cache_key not in cache:
         ddm_hssm = sample_full_ddm(
