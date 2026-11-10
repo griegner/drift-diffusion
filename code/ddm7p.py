@@ -12,8 +12,8 @@ def logp_full_ddm(data, v, a, z, t, sz, sv, st):
     return wfpt.wiener_logp_array(x=data, v=v, sv=sv, a=a * 2, z=z, sz=sz, t=t, st=st, err=1e-8, simps_err=1e-4)
 
 
-def sample_full_ddm(data, stimulus, chains=CHAINS, tune=TUNE, draws=DRAWS, seed=None, cores=None, mp_ctx=None):
-    """fit the 7p HSSM model with v ~ 0 + stimulus"""
+def sample_full_ddm(data, stimulus, chains=CHAINS, tune=TUNE, draws=DRAWS, seed=None, **kwargs):
+    """fit the 7p HSSM model with v ~ 0 + stimulus; kwargs (cores, mp_ctx, initvals, progressbar) go to HSSM.sample"""
 
     model = hssm.HSSM(
         data=data,
@@ -33,9 +33,7 @@ def sample_full_ddm(data, stimulus, chains=CHAINS, tune=TUNE, draws=DRAWS, seed=
         tune=tune,
         draws=draws,
         random_seed=seed,
-        cores=cores,
-        mp_ctx=mp_ctx,
-        progressbar=False,
+        **{"progressbar": False, **kwargs},
         idata_kwargs={"log_likelihood": False},  # omit per-trial log likelihood
     )
     return model

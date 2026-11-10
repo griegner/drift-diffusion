@@ -18,26 +18,29 @@ T3 = {
 # package units: noise SD 1, boundaries +/-a, starting point z in (-1, 1)
 A = T3["a"][2] / (2 * S)
 T0 = T3["Ter"][2]
-V = T3["v"][2] / S
+V = T3["v"][2] / S  # fig02-04
+ETA = T3["eta"][2] / S
 Z = 2 * T3["z/a"][2] - 1
 # variability in SD units; uniform width / sqrt(12)
 SD_T0 = T3["st"][2] / np.sqrt(12)
-SD_V = T3["eta"][2] / S
 SD_Z = 2 * T3["sz/a"][2] / np.sqrt(12)
 
 # simulation design
 A_TREND = 0.2  # boundary endpoints A * (1 +/- A_TREND)
 P_SWITCH = 0.05  # state switch probability per trial
 PUPIL_SIGMA, PUPIL_SD = 20, 0.15  # smoothing width (trials) and population SD
-PUPIL_TAIL = 3.5  # pupil range (SDs) used to set the drift slope
 
 # states 0/1: engaged/disengaged; disengagement shifts t0 up and z right
-T0_STATES = T0 + np.array([-1, 1]) * SD_T0
-V_STATES = V + np.array([1, -1]) * SD_V  # fig04 only
+T0_STATES = T0 + np.array([-1, 1]) * SD_T0 / 2  # half-SD gap limits misspecification bias
+V_STATES = V + np.array([1, -1]) * ETA  # fig04 only
 Z_STATES = Z + np.array([0, 2]) * SD_Z
 
-# drift reaches the Table 3 minimum at -PUPIL_TAIL pupil SDs
-V_PUPIL = (V - T3["v"][0] / S) / (PUPIL_TAIL * PUPIL_SD)
+# pupil designs (fig07/08): mean drift half an eta below the Table 3 mean (~85% accuracy);
+# pupil-driven drift SD reaches the Table 3 minimum drift at -PUPIL_TAIL pupil SDs
+V_PUPIL_MEAN = (T3["v"][2] - T3["eta"][2] / 2) / S
+PUPIL_TAIL = 3
+SD_V = (V_PUPIL_MEAN - T3["v"][0] / S) / PUPIL_TAIL
+V_PUPIL = SD_V / PUPIL_SD
 
 
 def engagement_states(rng, n):

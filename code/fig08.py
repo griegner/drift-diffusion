@@ -31,7 +31,7 @@ def scientific_settings(seed, chains, tune, draws):
         reference=dict(n=REFERENCE_N, rep=REFERENCE_REP),
         simulation={
             name: np.asarray(getattr(sim, name)).tolist()
-            for name in "A T0 V A_TREND T0_STATES Z_STATES V_PUPIL P_SWITCH PUPIL_SIGMA PUPIL_SD".split()
+            for name in "A T0 V_PUPIL_MEAN A_TREND T0_STATES Z_STATES V_PUPIL P_SWITCH PUPIL_SIGMA PUPIL_SD".split()
         },
         mle=dict(a="1 + time", t0="1", v="0 + stim + stim:pupil_centered", z="1", p_outlier=0),
         ar_lags=60,
@@ -63,7 +63,7 @@ def simulation_design(n, rep, config):
         pupil_centered=pupil,
         a=s["A"] * (1 + 2 * s["A_TREND"] * time),
         t0=np.array(s["T0_STATES"]),
-        magnitude=s["V"] + s["V_PUPIL"] * pupil,
+        magnitude=s["V_PUPIL_MEAN"] + s["V_PUPIL"] * pupil,
         z=np.array(s["Z_STATES"]),
     )
 

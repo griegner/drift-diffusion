@@ -211,7 +211,7 @@ def plot_composite(records, n, rep, sizes, config, targets, estimates, output):
 def plot_distributions(groups, config, output):
     sizes = sorted(groups)
     s = config["simulation"]
-    truth = [s["A"], s["T0"], s["V"], np.mean(s["Z_STATES"])]
+    truth = [s["A"], s["T0"], s["V_PUPIL_MEAN"], np.mean(s["Z_STATES"])]
     fig, axes = plt.subplots(2 * len(sizes), 4, figsize=(14, 5 * len(sizes)), layout="constrained", squeeze=False)
     for value, index in [("point estimate", 0), ("SE", 1)]:
         methods = ["autocorrelation-robust", "mcmc"] if index == 0 else METHODS + ["mcmc"]

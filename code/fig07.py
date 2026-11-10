@@ -12,10 +12,10 @@ import arviz as az
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from ddm7p import CHAINS, DRAWS, TUNE, logp_full_ddm, sample_full_ddm
+from ddm7p import CHAINS, logp_full_ddm, sample_full_ddm
 from matplotlib.colors import to_rgb
 from scipy.stats import binomtest
-from settings import T0, V_PUPIL, A, V, Z, pupil_trace
+from settings import T0, V_PUPIL, V_PUPIL_MEAN, A, Z, pupil_trace
 
 from drift_diffusion.model import DriftDiffusionModel, pdf
 from drift_diffusion.sim import sample_from_pdf
@@ -58,9 +58,11 @@ def conditional_accuracy_full(rt, v_coherence, a, z, t, sz, sv, st, *, coherence
 
 ROOT = Path(__file__).resolve().parents[1]
 HSSM_CACHE = ROOT / "data/fig07-hssm.json"
+SEED = 58
+TUNE, DRAWS = 1000, 3000  # longer than the ddm7p defaults so the single 7p fit reaches r_hat <= 1.01
 
 
-def main(n_trials=1000, seed=7, chains=CHAINS, tune=TUNE, draws=DRAWS):
+def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
     """plot and save fig07"""
 
     with (ROOT / "code/config.json").open() as f:
@@ -74,12 +76,12 @@ def main(n_trials=1000, seed=7, chains=CHAINS, tune=TUNE, draws=DRAWS):
 
     # positive coherence makes R correct; positive drift favors R
     beta_pupil = V_PUPIL
-    beta_coherence = V + beta_pupil * pupil_centered.mean()  # constant model's session drift
-    v_pupil = coherence * (V + beta_pupil * pupil_centered)
+    beta_coherence = V_PUPIL_MEAN + beta_pupil * pupil_centered.mean()  # constant model's session drift
+    v_pupil = coherence * (V_PUPIL_MEAN + beta_pupil * pupil_centered)
     params = dict(a=A, t0=T0, v=v_pupil, z=Z)
 
-    # --seed varies pupil and stimuli; RT sampling uses a fixed seed
-    ys = sample_from_pdf(**params, n_samples=n_trials, random_state=0)
+    # --seed varies pupil, stimuli, and RT sampling
+    ys = sample_from_pdf(**params, n_samples=n_trials, random_state=seed)
     choices, rts = np.sign(ys), np.abs(ys)
 
     print(f"|v| range: {np.abs(v_pupil).min():.3f} to {np.abs(v_pupil).max():.3f}")
@@ -198,7 +200,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-trials", type=int, default=1000)
-    parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--chains", type=int, default=CHAINS, help="MCMC chains, run in parallel")
     parser.add_argument("--tune", type=int, default=TUNE, help="MCMC (Slice) tuning iterations per chain")
     parser.add_argument("--draws", type=int, default=DRAWS, help="MCMC (Slice) draws per chain")

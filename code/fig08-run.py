@@ -49,6 +49,22 @@ def simulate(n, rep, config):
     return pd.DataFrame(dict(time=design["time"], pupil_centered=design["pupil_centered"], stim=stim)), y
 
 
+def true_7p(s):
+    """generative values in HSSM units; two-point t0/z states as uniforms with matching mean and SD"""
+
+    t0_gap = s["T0_STATES"][1] - s["T0_STATES"][0]
+    z_gap = (s["Z_STATES"][1] - s["Z_STATES"][0]) / 2  # HSSM z = (z + 1) / 2
+    return dict(
+        a=s["A"],
+        t=np.mean(s["T0_STATES"]),
+        v_stim=s["V_PUPIL_MEAN"],
+        z=(np.mean(s["Z_STATES"]) + 1) / 2,
+        sz=np.sqrt(3) * z_gap,
+        sv=s["V_PUPIL"] * s["PUPIL_SD"],
+        st=np.sqrt(3) * t0_gap,
+    )
+
+
 def fit_task(method, n, rep, config, cores, reference):
     """fit in a spawned worker; time fitting only"""
 
@@ -90,6 +106,9 @@ def fit_task(method, n, rep, config, cores, reference):
                 seed=mcmc_seed(config, n, rep),
                 cores=cores,
                 mp_ctx="spawn",
+                # reference only: start chains at the generative values instead of HSSM's defaults
+                initvals=true_7p(config["simulation"]) if reference else None,
+                progressbar=reference,
             )
             runtime = time.perf_counter() - started
             summary = az.summary(model.traces, var_names=MCMC_NAMES, round_to="none")
