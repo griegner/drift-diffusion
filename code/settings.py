@@ -31,7 +31,7 @@ P_SWITCH = 0.05  # state switch probability per trial
 PUPIL_SIGMA, PUPIL_SD = 20, 0.15  # smoothing width (trials) and population SD
 
 # states 0/1: engaged/disengaged; disengagement shifts t0 up and z right
-T0_STATES = T0 + np.array([-1, 1]) * SD_T0 / 2  # half-SD gap limits misspecification bias
+T0_STATES = T0 + np.array([-1, 1]) * 0.75 * SD_T0  # 0.75-SD mixture spread limits misspecification bias
 V_STATES = V + np.array([1, -1]) * ETA  # fig04 only
 Z_STATES = Z + np.array([0, 2]) * SD_Z
 
