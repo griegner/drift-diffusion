@@ -4,7 +4,7 @@ import hssm
 from hddm_wfpt import wfpt
 from hssm.likelihoods.blackbox import hddm_to_hssm
 
-CHAINS, TUNE, DRAWS = 4, 300, 1000
+CHAINS, TUNE, DRAWS = 4, 1000, 1000 # defaults
 # density and simpson tolerance defaults: https://hddm.readthedocs.io/en/latest/hddm.models.html#hddm.models.hddm_info.HDDM
 ERR, SIMPS_ERR = 1e-4, 1e-3
 
