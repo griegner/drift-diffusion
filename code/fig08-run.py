@@ -198,7 +198,7 @@ def parse_args(argv=None):
     parser.add_argument("--tune", type=int, default=TUNE)
     parser.add_argument("--draws", type=int, default=DRAWS)
     parser.add_argument(
-        "--timeout-per-1000", type=float, default=3600, help="MCMC seconds per 1000 trials; inf disables"
+        "--timeout-per-1000", type=float, default=10800, help="MCMC seconds per 1000 trials; inf disables"
     )
     parser.add_argument("--output", type=Path, default=ROOT / "data/fig08")
     parser.add_argument("--machine", default=platform.node(), help="runtime label (default: hostname)")
