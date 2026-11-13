@@ -4,7 +4,7 @@
 set -e
 
 run() {
-    pixi run -e code-ocean python code/fig08-run.py "$@" --n-jobs 4 --tune 1000 --timeout-per-1000 3600 \
+    pixi run -e code-ocean python code/fig08-run.py "$@" --n-jobs 4 --tune 1000 --timeout-per-1000 inf \
         --output data/fig08-mac1 --machine mac1
 }
 

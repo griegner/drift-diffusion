@@ -4,9 +4,11 @@ import hssm
 from hddm_wfpt import wfpt
 from hssm.likelihoods.blackbox import hddm_to_hssm
 
-CHAINS, TUNE, DRAWS = 4, 1000, 1000 # defaults
+CHAINS, TUNE, DRAWS = 4, 1000, 1000  # defaults
 # density and simpson tolerance defaults: https://hddm.readthedocs.io/en/latest/hddm.models.html#hddm.models.hddm_info.HDDM
 ERR, SIMPS_ERR = 1e-4, 1e-3
+# HSSM's default start (sz = sv = st = 2, t = 0.025) gives every trial zero density, causing long slice step-outs
+INITVALS = dict(a=1.5, t=0.1, z=0.5, sz=0.2, sv=0.5, st=0.1)
 
 
 @hddm_to_hssm
@@ -30,6 +32,8 @@ def sample_full_ddm(data, stimulus, chains=CHAINS, tune=TUNE, draws=DRAWS, seed=
             )
         ],
     )
+    if kwargs.get("initvals") is None:
+        kwargs["initvals"] = {**INITVALS, f"v_{stimulus}": 0.0}
     model.sample(
         chains=chains,
         tune=tune,
