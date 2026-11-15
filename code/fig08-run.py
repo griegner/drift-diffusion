@@ -16,6 +16,7 @@ from fig08 import (
     MCMC_OFFSET,
     MCMC_SCALE,
     METHODS,
+    REFERENCE_MLE_FITS,
     REFERENCE_N,
     REFERENCE_REP,
     ROOT,
@@ -75,24 +76,31 @@ def fit_task(method, n, rep, config, cores, reference):
         if method == "mle":
             from drift_diffusion.model import DriftDiffusionModel
 
-            mle = DriftDiffusionModel(
-                **config["mle"],
-                cov_estimator="sample-hessian" if reference else "all",
-                autocorrelation_lags=config["ar_lags"],
-            )
-            started = time.perf_counter()
-            mle.fit(X, y)
-            runtime = time.perf_counter() - started
-            cov = np.array(mle.covariance_) if reference else np.array([mle.covariance_[m] for m in METHODS])
-            gradient = np.max(abs(mle.fit_.jac))
+            runtime, fits = 0.0, []
+            # reference: average independent 50,000-trial fits to reduce its Monte Carlo error
+            for r in range(rep, rep + (REFERENCE_MLE_FITS if reference else 1)):
+                if r != rep:
+                    X, y = simulate(n, r, config)
+                mle = DriftDiffusionModel(
+                    **config["mle"],
+                    cov_estimator="sample-hessian" if reference else "all",
+                    autocorrelation_lags=config["ar_lags"],
+                )
+                started = time.perf_counter()
+                mle.fit(X, y)
+                runtime += time.perf_counter() - started
+                cov = np.array(mle.covariance_) if reference else np.array([mle.covariance_[m] for m in METHODS])
+                fits.append((mle.params_, cov, mle.fit_.fun, np.max(abs(mle.fit_.jac))))
+            params, cov, objective, gradient = (np.mean(v, axis=0) for v in zip(*fits))
+            cov, gradient = cov / len(fits), max(f[3] for f in fits)  # covariance of the mean
             valid = (
-                np.isfinite(mle.fit_.fun)
+                np.isfinite(objective)
                 and gradient < config["gradient_tolerance"]
-                and np.isfinite(mle.params_).all()
+                and np.isfinite(params).all()
                 and np.isfinite(cov).all()
                 and np.linalg.eigvalsh((cov + cov.swapaxes(-1, -2)) / 2).min() > 0
             )
-            result = dict(params=mle.params_, cov=cov, objective=mle.fit_.fun, max_gradient=gradient)
+            result = dict(params=params, cov=cov, objective=objective, max_gradient=gradient)
         else:
             import arviz as az
             import pandas as pd
@@ -203,7 +211,7 @@ def parse_args(argv=None):
     parser.add_argument("--output", type=Path, default=ROOT / "data/fig08")
     parser.add_argument("--machine", default=platform.node(), help="runtime label (default: hostname)")
     parser.add_argument(
-        "--pseudo-true", action="store_true", help="fit the shared 50,000-trial reference instead of repeats"
+        "--pseudo-true", action="store_true", help="fit the shared 50,000-trial reference(s) instead of repeats"
     )
     args = parser.parse_args(argv)
     if args.n_trials < SESSION or args.n_trials % SESSION or args.seed < 0:

@@ -10,6 +10,7 @@ import settings as sim
 ROOT = Path(__file__).resolve().parents[1]
 SESSION, SEED = 1000, 20261020
 REFERENCE_N, REFERENCE_REP = 50_000, 10**6
+REFERENCE_MLE_FITS = 10  # the MLE reference averages fits to reps REFERENCE_REP, REFERENCE_REP + 1, ...
 METHODS = ["sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust"]
 PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
 MCMC_NAMES = ["a", "t", "v_stim", "z", "sz", "sv", "st"]
