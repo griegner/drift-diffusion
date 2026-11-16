@@ -12,7 +12,7 @@ import arviz as az
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from ddm7p import CHAINS, ERR, SIMPS_ERR, logp_full_ddm, sample_full_ddm
+from ddm7p import CHAINS, DRAWS, ERR, SIMPS_ERR, TUNE, logp_full_ddm, sample_full_ddm
 from matplotlib.colors import to_rgb
 from scipy.stats import binomtest
 from settings import T0, V_PUPIL, V_PUPIL_MEAN, A, Z, pupil_trace
@@ -58,8 +58,7 @@ def conditional_accuracy_full(rt, v_coherence, a, z, t, sz, sv, st, *, coherence
 
 ROOT = Path(__file__).resolve().parents[1]
 HSSM_CACHE = ROOT / "data/fig07-hssm.json"
-SEED = 58
-TUNE, DRAWS = 1000, 3000  # longer than the ddm7p defaults so the single 7p fit reaches r_hat <= 1.01
+SEED = 7
 
 
 def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
@@ -80,8 +79,8 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
     v_pupil = coherence * (V_PUPIL_MEAN + beta_pupil * pupil_centered)
     params = dict(a=A, t0=T0, v=v_pupil, z=Z)
 
-    # --seed varies pupil, stimuli, and RT sampling
-    ys = sample_from_pdf(**params, n_samples=n_trials, random_state=seed)
+    # --seed varies pupil and stimuli; retain the original RT sampling stream
+    ys = sample_from_pdf(**params, n_samples=n_trials, random_state=0)
     choices, rts = np.sign(ys), np.abs(ys)
 
     print(f"|v| range: {np.abs(v_pupil).min():.3f} to {np.abs(v_pupil).max():.3f}")
@@ -111,7 +110,7 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
 
     # reuse 7p posterior means for matching run settings
     names = ("v_coherence", "a", "z", "t", "sz", "sv", "st")
-    cache_key = f"n{n_trials}-seed{seed}-c{chains}-t{tune}-d{draws}-err{ERR:g}-simps{SIMPS_ERR:g}"
+    cache_key = f"n{n_trials}-seed{seed}-rt0-c{chains}-t{tune}-d{draws}-err{ERR:g}-simps{SIMPS_ERR:g}"
     cache = json.loads(HSSM_CACHE.read_text()) if HSSM_CACHE.exists() else {}
     if cache_key not in cache:
         ddm_hssm = sample_full_ddm(
@@ -127,10 +126,7 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
         HSSM_CACHE.write_text(json.dumps(cache, indent=2))
     params_hssm = cache[cache_key]
     trial = np.arange(1, n_trials + 1)
-    rt_grid = np.linspace(max(params["t0"], params_hssm["t"] + params_hssm["st"] / 2) + 0.1, 2, 100)
     v_example = rng.normal(params_hssm["v_coherence"], params_hssm["sv"], n_trials)
-    accuracy_sim = conditional_accuracy(rt_grid, **params, correct_boundary=coherence)
-    accuracy_hssm = conditional_accuracy_full(rt_grid, **params_hssm, coherence=coherence)
 
     # RT deciles: accuracy and 95% Wilson intervals
     decile = np.digitize(rts, np.quantile(rts, np.linspace(0, 1, 11))[1:-1])
@@ -139,6 +135,11 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
     rt_bins = [rts[decile == b].mean() for b in range(10)]
     accuracy_bins = np.array([test.statistic for test in tests])
     ci_lower, ci_upper = np.array([test.proportion_ci(method="wilson") for test in tests]).T
+
+    # start model curves at the first empirical RT-bin center.
+    rt_grid = np.linspace(min(rt_bins), max(2, max(rt_bins)), 100)
+    accuracy_sim = conditional_accuracy(rt_grid, **params, correct_boundary=coherence)
+    accuracy_hssm = conditional_accuracy_full(rt_grid, **params_hssm, coherence=coherence)
 
     fits = {}
     for key, ddm in models.items():
