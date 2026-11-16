@@ -16,7 +16,7 @@ PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
 MCMC_NAMES = ["a", "t", "v_stim", "z", "sz", "sv", "st"]
 # convert HSSM units: z -> 2z - 1, sz -> 2sz
 MCMC_SCALE, MCMC_OFFSET = np.array([1, 1, 1, 2, 2, 1, 1]), np.array([0, 0, 0, -1, 0, 0, 0])
-QUANTITY_LABELS = [r"$\bar{a}$", r"$t_0$", r"$\bar{v}$", r"$\bar{z}$"]
+QUANTITY_LABELS = [r"$\bar{a}$", r"$\bar{t}_0$", r"$\bar{v}$", r"$\bar{z}$"]
 COLORS = {method: (1, 0, 0, alpha) for method, alpha in zip(METHODS, [0.2, 0.4, 0.6, 0.8])}
 COLORS["mcmc"] = "#3b6fb6"
 PATTERN = re.compile(r"(?:n\d+-rep\d+|pseudo-true)-(?:mle|mcmc)\.npz")
