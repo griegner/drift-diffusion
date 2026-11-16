@@ -128,6 +128,11 @@ def plot_covariance_distributions(covs_df, params_df):
             linestyle = "-" if row == col else "--"
             ax.axvline(x=correlation, c="r", lw=2, ls=linestyle)
             ax.xaxis.set_major_formatter(zero_formatter())
+            ticks = ax.get_xticks()
+            lo, hi = ax.get_xlim()
+            ticks = ticks[(ticks >= lo) & (ticks <= hi)]
+            if len(ticks) > 2:
+                ax.set_xticks(ticks[[0, -1]])
 
             if row == 0:
                 ax.set_xlabel(param_labels[col], fontsize=22)
