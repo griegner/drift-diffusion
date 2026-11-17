@@ -56,6 +56,29 @@ def cov_to_corr(cov):
     return corr
 
 
+def simulation_metrics(params_df, covs_df, reference):
+    """summarize point/SE relative bias (%) and correlation error without trimming"""
+
+    names = list(params_df.columns)
+    columns = [f"{i},{j}" for i in names for j in names]
+    diagonal = [f"{p},{p}" for p in names]
+    pairs = [f"{p},{q}" for i, p in enumerate(names) for q in names[i + 1 :]]
+    empirical = pd.Series(cov_to_corr(np.cov(params_df.T)).flatten(), index=columns)
+    means = covs_df.groupby("estimator")[columns].mean()
+    point_reference = pd.Series(reference)
+    se_bias = 100 * (means[diagonal] / empirical[diagonal] - 1)
+    se_bias.columns = names
+    return {
+        "reference_parameters": reference,
+        "mean_parameters": params_df.mean().to_dict(),
+        "empirical_standard_errors": dict(zip(names, empirical[diagonal])),
+        "empirical_correlations": empirical[pairs].to_dict(),
+        "relative_point_bias_pct": (100 * (params_df.mean() - point_reference) / point_reference).to_dict(),
+        "relative_standard_error_bias_pct": se_bias.to_dict(orient="index"),
+        "mean_correlation_error": (means[pairs] - empirical[pairs]).to_dict(orient="index"),
+    }
+
+
 def zero_formatter():
     """format tick labels"""
 
@@ -243,6 +266,11 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         params_, covs_ = zip(*results)
         params_df = pd.DataFrame(params_, columns=param_names)
         covs_df = pd.DataFrame([row for c in covs_ for row in c])
+
+    metrics = dict(setting=setting, **kwargs, **simulation_metrics(params_df, covs_df, pseudotrue_params))
+    metrics_path = Path(f"{path_a[:-1]}-metrics.json")
+    metrics_path.write_text(json.dumps(metrics, indent=2, allow_nan=False) + "\n")
+    print("metrics:", metrics_path)
 
     fig = plot_parameter_distributions(params_df, pseudotrue_params)
     fig.savefig(path_a)
