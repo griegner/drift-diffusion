@@ -10,7 +10,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from fig08 import COLORS, METHODS, QUANTITY_LABELS, ROOT, SESSION, collect_results, contrasts, trial_inputs
-from matplotlib.colors import to_rgb
 from matplotlib.lines import Line2D
 from matplotlib.ticker import StrMethodFormatter
 
@@ -75,36 +74,21 @@ def scores(estimates):
     return result
 
 
-def plot_example(fig, spec, records, n, rep, config, targets):
+def plot_example(fig, spec, n, rep, config):
+    """generative trial-level parameters of one simulated repeat"""
+
     design, state, _, _ = trial_inputs(n, rep, config)
-    mle, mcmc = (records[(False, n, rep, method)] for method in ("mle", "mcmc"))
-    a, t0, v, z, sz, sv, st = mcmc["params"]
-    rng = np.random.default_rng(0)
-    draws = [
-        np.full(n, a),
-        rng.uniform(t0 - st / 2, t0 + st / 2, n),
-        np.abs(rng.normal(v, sv, n)),
-        rng.uniform(z - sz / 2, z + sz / 2, n),
-    ]
-    X = np.tile(np.eye(6)[[0, 2, 3, 5]][:, None, :], (1, n, 1))
-    X[0, :, 1], X[2, :, 4] = design["time"], design["pupil_centered"]
-    cov = mle["cov"][METHODS.index("autocorrelation-robust")]
-    pale = {key: 0.3 * np.array(to_rgb(color)) + 0.7 for key, color in [("mle", "r"), ("mcmc", COLORS["mcmc"])]}
     trial = np.arange(1, n + 1)
+    values = [design["a"], design["t0"][state], np.abs(design["magnitude"]), design["z"][state]]
     axes = [fig.add_subplot(row) for row in spec.subgridspec(4, 1)]
-    for ax, B, samples, label in zip(axes, X, draws, [r"$a$", r"$t_0$", r"$|v|$", r"$z$"]):
-        mean, half = B @ mle["params"], 1.96 * np.sqrt(np.einsum("ij,jk,ik->i", B, cov, B))
-        ax.plot(trial, samples, color=pale["mcmc"], lw=0.65, zorder=1)
-        ax.fill_between(trial, mean - half, mean + half, color=pale["mle"], zorder=2)
-        ax.plot(trial, B @ targets["mle"], "--", color="k", lw=1.2, zorder=4)
+    for ax, value, label in zip(axes, values, [r"$a$", r"$t_0$", r"$|v|$", r"$z$"]):
+        ax.step(trial, value, color="k", lw=0.8, where="post")
         ax.set_ylabel(label, rotation=0, ha="right", va="center", fontsize=18)
         ax.set_xlim(1, n)
+        ax.margins(y=0.2)
         ax.tick_params(labelbottom=ax is axes[-1])
-    for ax, key in zip(axes[1::2], ["t0", "z"]):
-        ax.step(trial, design[key][state], color=".25", lw=0.6, where="post", zorder=3)
-    axes[1].set_ylim(0.33, 0.53)
     axes[-1].set_xlabel("Trial")
-    axes[0].set_title(f"A. Example Simulation and Model Fits (repeat {rep})")
+    axes[0].set_title(f"A. Example Simulation (n = {n:,}, repeat {rep})")
 
 
 def plot_runtime(ax, records, machines):
@@ -138,10 +122,9 @@ def plot_runtime(ax, records, machines):
     ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,g}"))
 
 
-def plot_summary(spec, result, counts, key, methods, title, ylabel):
+def plot_summary(axes, result, counts, key, methods, title, ylabel):
     """one row per sample size; methods dodged within each quantity"""
 
-    axes = spec.subgridspec(len(result), 1).subplots(sharex=True, sharey=True, squeeze=False)[:, 0]
     for ax, (n, scores_n) in zip(axes, result.items()):
         for offset, method in zip(0.15 * (np.arange(len(methods)) - (len(methods) - 1) / 2), methods):
             value, half = scores_n[method][key]
@@ -159,20 +142,23 @@ def plot_summary(spec, result, counts, key, methods, title, ylabel):
     axes[-1].tick_params(axis="x", labelsize=18)
 
 
-def plot_figure(records, groups, example, config, targets, machines, output):
+def plot_figure(records, groups, example, config, machines, output):
     result = {n: scores(estimates) for n, estimates in groups.items()}
     for n, scores_n in result.items():
         for method, metrics in scores_n.items():
             print(f"n={n} {method}:", {key: np.round(value, 1).tolist() for key, (value, _) in metrics.items()})
     fig = plt.figure(figsize=(12, 8.5), layout="constrained")
-    grid = fig.add_gridspec(2, 3, height_ratios=[1, 1.15])
-    plot_example(fig, grid[0, :2], records, *example, config, targets)
-    plot_runtime(fig.add_subplot(grid[0, 2]), records, machines)
+    top, bottom = fig.subfigures(2, 1, height_ratios=[1, 1.15])
+    grid = top.add_gridspec(1, 3)
+    plot_example(top, grid[0, :2], *example, config)
+    plot_runtime(top.add_subplot(grid[0, 2]), records, machines)
+    # one gridspec for panels C-E keeps their axes the same width
+    axes = bottom.subplots(len(result), len(PANELS), sharex=True, sharey="col", squeeze=False)
     counts = {n: len(estimates["mcmc"][0]) for n, estimates in groups.items()}
     for col, panel in enumerate(PANELS):
-        plot_summary(grid[1, col], result, counts, *panel)
+        plot_summary(axes[:, col], result, counts, *panel)
     handles = [Line2D([], [], color=color, marker="o", ms=6, ls="none", label=LABELS[m]) for m, color in COLORS.items()]
-    fig.legend(handles=handles, loc="outside lower center", ncol=3, frameon=False)
+    bottom.legend(handles=handles, loc="outside lower center", ncol=3, frameon=False)
     fig.savefig(output / "fig08.svg")
     plt.close(fig)
 
@@ -213,15 +199,6 @@ def plot_distributions(groups, config, output):
 
 def main(args):
     config, records = collect_results(args.inputs)
-    n, rep = args.example
-    eligible = sorted(
-        r
-        for ref, size, r, m in records
-        if (ref, size, m) == (False, n, "mle")
-        and all(records.get((False, n, r, method), {}).get("valid") for method in ("mle", "mcmc"))
-    )
-    if rep not in eligible:
-        raise ValueError(f"Need --example {n}:REP with both fits valid; available IDs: {eligible}")
     targets = {}
     for method in ("mle", "mcmc"):
         reference = [fit for key, fit in records.items() if key[0] and key[3] == method]
@@ -241,7 +218,7 @@ def main(args):
     plt.rcParams["font.size"] = 12
     groups = {size: estimates(records, size, targets) for size in sizes}
     args.output.mkdir(parents=True, exist_ok=True)
-    plot_figure(records, groups, args.example, config, targets, args.runtime_machines, args.output)
+    plot_figure(records, groups, args.example, config, args.runtime_machines, args.output)
     plot_distributions(groups, config, args.output)
 
 
@@ -260,7 +237,9 @@ def parse_args(argv=None):
     parser.add_argument("--inputs", type=Path, nargs="+", default=[ROOT / "data/fig08"])
     parser.add_argument("--output", type=Path, default=ROOT / "results")
     parser.add_argument("--n-trials", type=int, nargs="+", default=[1000, 3000, 5000], help="panels C-E sizes")
-    parser.add_argument("--example", type=example_pair, required=True, metavar="N:REP", help="panel A example")
+    parser.add_argument(
+        "--example", type=example_pair, required=True, metavar="N:REP", help="panel A example simulation"
+    )
     parser.add_argument("--runtime-machines", nargs="+", default=["mac1", "mac2"], help="panel B machines")
     return parser.parse_args(argv)
 

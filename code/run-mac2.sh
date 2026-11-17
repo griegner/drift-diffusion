@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# runtime machine: n=10000
+# runtime machine: n=5000
 
 set -e
 
-pixi run -e code-ocean python code/fig08-run.py --n-trials 10000 --repeats 0:150 --tune 1000 --timeout-per-1000 inf \
-    --output data/fig08-mac2 --machine mac2
+pixi run -e code-ocean python code/fig08-run.py --n-trials 5000 --repeats 0:250 --tune 1000 --draws 1000 \
+    --timeout-per-1000 inf --output data/fig08-v2-mac2 --machine mac2

@@ -13,7 +13,10 @@ INITVALS = dict(a=1.5, t=0.1, z=0.5, sz=0.2, sv=0.5, st=0.1)
 
 @hddm_to_hssm
 def logp_full_ddm(data, v, a, z, t, sz, sv, st):
-    return wfpt.wiener_logp_array(x=data, v=v, sv=sv, a=a * 2, z=z, sz=sz, t=t, st=st, err=ERR, simps_err=SIMPS_ERR)
+    # t is the lower edge of the uniform t0, so HSSM's rt > t guard checks the true support; wfpt takes the centre
+    return wfpt.wiener_logp_array(
+        x=data, v=v, sv=sv, a=a * 2, z=z, sz=sz, t=t + st / 2, st=st, err=ERR, simps_err=SIMPS_ERR
+    )
 
 
 def sample_full_ddm(data, stimulus, chains=CHAINS, tune=TUNE, draws=DRAWS, seed=None, **kwargs):
