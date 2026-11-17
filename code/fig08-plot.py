@@ -35,11 +35,18 @@ def fits_for(records, n, method, valid=False):
     ]
 
 
-def estimates(records, n, targets):
+def usable(fit, unconverged):
+    """valid fits; with unconverged, also completed MCMC fits that failed r_hat/ESS (not timeouts or errors)"""
+
+    return bool(fit["valid"]) or (unconverged and str(fit["status"]) == "diagnostic_failure")
+
+
+def estimates(records, n, targets, unconverged=False):
     """(points, SEs, pseudo-true) of the four reported quantities per method"""
 
     L = contrasts(n)
-    mle, mcmc = (fits_for(records, n, method, valid=True) for method in ("mle", "mcmc"))
+    mle = fits_for(records, n, "mle", valid=True)
+    mcmc = [fit for fit in fits_for(records, n, "mcmc") if usable(fit, unconverged)]
     points = np.array([f["params"] for f in mle]) @ L.T
     cov = np.array([f["cov"] for f in mle])
     result = {
@@ -64,7 +71,7 @@ def scores(estimates):
         influence = dict(
             bias=100 * error / reference,
             se_bias=100 * ((uncs - unc) / sd - unc * ((params - params.mean(axis=0)) ** 2 - sd**2) / (2 * sd**3)),
-            coverage=100 * (abs(error) <= 1.96 * uncs),
+            coverage=np.where(np.isnan(error), np.nan, 100 * (abs(error) <= 1.96 * uncs)),
         )
         values = {key: value.mean(axis=0) for key, value in influence.items()} | {"se_bias": 100 * (unc - sd) / sd}
         result[method] = {
@@ -91,7 +98,7 @@ def plot_example(fig, spec, n, rep, config):
     axes[0].set_title(f"A. Example Simulation (n = {n:,}, repeat {rep})")
 
 
-def plot_runtime(ax, records, machines):
+def plot_runtime(ax, records, machines, unconverged=False):
     """runtime per fit on a log scale; medians are printed for the caption"""
 
     rng = np.random.default_rng(0)
@@ -103,7 +110,7 @@ def plot_runtime(ax, records, machines):
             [
                 (key[1], fit["runtime"] / 60)
                 for key, fit in records.items()
-                if not key[0] and key[3] == method and fit["valid"] and str(fit["machine"]) in machines
+                if not key[0] and key[3] == method and usable(fit, unconverged) and str(fit["machine"]) in machines
             ]
         ).T
         sizes = np.unique(n)
@@ -142,7 +149,7 @@ def plot_summary(axes, result, counts, key, methods, title, ylabel):
     axes[-1].tick_params(axis="x", labelsize=18)
 
 
-def plot_figure(records, groups, example, config, machines, output):
+def plot_figure(records, groups, example, config, machines, output, unconverged=False):
     result = {n: scores(estimates) for n, estimates in groups.items()}
     for n, scores_n in result.items():
         for method, metrics in scores_n.items():
@@ -151,7 +158,7 @@ def plot_figure(records, groups, example, config, machines, output):
     top, bottom = fig.subfigures(2, 1, height_ratios=[1, 1.15])
     grid = top.add_gridspec(1, 3)
     plot_example(top, grid[0, :2], *example, config)
-    plot_runtime(top.add_subplot(grid[0, 2]), records, machines)
+    plot_runtime(top.add_subplot(grid[0, 2]), records, machines, unconverged)
     # one gridspec for panels C-E keeps their axes the same width
     axes = bottom.subplots(len(result), len(PANELS), sharex=True, sharey="col", squeeze=False)
     counts = {n: len(estimates["mcmc"][0]) for n, estimates in groups.items()}
@@ -202,23 +209,25 @@ def main(args):
     targets = {}
     for method in ("mle", "mcmc"):
         reference = [fit for key, fit in records.items() if key[0] and key[3] == method]
-        if len(reference) != 1 or not reference[0]["valid"]:
-            raise ValueError(f"Need a valid {method} reference; run fig08-run.py --pseudo-true and include its folder")
-        targets[method] = reference[0]["params"]
+        if len(reference) == 1 and reference[0]["valid"]:
+            targets[method] = reference[0]["params"]
+        else:  # interim plots: SE bias needs no reference; point bias and coverage are left blank
+            print(f"no valid {method} reference (fig08-run.py --pseudo-true); panels C and E omit it")
+            targets[method] = np.full(6 if method == "mle" else 7, np.nan)
     sizes = sorted(set(args.n_trials))
     for size in sizes:
         for method in ("mle", "mcmc"):
             fits = fits_for(records, size, method)
-            passed = sum(bool(f["valid"]) for f in fits)
-            print(f"n={size} {method}: {passed}/{len(fits)} passed; {dict(Counter(str(f['status']) for f in fits))}")
+            passed = sum(usable(f, args.include_unconverged) for f in fits)
+            print(f"n={size} {method}: {passed}/{len(fits)} used; {dict(Counter(str(f['status']) for f in fits))}")
             if passed < 2:
-                raise ValueError(f"Need at least two valid {method} fits for n={size}")
+                raise ValueError(f"Need at least two usable {method} fits for n={size}")
     with (ROOT / "code/config.json").open() as f:
         plt.rcParams.update(json.load(f)["rc-params"])
     plt.rcParams["font.size"] = 12
-    groups = {size: estimates(records, size, targets) for size in sizes}
+    groups = {size: estimates(records, size, targets, args.include_unconverged) for size in sizes}
     args.output.mkdir(parents=True, exist_ok=True)
-    plot_figure(records, groups, args.example, config, args.runtime_machines, args.output)
+    plot_figure(records, groups, args.example, config, args.runtime_machines, args.output, args.include_unconverged)
     plot_distributions(groups, config, args.output)
 
 
@@ -239,6 +248,11 @@ def parse_args(argv=None):
     parser.add_argument("--n-trials", type=int, nargs="+", default=[1000, 3000, 5000], help="panels C-E sizes")
     parser.add_argument(
         "--example", type=example_pair, required=True, metavar="N:REP", help="panel A example simulation"
+    )
+    parser.add_argument(
+        "--include-unconverged",
+        action="store_true",
+        help="also use completed MCMC fits that failed r_hat/ESS (timeouts and errors stay excluded)",
     )
     parser.add_argument("--runtime-machines", nargs="+", default=["mac1", "mac2"], help="panel B machines")
     return parser.parse_args(argv)
