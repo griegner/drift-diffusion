@@ -6,11 +6,14 @@ from pathlib import Path
 
 import numpy as np
 import settings as sim
+from pseudotrue import N_FITS as REFERENCE_FITS
+from pseudotrue import N_TRIALS as REFERENCE_N
+from pseudotrue import REP as REFERENCE_REP
 
 ROOT = Path(__file__).resolve().parents[1]
 SESSION, SEED = 1000, 20261020
-REFERENCE_N, REFERENCE_REP = 50_000, 10**6
-REFERENCE_MLE_FITS = 10  # the MLE reference averages fits to reps REFERENCE_REP, REFERENCE_REP + 1, ...
+# pseudo-true targets average REFERENCE_FITS fits per method to reps REFERENCE_REP, REFERENCE_REP + 1, ...
+REFERENCE_REPS = range(REFERENCE_REP, REFERENCE_REP + REFERENCE_FITS)
 METHODS = ["sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust"]
 PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
 MCMC_NAMES = ["a", "t", "v_stim", "z", "sz", "sv", "st"]
@@ -19,7 +22,7 @@ MCMC_SCALE, MCMC_OFFSET = np.array([1, 1, 1, 2, 2, 1, 1]), np.array([0, 0, 0, -1
 QUANTITY_LABELS = [r"$\bar{a}$", r"$\bar{t}_0$", r"$\bar{v}$", r"$\bar{z}$"]
 COLORS = {method: (1, 0, 0, alpha) for method, alpha in zip(METHODS, [0.2, 0.4, 0.6, 0.8])}
 COLORS["mcmc"] = "#3b6fb6"
-PATTERN = re.compile(r"(?:n\d+-rep\d+|pseudo-true)-(?:mle|mcmc)\.npz")
+PATTERN = re.compile(r"(?:n\d+|pseudo-true)-rep\d+-(?:mle|mcmc)\.npz")
 
 
 def scientific_settings(seed, chains, tune, draws):
@@ -84,7 +87,7 @@ def contrasts(n):
 
 
 def checkpoint_path(folder, method, n, rep, reference=False):
-    return Path(folder) / f"{'pseudo-true' if reference else f'n{n}-rep{rep}'}-{method}.npz"
+    return Path(folder) / f"{'pseudo-true' if reference else f'n{n}'}-rep{rep}-{method}.npz"
 
 
 def save_fit(path, **record):
@@ -135,7 +138,7 @@ def collect_results(folders):
                 checkpoint_path(folder, key[3], key[1], key[2], key[0]) != path
                 or int(fit["seed"]) != config["seed"]
                 or int(fit["mcmc_seed"]) != mcmc_seed(config, key[1], key[2])
-                or (key[0] and key[1:3] != (REFERENCE_N, REFERENCE_REP))
+                or (key[0] and (key[1] != REFERENCE_N or key[2] not in REFERENCE_REPS))
             ):
                 raise ValueError(f"Inconsistent fit identity in {path}")
             if key in records:
@@ -147,3 +150,14 @@ def collect_results(folders):
                     raise ValueError(f"Conflicting fit records: {path.name}")
             records[key] = fit
     return config, records
+
+
+def reference_targets(records, method):
+    """mean of the REFERENCE_FITS pseudo-true fits; None until all exist and are valid"""
+
+    fits = [records.get((True, REFERENCE_N, rep, method)) for rep in REFERENCE_REPS]
+    if not all(fit is not None and fit["valid"] for fit in fits):
+        done = [rep for rep, fit in zip(REFERENCE_REPS, fits) if fit is not None and fit["valid"]]
+        print(f"{method} reference: valid fits for reps {done}, need all of {list(REFERENCE_REPS)}")
+        return None
+    return np.mean([fit["params"] for fit in fits], axis=0)

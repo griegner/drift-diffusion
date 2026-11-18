@@ -16,9 +16,8 @@ from fig08 import (
     MCMC_OFFSET,
     MCMC_SCALE,
     METHODS,
-    REFERENCE_MLE_FITS,
     REFERENCE_N,
-    REFERENCE_REP,
+    REFERENCE_REPS,
     ROOT,
     SEED,
     SESSION,
@@ -76,23 +75,17 @@ def fit_task(method, n, rep, config, cores, reference):
         if method == "mle":
             from drift_diffusion.model import DriftDiffusionModel
 
-            runtime, fits = 0.0, []
-            # reference: average independent 50,000-trial fits to reduce its Monte Carlo error
-            for r in range(rep, rep + (REFERENCE_MLE_FITS if reference else 1)):
-                if r != rep:
-                    X, y = simulate(n, r, config)
-                mle = DriftDiffusionModel(
-                    **config["mle"],
-                    cov_estimator="sample-hessian" if reference else "all",
-                    autocorrelation_lags=config["ar_lags"],
-                )
-                started = time.perf_counter()
-                mle.fit(X, y)
-                runtime += time.perf_counter() - started
-                cov = np.array(mle.covariance_) if reference else np.array([mle.covariance_[m] for m in METHODS])
-                fits.append((mle.params_, cov, mle.fit_.fun, np.max(abs(mle.fit_.jac))))
-            params, cov, objective, gradient = (np.mean(v, axis=0) for v in zip(*fits))
-            cov, gradient = cov / len(fits), max(f[3] for f in fits)  # covariance of the mean
+            # references only need coefficients; skip the score-based covariances
+            mle = DriftDiffusionModel(
+                **config["mle"],
+                cov_estimator="sample-hessian" if reference else "all",
+                autocorrelation_lags=config["ar_lags"],
+            )
+            started = time.perf_counter()
+            mle.fit(X, y)
+            runtime = time.perf_counter() - started
+            params, objective, gradient = mle.params_, mle.fit_.fun, np.max(abs(mle.fit_.jac))
+            cov = np.array(mle.covariance_) if reference else np.array([mle.covariance_[m] for m in METHODS])
             valid = (
                 np.isfinite(objective)
                 and gradient < config["gradient_tolerance"]
@@ -144,7 +137,7 @@ def fit_task(method, n, rep, config, cores, reference):
 
 def run(args, config):
     prepare_folder(args.output, config)
-    n, reps = (REFERENCE_N, [REFERENCE_REP]) if args.pseudo_true else (args.n_trials, args.repeats)
+    n, reps = (REFERENCE_N, REFERENCE_REPS) if args.pseudo_true else (args.n_trials, args.repeats)
     budget = (os.cpu_count() or 1) if args.n_jobs == -1 else args.n_jobs
     for method in ("mle", "mcmc"):
         cores = min(config["mcmc"]["chains"], budget) if method == "mcmc" else 1
@@ -211,7 +204,9 @@ def parse_args(argv=None):
     parser.add_argument("--output", type=Path, default=ROOT / "data/fig08")
     parser.add_argument("--machine", default=platform.node(), help="runtime label (default: hostname)")
     parser.add_argument(
-        "--pseudo-true", action="store_true", help="fit the shared 50,000-trial reference(s) instead of repeats"
+        "--pseudo-true",
+        action="store_true",
+        help="fit the 50,000-trial pseudo-true references (averaged when plotting) instead of repeats",
     )
     args = parser.parse_args(argv)
     if args.n_trials < SESSION or args.n_trials % SESSION or args.seed < 0:

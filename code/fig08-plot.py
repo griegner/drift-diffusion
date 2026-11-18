@@ -9,7 +9,17 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from fig08 import COLORS, METHODS, QUANTITY_LABELS, ROOT, SESSION, collect_results, contrasts, trial_inputs
+from fig08 import (
+    COLORS,
+    METHODS,
+    QUANTITY_LABELS,
+    ROOT,
+    SESSION,
+    collect_results,
+    contrasts,
+    reference_targets,
+    trial_inputs,
+)
 from matplotlib.lines import Line2D
 from matplotlib.ticker import StrMethodFormatter
 
@@ -208,10 +218,8 @@ def main(args):
     config, records = collect_results(args.inputs)
     targets = {}
     for method in ("mle", "mcmc"):
-        reference = [fit for key, fit in records.items() if key[0] and key[3] == method]
-        if len(reference) == 1 and reference[0]["valid"]:
-            targets[method] = reference[0]["params"]
-        else:  # interim plots: SE bias needs no reference; point bias and coverage are left blank
+        targets[method] = reference_targets(records, method)
+        if targets[method] is None:  # interim plots: SE bias needs no reference; point bias and coverage are left blank
             print(f"no valid {method} reference (fig08-run.py --pseudo-true); panels C and E omit it")
             targets[method] = np.full(6 if method == "mle" else 7, np.nan)
     sizes = sorted(set(args.n_trials))
