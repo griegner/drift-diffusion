@@ -6,7 +6,7 @@ from sklearn.base import clone
 
 N_TRIALS = 50_000
 REP = 10**6  # reserved reference-sample IDs: REP, REP + 1, ..., REP + N_FITS - 1
-N_FITS = 5
+N_FITS = 3
 
 
 def pseudotrue_4p(ddm, X, y):

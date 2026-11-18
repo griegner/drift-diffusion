@@ -228,12 +228,12 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         # compute and cache the large-sample reference (mean of N_FITS fits) before repeats
         path = Path(__file__).resolve().parents[1] / "data/fig04-pseudotrue.json"
         cache = json.loads(path.read_text()) if path.exists() else {}
-        if cache.get("n_fits") != N_FITS:  # older caches hold a single fit
+        if (cache.get("n_fits"), cache.get("n_trials")) != (N_FITS, N_TRIALS):
             thetas = []
             for rep in tqdm(range(REP, REP + N_FITS), desc="pseudo-true"):
                 stim, y = sample_persistent(N_TRIALS, rep, seed=kwargs["random_state"])
                 thetas.append(pseudotrue_4p(ddm, pd.DataFrame({"stim": stim}), y))
-            cache = dict(zip(param_names, np.mean(thetas, axis=0).tolist())) | dict(n_fits=N_FITS)
+            cache = dict(zip(param_names, np.mean(thetas, axis=0).tolist())) | dict(n_fits=N_FITS, n_trials=N_TRIALS)
             path.write_text(json.dumps(cache, indent=2) + "\n")
         pseudotrue_params = {name: cache[name] for name in param_names}
         print("pseudo-true:", {name: round(value, 6) for name, value in pseudotrue_params.items()})

@@ -141,7 +141,8 @@ def run(args, config):
     budget = (os.cpu_count() or 1) if args.n_jobs == -1 else args.n_jobs
     for method in ("mle", "mcmc"):
         cores = min(config["mcmc"]["chains"], budget) if method == "mcmc" else 1
-        workers = max(1, budget // cores)
+        # 50,000-trial references run one at a time to stay within memory
+        workers = 1 if args.pseudo_true else max(1, budget // cores)
         tasks = [
             (rep, (method, n, rep, config, cores, args.pseudo_true))
             for rep in reps
