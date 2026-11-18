@@ -110,8 +110,7 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
 
     # reuse 7p posterior means for matching run settings
     names = ("v_coherence", "a", "z", "t", "sz", "sv", "st")
-    # tedge: the 7p t is the lower edge of the uniform t0 (earlier caches stored the centre)
-    cache_key = f"n{n_trials}-seed{seed}-rt0-c{chains}-t{tune}-d{draws}-err{ERR:g}-simps{SIMPS_ERR:g}-tedge"
+    cache_key = f"n{n_trials}-seed{seed}-rt0-c{chains}-t{tune}-d{draws}-err{ERR:g}-simps{SIMPS_ERR:g}"
     cache = json.loads(HSSM_CACHE.read_text()) if HSSM_CACHE.exists() else {}
     if cache_key not in cache:
         ddm_hssm = sample_full_ddm(

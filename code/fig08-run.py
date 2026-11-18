@@ -57,7 +57,7 @@ def true_7p(s):
     z_gap = (s["Z_STATES"][1] - s["Z_STATES"][0]) / 2  # HSSM z = (z + 1) / 2
     return dict(
         a=s["A"],
-        t=np.mean(s["T0_STATES"]) - np.sqrt(3) * t0_gap / 2,  # lower edge of the uniform t0
+        t=np.mean(s["T0_STATES"]),
         v_stim=s["V_PUPIL_MEAN"],
         z=(np.mean(s["Z_STATES"]) + 1) / 2,
         sz=np.sqrt(3) * z_gap,
@@ -119,10 +119,6 @@ def fit_task(method, n, rep, config, cores, reference):
                 progressbar=reference,
             )
             runtime = time.perf_counter() - started
-            posterior = model.traces.posterior
-            posterior["t"] = (
-                posterior["t"] + posterior["st"] / 2
-            )  # report the centre; the sampler's t is the lower edge
             summary = az.summary(model.traces, var_names=MCMC_NAMES, round_to="none")
             r_hat, ess = summary["r_hat"].to_numpy(), summary["ess_bulk"].to_numpy()
             valid = (

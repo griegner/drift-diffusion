@@ -20,7 +20,6 @@ QUANTITY_LABELS = [r"$\bar{a}$", r"$\bar{t}_0$", r"$\bar{v}$", r"$\bar{z}$"]
 COLORS = {method: (1, 0, 0, alpha) for method, alpha in zip(METHODS, [0.2, 0.4, 0.6, 0.8])}
 COLORS["mcmc"] = "#3b6fb6"
 PATTERN = re.compile(r"(?:n\d+-rep\d+|pseudo-true)-(?:mle|mcmc)\.npz")
-T0_GAP_SD = 1.0  # fig08 t0 states T0 +/- T0_GAP_SD * SD_T0 (st-equivalent = Table 3 mean); fig02-04 keep settings.py
 
 
 def scientific_settings(seed, chains, tune, draws):
@@ -33,14 +32,12 @@ def scientific_settings(seed, chains, tune, draws):
         reference=dict(n=REFERENCE_N, rep=REFERENCE_REP),
         simulation={
             name: np.asarray(getattr(sim, name)).tolist()
-            for name in "A T0 V_PUPIL_MEAN A_TREND Z_STATES V_PUPIL P_SWITCH PUPIL_SIGMA PUPIL_SD".split()
-        }
-        | dict(T0_STATES=(sim.T0 + np.array([-1, 1]) * T0_GAP_SD * sim.SD_T0).tolist()),
+            for name in "A T0 V_PUPIL_MEAN A_TREND T0_STATES Z_STATES V_PUPIL P_SWITCH PUPIL_SIGMA PUPIL_SD".split()
+        },
         mle=dict(a="1 + time", t0="1", v="0 + stim + stim:pupil_centered", z="1", p_outlier=0),
         ar_lags=60,
         gradient_tolerance=0.01,
         mcmc=dict(chains=chains, tune=tune, draws=draws),
-        mcmc_t="lower edge sampled; centre t + st/2 reported",
         max_r_hat=1.01,
         ess_per_chain=100,
         param_names=PARAM_NAMES,

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# runtime machine: n=5000
+# runtime machine: n=10000; resumes v1 (MCMC 0:127 minus rep 115 done), win takes 500:900, mac1 900:1300
 
 set -e
 
-pixi run -e code-ocean python code/fig08-run.py --n-trials 5000 --repeats 0:250 --tune 1000 --draws 1000 \
-    --timeout-per-1000 inf --output data/fig08-v2-mac2 --machine mac2
+pixi run -e code-ocean python code/fig08-run.py --n-trials 10000 --repeats 0:500 --tune 1000 --timeout-per-1000 inf \
+    --output data/fig08-v1-mac2 --machine mac2
