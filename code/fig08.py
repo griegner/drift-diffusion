@@ -19,7 +19,7 @@ PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
 MCMC_NAMES = ["a", "t", "v_stim", "z", "sz", "sv", "st"]
 # convert HSSM units: z -> 2z - 1, sz -> 2sz
 MCMC_SCALE, MCMC_OFFSET = np.array([1, 1, 1, 2, 2, 1, 1]), np.array([0, 0, 0, -1, 0, 0, 0])
-QUANTITY_LABELS = [r"$\bar{a}$", r"$\bar{t}_0$", r"$\bar{v}$", r"$\bar{z}$"]
+QUANTITY_LABELS = [r"$\bar{a}$", r"$\bar{t}_0$", r"$\overline{|v|}$", r"$\bar{z}$"]
 COLORS = {method: (1, 0, 0, alpha) for method, alpha in zip(METHODS, [0.2, 0.4, 0.6, 0.8])}
 COLORS["mcmc"] = "#3b6fb6"
 PATTERN = re.compile(r"(?:n\d+|pseudo-true)-rep\d+-(?:mle|mcmc)\.npz")
@@ -153,11 +153,14 @@ def collect_results(folders):
 
 
 def reference_targets(records, method):
-    """mean of the REFERENCE_FITS pseudo-true fits; None until all exist and are valid"""
+    """mean of the valid pseudo-true fits (failed MCMC references are dropped); None until all reps have run"""
 
-    fits = [records.get((True, REFERENCE_N, rep, method)) for rep in REFERENCE_REPS]
-    if not all(fit is not None and fit["valid"] for fit in fits):
-        done = [rep for rep, fit in zip(REFERENCE_REPS, fits) if fit is not None and fit["valid"]]
-        print(f"{method} reference: valid fits for reps {done}, need all of {list(REFERENCE_REPS)}")
+    fits = {rep: records.get((True, REFERENCE_N, rep, method)) for rep in REFERENCE_REPS}
+    missing = [rep for rep, fit in fits.items() if fit is None]
+    valid = [rep for rep, fit in fits.items() if fit is not None and fit["valid"]]
+    if missing or not valid:
+        print(f"{method} reference: missing reps {missing}, valid reps {valid}")
         return None
-    return np.mean([fit["params"] for fit in fits], axis=0)
+    if len(valid) < len(fits):
+        print(f"{method} reference: averaging valid reps {valid}; dropped {sorted(set(fits) - set(valid))}")
+    return np.mean([fits[rep]["params"] for rep in valid], axis=0)
