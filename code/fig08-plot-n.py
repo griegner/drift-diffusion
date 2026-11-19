@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from fig08 import COLORS, QUANTITY_LABELS, ROOT, SESSION, collect_results, reference_targets, trial_inputs
 from matplotlib.lines import Line2D
-from matplotlib.ticker import NullFormatter, StrMethodFormatter
+from matplotlib.ticker import StrMethodFormatter
 
 # reuse the scores, method lists, and labels from fig08-plot.py (hyphenated, so not importable by name)
 spec = importlib.util.spec_from_file_location("fig08_plot", Path(__file__).with_name("fig08-plot.py"))
@@ -43,28 +43,36 @@ def plot_example(axes, config):
 
 
 def plot_runtime(ax, records, machines):
-    """runtime per fit on log-log axes (slope = scaling with n); medians are printed for the caption"""
+    """runtime per paired fit (log y) with median bars; the legend gives the zero-intercept slope of the medians"""
 
+    def usable(key):
+        fit = records.get(key)
+        return fit is not None and fit["valid"] and str(fit["machine"]) in machines
+
+    # repeats where both methods gave a valid fit on a runtime machine
+    pairs = [
+        (n, rep)
+        for reference, n, rep, method in records
+        if not reference and method == "mle" and usable((False, n, rep, "mle")) and usable((False, n, rep, "mcmc"))
+    ]
     rng = np.random.default_rng(0)
-    for method, color in [("mle", COLORS["autocorrelation-robust"]), ("mcmc", COLORS["mcmc"])]:
-        n, minutes = np.array(
-            [
-                (key[1], fit["runtime"] / 60)
-                for key, fit in records.items()
-                if not key[0] and key[3] == method and fit["valid"] and str(fit["machine"]) in machines
-            ]
-        ).T
-        jitter = np.exp(rng.uniform(-0.08, 0.08, len(n)))  # multiplicative, so equal width on the log axis
-        ax.plot(n * jitter, minutes, "o", color=color, ms=3, mec="white", mew=0.3, alpha=0.5)
-        print(
-            f"{method} median runtime (min):",
-            {int(s): round(float(np.median(minutes[n == s])), 2) for s in np.unique(n)},
-        )
-    sizes = np.unique(n)
-    ax.set(title="B. Runtime (minutes)", xlabel="n Trials", xscale="log", yscale="log", xticks=sizes)
-    ax.set_xlim(sizes[0] / 1.25, sizes[-1] * 1.25)
+    for method, color, label in [
+        ("mle", COLORS["autocorrelation-robust"], "4p MLE"),
+        ("mcmc", COLORS["mcmc"], "7p MCMC"),
+    ]:
+        n, minutes = np.array([(n, records[(False, n, rep, method)]["runtime"] / 60) for n, rep in pairs]).T
+        sizes = np.unique(n)
+        medians = np.array([np.median(minutes[n == s]) for s in sizes])
+        slope = sizes @ medians / (sizes @ sizes)  # least-squares line through the origin, fitted to the medians
+        jitter = rng.uniform(-250, 250, len(n))
+        ax.plot(n + jitter, minutes, "o", color=color, ms=3, mec="white", mew=0.3, alpha=0.5)
+        ax.plot([], [], "o", color=color, ms=5, label=f"{label}: {1000 * slope:.1f} min/1000 trials")
+        ax.hlines(medians, sizes - 400, sizes + 400, color="k", lw=1.2)
+        print(f"{method} median runtime (min):", dict(zip(sizes.astype(int).tolist(), medians.round(3).tolist())))
+    print("paired repeats:", {int(s): int(np.sum(n == s)) for s in sizes})
+    ax.set(title="B. Runtime (minutes)", yscale="log", xlim=(0, sizes[-1] * 1.08), xticks=sizes, xlabel="n Trials")
+    ax.legend(loc="upper left", frameon=False, fontsize=10)
     ax.xaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
-    ax.xaxis.set_minor_formatter(NullFormatter())
     ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,g}"))
 
 
@@ -130,7 +138,11 @@ def main(args):
         raise ValueError("Need the pseudo-true references (fig08-run.py --pseudo-true)")
     plt.rcParams.update(json.loads((ROOT / "code/config.json").read_text())["rc-params"])
     plt.rcParams["font.size"] = 12
-    groups = {n: base.estimates(records, n, targets) for n in sorted(set(args.n_trials))}
+    groups = {}
+    for n in sorted(set(args.n_trials)):  # keep the first b paired repeats (lowest repeat IDs) per sample size
+        estimates = base.estimates(records, n, targets)
+        groups[n] = {method: (points[: args.b], ses[: args.b], ref) for method, (points, ses, ref) in estimates.items()}
+        print(f"n={n}: using b={len(groups[n]['mcmc'][0])} paired repeats")
     args.output.mkdir(parents=True, exist_ok=True)
     plot_figure(records, groups, config, args.runtime_machines, args.output)
 
@@ -143,6 +155,7 @@ def parse_args(argv=None):
     parser.add_argument("--inputs", type=Path, nargs="+", default=folders)
     parser.add_argument("--output", type=Path, default=ROOT / "results")
     parser.add_argument("--n-trials", type=int, nargs="+", default=[1000, 3000, 5000, 10000], help="panels C-E sizes")
+    parser.add_argument("--b", type=int, default=500, help="panels C-E: first b paired repeats per size")
     parser.add_argument("--runtime-machines", nargs="+", default=["mac1", "mac2"], help="panel B machines")
     return parser.parse_args(argv)
 
