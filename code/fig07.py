@@ -15,7 +15,7 @@ import pandas as pd
 from ddm7p import CHAINS, DRAWS, ERR, SIMPS_ERR, TUNE, logp_full_ddm, sample_full_ddm
 from matplotlib.colors import to_rgb
 from scipy.stats import binomtest
-from settings import T0, V_PUPIL, V_PUPIL_MEAN, A, Z, pupil_trace
+from settings import PUPIL_SD, T0, V_PUPIL_ETA, A, V, Z, pupil_trace
 
 from drift_diffusion.model import DriftDiffusionModel, pdf
 from drift_diffusion.sim import sample_from_pdf
@@ -69,14 +69,15 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
     plt.rcParams["font.size"] = 12
     rng = np.random.default_rng(seed)
 
-    # population-scaled pupil, as in fig08; session means vary
-    pupil_centered = pupil_trace(rng, 1, n_trials)[0]
+    # unlike fig08, centre and scale this session's pupil (mean 0, SD PUPIL_SD) so drift has mean V and SD ETA
+    pupil = pupil_trace(rng, 1, n_trials)[0]
+    pupil_centered = PUPIL_SD * (pupil - pupil.mean()) / pupil.std()
     coherence = rng.choice([-1, 1], n_trials)
 
-    # positive coherence makes R correct; positive drift favors R
-    beta_pupil = V_PUPIL
-    beta_coherence = V_PUPIL_MEAN + beta_pupil * pupil_centered.mean()  # constant model's session drift
-    v_pupil = coherence * (V_PUPIL_MEAN + beta_pupil * pupil_centered)
+    # population drift mean and SD from Table 3 (V, ETA); positive coherence makes R correct
+    beta_pupil = V_PUPIL_ETA
+    beta_coherence = V + beta_pupil * pupil_centered.mean()  # constant model's session drift
+    v_pupil = coherence * (V + beta_pupil * pupil_centered)
     params = dict(a=A, t0=T0, v=v_pupil, z=Z)
 
     # --seed varies pupil and stimuli; retain the original RT sampling stream
@@ -110,7 +111,8 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
 
     # reuse 7p posterior means for matching run settings
     names = ("v_coherence", "a", "z", "t", "sz", "sv", "st")
-    cache_key = f"n{n_trials}-seed{seed}-rt0-c{chains}-t{tune}-d{draws}-err{ERR:g}-simps{SIMPS_ERR:g}"
+    design = f"n{n_trials}-seed{seed}-zscored-v{V:g}-b{beta_pupil:.4g}-rt0"
+    cache_key = f"{design}-c{chains}-t{tune}-d{draws}-err{ERR:g}-simps{SIMPS_ERR:g}"
     cache = json.loads(HSSM_CACHE.read_text()) if HSSM_CACHE.exists() else {}
     if cache_key not in cache:
         ddm_hssm = sample_full_ddm(
@@ -128,7 +130,7 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
     trial = np.arange(1, n_trials + 1)
     v_example = rng.normal(params_hssm["v_coherence"], params_hssm["sv"], n_trials)
 
-    # RT deciles: accuracy and 95% Wilson intervals
+    # RT deciles: accuracy and 95% binomial intervals
     decile = np.digitize(rts, np.quantile(rts, np.linspace(0, 1, 11))[1:-1])
     correct = choices == coherence
     tests = [binomtest(correct[decile == b].sum(), np.sum(decile == b)) for b in range(10)]
@@ -151,9 +153,9 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
 
     labels = {
         "true": "True DDM",
-        "constant": "Constant 4p-DDM",
-        "covariate": "Pupil-Dependent 4p-DDM",
-        "variable": "Across-Trial Variability 7p-DDM",
+        "constant": "Constant 4p MLE",
+        "covariate": "Pupil-Dependent 4p MLE",
+        "variable": "Across-Trial Variability 7p MCMC",
     }
     axes_labels = [
         dict(xlabel="Trial", ylabel=r"$|v|$", title="A. Pupil-Dependent Drift Rate"),
@@ -185,7 +187,7 @@ def main(n_trials=1000, seed=SEED, chains=CHAINS, tune=TUNE, draws=DRAWS):
         ms=4,
         elinewidth=1,
         zorder=0,
-        label="Simulated Data, 95% CI",
+        label="Simulated Data (95% CI)",
     )
     for ax, text in zip(axs, axes_labels):
         ax.set(**text)

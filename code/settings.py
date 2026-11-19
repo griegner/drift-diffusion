@@ -18,7 +18,7 @@ T3 = {
 # package units: noise SD 1, boundaries +/-a, starting point z in (-1, 1)
 A = T3["a"][2] / (2 * S)
 T0 = T3["Ter"][2]
-V = T3["v"][2] / S  # fig02-04
+V = T3["v"][2] / S  # fig02-04 and fig07
 ETA = T3["eta"][2] / S
 Z = 2 * T3["z/a"][2] - 1
 # variability in SD units; uniform width / sqrt(12)
@@ -35,12 +35,13 @@ T0_STATES = T0 + np.array([-1, 1]) * 0.75 * SD_T0  # 0.75-SD mixture spread limi
 V_STATES = V + np.array([1, -1]) * ETA  # fig04 only
 Z_STATES = Z + np.array([0, 2]) * SD_Z
 
-# pupil designs (fig07/08): mean drift half an eta below the Table 3 mean (~85% accuracy);
-# pupil-driven drift SD reaches the Table 3 minimum drift at -PUPIL_TAIL pupil SDs
+# fig08: scale drift to ~85% accuracy
 V_PUPIL_MEAN = (T3["v"][2] - T3["eta"][2] / 2) / S
 PUPIL_TAIL = 3
 SD_V = (V_PUPIL_MEAN - T3["v"][0] / S) / PUPIL_TAIL
 V_PUPIL = SD_V / PUPIL_SD
+
+V_PUPIL_ETA = ETA / PUPIL_SD  # fig07
 
 
 def engagement_states(rng, n):
