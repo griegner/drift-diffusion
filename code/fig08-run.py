@@ -137,12 +137,12 @@ def fit_task(method, n, rep, config, cores, reference):
 
 def run(args, config):
     prepare_folder(args.output, config)
-    n, reps = (REFERENCE_N, REFERENCE_REPS) if args.pseudo_true else (args.n_trials, args.repeats)
+    n, reps = REFERENCE_N if args.pseudo_true else args.n_trials, args.repeats
     budget = (os.cpu_count() or 1) if args.n_jobs == -1 else args.n_jobs
-    for method in ("mle", "mcmc"):
+    for method in args.methods:
         cores = min(config["mcmc"]["chains"], budget) if method == "mcmc" else 1
-        # 50,000-trial references run one at a time to stay within memory
-        workers = 1 if args.pseudo_true else max(1, budget // cores)
+        # Share the CPU budget across fits; each MCMC fit uses up to one core per chain.
+        workers = max(1, budget // cores)
         tasks = [
             (rep, (method, n, rep, config, cores, args.pseudo_true))
             for rep in reps
@@ -193,7 +193,12 @@ def repeat_range(value):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-trials", type=int, default=SESSION, help="trials per repeat (default 1000)")
-    parser.add_argument("--repeats", type=repeat_range, default="0:500", help="repeat IDs START:STOP (default 0:500)")
+    parser.add_argument(
+        "--repeats",
+        type=repeat_range,
+        help="repeat IDs START:STOP (exclusive); default 1000000:1000010 with --pseudo-true, otherwise 0:500",
+    )
+    parser.add_argument("--methods", choices=("mle", "mcmc"), nargs="+", default=["mle", "mcmc"])
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--n-jobs", type=int, default=-1, help="CPU budget; -1 uses all CPUs")
     parser.add_argument("--chains", type=int, default=CHAINS)
@@ -210,6 +215,10 @@ def parse_args(argv=None):
         help="fit the 50,000-trial pseudo-true references (averaged when plotting) instead of repeats",
     )
     args = parser.parse_args(argv)
+    if args.repeats is None:
+        args.repeats = REFERENCE_REPS if args.pseudo_true else range(500)
+    if args.pseudo_true and (args.repeats.start < REFERENCE_REPS.start or args.repeats.stop > REFERENCE_REPS.stop):
+        parser.error(f"pseudo-true repeats must lie within {REFERENCE_REPS.start}:{REFERENCE_REPS.stop}")
     if args.n_trials < SESSION or args.n_trials % SESSION or args.seed < 0:
         parser.error(f"need a nonnegative seed and n-trials a positive multiple of {SESSION}")
     if args.n_jobs != -1 and args.n_jobs < 1 or args.chains < 2 or args.tune < 0 or args.draws < 4:

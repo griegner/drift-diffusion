@@ -6,13 +6,13 @@ from pathlib import Path
 
 import numpy as np
 import settings as sim
-from pseudotrue import N_FITS as REFERENCE_FITS
 from pseudotrue import N_TRIALS as REFERENCE_N
 from pseudotrue import REP as REFERENCE_REP
 
 ROOT = Path(__file__).resolve().parents[1]
 SESSION, SEED = 1000, 20261020
 # pseudo-true targets average REFERENCE_FITS fits per method to reps REFERENCE_REP, REFERENCE_REP + 1, ...
+REFERENCE_FITS = 10
 REFERENCE_REPS = range(REFERENCE_REP, REFERENCE_REP + REFERENCE_FITS)
 METHODS = ["sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust"]
 PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
@@ -161,6 +161,8 @@ def reference_targets(records, method):
     if missing or not valid:
         print(f"{method} reference: missing reps {missing}, valid reps {valid}")
         return None
-    if len(valid) < len(fits):
-        print(f"{method} reference: averaging valid reps {valid}; dropped {sorted(set(fits) - set(valid))}")
+    print(
+        f"{method} reference: averaging {len(valid)}/{len(fits)} valid reps {valid}; "
+        f"dropped {sorted(set(fits) - set(valid))}"
+    )
     return np.mean([fits[rep]["params"] for rep in valid], axis=0)
