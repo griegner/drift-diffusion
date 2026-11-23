@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SESSION, SEED = 1000, 20261020
 # pseudo-true targets average REFERENCE_FITS fits per method to reps REFERENCE_REP, REFERENCE_REP + 1, ...
 REFERENCE_FITS = 10
+MIN_REFERENCE_FITS = 8  # plotting averages the valid fits once at least this many are present (MCMC fits can fail)
 REFERENCE_REPS = range(REFERENCE_REP, REFERENCE_REP + REFERENCE_FITS)
 METHODS = ["sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust"]
 PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
@@ -22,6 +23,13 @@ MCMC_SCALE, MCMC_OFFSET = np.array([1, 1, 1, 2, 2, 1, 1]), np.array([0, 0, 0, -1
 QUANTITY_LABELS = [r"$\bar{a}$", r"$\bar{t}_0$", r"$\overline{|v|}$", r"$\bar{z}$"]
 COLORS = {method: (1, 0, 0, alpha) for method, alpha in zip(METHODS, [0.2, 0.4, 0.6, 0.8])}
 COLORS["mcmc"] = "#3b6fb6"
+LABELS = {
+    "sample-hessian": "4p MLE (10d) Sample Hessian",
+    "outer-product": "4p MLE (10c) Outer Product",
+    "misspecification-robust": "4p MLE (10b) Misspec. Robust",
+    "autocorrelation-robust": "4p MLE (10a) Autocorr. Robust",
+    "mcmc": "7p MCMC",
+}
 PATTERN = re.compile(r"(?:n\d+|pseudo-true)-rep\d+-(?:mle|mcmc)\.npz")
 
 
@@ -153,16 +161,67 @@ def collect_results(folders):
 
 
 def reference_targets(records, method):
-    """mean of the valid pseudo-true fits (failed MCMC references are dropped); None until all reps have run"""
+    """mean of the valid pseudo-true fits; None with fewer than MIN_REFERENCE_FITS"""
 
     fits = {rep: records.get((True, REFERENCE_N, rep, method)) for rep in REFERENCE_REPS}
     missing = [rep for rep, fit in fits.items() if fit is None]
     valid = [rep for rep, fit in fits.items() if fit is not None and fit["valid"]]
-    if missing or not valid:
-        print(f"{method} reference: missing reps {missing}, valid reps {valid}")
+    invalid = sorted(set(fits) - set(valid) - set(missing))
+    if len(valid) < MIN_REFERENCE_FITS:
+        print(f"{method} reference: {len(valid)} valid reps {valid}, need {MIN_REFERENCE_FITS} (missing {missing})")
         return None
-    print(
-        f"{method} reference: averaging {len(valid)}/{len(fits)} valid reps {valid}; "
-        f"dropped {sorted(set(fits) - set(valid))}"
-    )
+    print(f"{method} reference: averaging {len(valid)}/{len(fits)} valid reps; invalid {invalid}, missing {missing}")
     return np.mean([fits[rep]["params"] for rep in valid], axis=0)
+
+
+def valid_fits(records, n, method):
+    """valid fits, lowest repeat IDs first"""
+
+    return [
+        fit
+        for (reference, size, _, name), fit in sorted(records.items())
+        if not reference and size == n and name == method and fit["valid"]
+    ]
+
+
+def estimates(records, n, targets, paired=True):
+    """(points, SEs, pseudo-true) of the four reported quantities per method, on valid fits (paired: both valid)"""
+
+    L = contrasts(n)
+    mle, mcmc = valid_fits(records, n, "mle"), valid_fits(records, n, "mcmc")
+    if paired:  # same simulated datasets for both methods
+        reps = {int(f["rep"]) for f in mle} & {int(f["rep"]) for f in mcmc}
+        print(f"n={n}: {len(reps)} paired repeats (of {len(mle)} valid MLE, {len(mcmc)} converged MCMC)")
+        mle, mcmc = [f for f in mle if int(f["rep"]) in reps], [f for f in mcmc if int(f["rep"]) in reps]
+    points = np.array([f["params"] for f in mle]) @ L.T
+    cov = np.array([f["cov"] for f in mle])
+    result = {
+        method: (points, np.sqrt(np.einsum("ij,rjk,ik->ri", L, cov[:, m], L)), L @ targets["mle"])
+        for m, method in enumerate(METHODS)
+    }
+    result["mcmc"] = (
+        np.array([f["params"] for f in mcmc])[:, :4],
+        np.array([f["sd"] for f in mcmc])[:, :4],
+        targets["mcmc"][:4],
+    )
+    return result
+
+
+def scores(estimates):
+    """point/SE relative bias and coverage (%), each with a 95% Monte Carlo half-width"""
+
+    result = {}
+    for method, (params, uncs, reference) in estimates.items():
+        error, sd, unc = params - reference, params.std(ddof=1, axis=0), uncs.mean(axis=0)
+        # influence functions give Monte Carlo SEs via the delta method
+        influence = dict(
+            bias=100 * error / reference,
+            se_bias=100 * ((uncs - unc) / sd - unc * ((params - params.mean(axis=0)) ** 2 - sd**2) / (2 * sd**3)),
+            coverage=np.where(np.isnan(error), np.nan, 100 * (abs(error) <= 1.96 * uncs)),
+        )
+        values = {key: value.mean(axis=0) for key, value in influence.items()} | {"se_bias": 100 * (unc - sd) / sd}
+        result[method] = {
+            key: (values[key], 1.96 * value.std(ddof=1, axis=0) / np.sqrt(len(params)))
+            for key, value in influence.items()
+        }
+    return result
