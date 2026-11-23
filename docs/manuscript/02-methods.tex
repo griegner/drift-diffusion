@@ -175,7 +175,7 @@ This result accommodates both misspecification, via the failure of the informati
 
 \subsubsection{Covariance Estimation}\label{sec:covariance-estimation}
 In practice, the asymptotic covariance is estimated by replacing population moments with their sample counterparts evaluated at the pseudo-MLE $\hat{\bm\beta}^*$. We define the sample Hessian matrix $\widehat{\mathcal{H}}_{\bm\beta}$, and the sample Fisher Information matrices (short-run $\widehat{\mathscr{I}}_{\bm\beta}$ and long-run $\widehat{\tilde{\mathscr{I}}}_{\bm\beta}$):
-\begin{equation}\label{eq:sample_info}
+\begin{equation}
     \widehat{\mathcal{H}}_{\bm\beta} = -\frac{1}{n} \sum_{i=1}^n \frac{\partial^2}{\partial\bm\beta\partial\bm\beta^\prime} \log f^*(Y_i), \quad
     \widehat{\mathscr{I}}_{\bm\beta} = \frac{1}{n} \sum_{i=1}^n \hat{S}_i \hat{S}_i^\prime, \quad
     \widehat{\tilde{\mathscr{I}}}_{\bm\beta} = \frac{1}{n} \sum_{i,j=1}^n w_{|i-j|} \hat{S}_i \hat{S}_j^\prime.
