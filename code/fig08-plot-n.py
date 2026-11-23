@@ -42,25 +42,37 @@ def plot_example(axes, config):
     axes[0].set_title(f"A. Example Simulation (n = {EXAMPLE_N:,}, {EXAMPLE_N // SESSION} sessions)")
 
 
-def plot_runtime(ax, records, machines):
-    """runtime per paired fit (log y) with median bars; the legend gives the zero-intercept slope of the medians"""
+def plot_runtime(ax, records, runtime_records, machines):
+    """runtime per fit (log y) with median bars; the legend gives the zero-intercept slope of the medians
+
+    MLE: every valid fit in the runtime benchmark (one machine, a fixed number of concurrent fits at every n);
+    MCMC: paired production fits on the runtime machines
+    """
 
     def usable(key):
         fit = records.get(key)
         return fit is not None and fit["valid"] and str(fit["machine"]) in machines
 
-    # repeats where both methods gave a valid fit on a runtime machine
-    pairs = [
+    paired = [
         (n, rep)
         for reference, n, rep, method in records
         if not reference and method == "mle" and usable((False, n, rep, "mle")) and usable((False, n, rep, "mcmc"))
     ]
+    runtimes = dict(
+        mle=[
+            (n, fit["runtime"])
+            for (reference, n, _, method), fit in runtime_records.items()
+            if not reference and method == "mle" and fit["valid"]
+        ],
+        mcmc=[(n, records[(False, n, rep, "mcmc")]["runtime"]) for n, rep in paired],
+    )
     rng = np.random.default_rng(0)
     for method, color, label in [
         ("mle", COLORS["autocorrelation-robust"], "4p MLE"),
         ("mcmc", COLORS["mcmc"], "7p MCMC"),
     ]:
-        n, minutes = np.array([(n, records[(False, n, rep, method)]["runtime"] / 60) for n, rep in pairs]).T
+        n, minutes = np.array(runtimes[method]).T
+        minutes = minutes / 60
         sizes = np.unique(n)
         medians = np.array([np.median(minutes[n == s]) for s in sizes])
         slope = sizes @ medians / (sizes @ sizes)  # least-squares line through the origin, fitted to the medians
@@ -69,7 +81,7 @@ def plot_runtime(ax, records, machines):
         ax.plot([], [], "o", color=color, ms=5, label=f"{label}: {1000 * slope:.1f} min/1000 trials")
         ax.hlines(medians, sizes - 400, sizes + 400, color="k", lw=1.2)
         print(f"{method} median runtime (min):", dict(zip(sizes.astype(int).tolist(), medians.round(3).tolist())))
-    print("paired repeats:", {int(s): int(np.sum(n == s)) for s in sizes})
+        print(f"{method} runtime fits:", {int(s): int(np.sum(n == s)) for s in sizes})
     ax.set(title="B. Runtime (minutes)", yscale="log", xlim=(0, sizes[-1] * 1.08), xticks=sizes, xlabel="n Trials")
     ax.legend(loc="upper left", frameon=False, fontsize=10)
     ax.xaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
@@ -104,7 +116,7 @@ def plot_summary(axes, result, counts, key, methods):
     axes[-1].set(xticks=x, xticklabels=[f"{n:,}" for n in sizes], xlim=(-0.5, len(sizes) - 0.5), xlabel="n Trials")
 
 
-def plot_figure(records, groups, config, machines, output):
+def plot_figure(records, runtime_records, groups, config, machines, output):
     # one flat 8 x 3 grid (no nesting) so the outer axis edges line up between the top and bottom halves
     fig = plt.figure(figsize=(12, 11), layout="constrained")
     grid = fig.add_gridspec(8, 3, height_ratios=[1] * 4 + [1.4] * 4)
@@ -113,7 +125,7 @@ def plot_figure(records, groups, config, machines, output):
     for ax in example[:-1]:
         ax.tick_params(labelbottom=False)
     plot_example(example, config)
-    plot_runtime(fig.add_subplot(grid[:4, 2]), records, machines)  # unit in the title: no y label gap
+    plot_runtime(fig.add_subplot(grid[:4, 2]), records, runtime_records, machines)  # unit in the title: no y label gap
     axes = np.array([[fig.add_subplot(grid[4 + k, col]) for col in range(3)] for k in range(4)])
     for col in range(3):  # share y within each panel column
         for ax in axes[1:, col]:
@@ -133,6 +145,9 @@ def plot_figure(records, groups, config, machines, output):
 
 def main(args):
     config, records = collect_results(args.inputs)
+    runtime_config, runtime_records = collect_results(args.runtime_inputs)
+    if runtime_config != config:
+        raise ValueError("Runtime benchmark settings differ from the fit settings")
     targets = {method: reference_targets(records, method) for method in ("mle", "mcmc")}
     if any(target is None for target in targets.values()):
         raise ValueError("Need the pseudo-true references (fig08-run.py --pseudo-true)")
@@ -144,7 +159,7 @@ def main(args):
         groups[n] = {method: (points[: args.b], ses[: args.b], ref) for method, (points, ses, ref) in estimates.items()}
         print(f"n={n}: using b={len(groups[n]['mcmc'][0])} paired repeats")
     args.output.mkdir(parents=True, exist_ok=True)
-    plot_figure(records, groups, config, args.runtime_machines, args.output)
+    plot_figure(records, runtime_records, groups, config, args.runtime_machines, args.output)
 
 
 def parse_args(argv=None):
@@ -155,8 +170,15 @@ def parse_args(argv=None):
     parser.add_argument("--inputs", type=Path, nargs="+", default=folders)
     parser.add_argument("--output", type=Path, default=ROOT / "results")
     parser.add_argument("--n-trials", type=int, nargs="+", default=[1000, 3000, 5000, 10000], help="panels C-E sizes")
-    parser.add_argument("--b", type=int, default=500, help="panels C-E: first b paired repeats per size")
-    parser.add_argument("--runtime-machines", nargs="+", default=["mac1", "mac2"], help="panel B machines")
+    parser.add_argument("--b", type=int, default=600, help="panels C-E: first b paired repeats per size")
+    parser.add_argument("--runtime-machines", nargs="+", default=["mac1", "mac2"], help="panel B MCMC machines")
+    parser.add_argument(
+        "--runtime-inputs",
+        type=Path,
+        nargs="+",
+        default=[ROOT / "data/fig08-v1-runtime"],
+        help="panel B MLE runtimes: MLE fits rerun on one machine with the same number of concurrent fits at every n",
+    )
     return parser.parse_args(argv)
 
 
