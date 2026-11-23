@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# fig08 pseudo-true
 
 set -e
 
 # PyTensor compiles C modules; keep the cache in one place
 export PYTENSOR_FLAGS="${PYTENSOR_FLAGS:+${PYTENSOR_FLAGS},}base_compiledir=C:/pytensor"
 
-# Three MCMC fits at a time, four chains each: 12 chain workers; completed fits are skipped.
-pixi run -e code-ocean python code/fig08-run.py --pseudo-true --methods mcmc --repeats 1000000:1000015 \
-    --n-jobs 12 --chains 4 --tune 1000 --timeout-per-1000 inf --output data/fig08-reference-win --machine win
+pixi run -e code-ocean python code/fig08-run.py --n-trials 5000 --repeats 1000:1280 --tune 1000 --timeout-per-1000 2000 \
+    --output data/fig08-v1-win --machine win
+pixi run -e code-ocean python code/fig08-run.py --n-trials 10000 --repeats 1300:1470 --tune 1000 --timeout-per-1000 2000 \
+    --output data/fig08-v1-win --machine win
