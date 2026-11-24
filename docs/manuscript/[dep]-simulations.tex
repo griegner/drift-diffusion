@@ -1,0 +1,74 @@
+\documentclass[00-main.tex]{subfiles}
+
+\begin{document}
+
+\section{Validation by Simulation}\label{sec:simulations}
+\subsection{Simulation Settings}\label{sec:simulation-settings}
+The finite-sample performance of the pseudo-MLE $\hat{\bm\beta}^*$ \eqref{eq:beta_}, equivalently $\hat{\bm\theta}^*$ without covariates, and the covariance estimators $\widehat{V}_\text{AR}$--$\widehat{V}_\text{SH}$ \eqref{eq:V_ar}--\eqref{eq:V_sh} was assessed via Monte Carlo simulations across three settings. In each setting, $b =$ 900 independent replications of a sequence of choice and reaction times $\bm{Y} = (Y_1, \dots, Y_n)$ of length $n =$ 1000 were simulated under the true density ($f_0$; \ref{eq:f_dep}) and fit under the working density ($f^*$; \ref{eq:f_ind}). Settings vary along two dimensions: specification ($f_0 = f^*$ or $f_0 \neq f^*$) and parameter structure (fixed or varying across trials), which together determine whether the information matrix equality $\mathcal{H}_{\bm\beta} = \mathscr{I}_{\bm\beta}$ holds and which covariance estimators are consistent (Section~\ref{sec:covariance-estimation}). The first two settings are correctly specified; the second additionally demonstrates modeling of nonstationarity through covariates. The third tests robustness to unmodeled parameter variability and temporal dependence.
+
+\begin{itemize}
+
+    \item \emph{Correct specification, constant parameters} ($f_0 = f^*$): a baseline correctly specified setting with parameters $a,t_0,|v|,z$ fixed across trials. Decision outcomes are $iid$, the information matrix equality holds, and all four covariance estimators are expected to be consistent (Figure~\ref{fig:sim_constant}).
+
+    \item \emph{Correct specification, trending decision boundary} ($f_0 = f^*$): a correctly specified setting where the decision boundary increases linearly from $0.8\beta_a$ to $1.2\beta_a$ over the session, with midpoint value $\beta_a = 0.625$, while $t_0,|v|,z$ are held constant. The working model uses $a_i=\beta_a x_i$. The information matrix equality holds, and all four covariance estimators are expected to be consistent. This setting demonstrates two capabilities of the pseudo-MLE in modeling DDM parameters as functions of covariates (Section~\ref{sec:covariates}), and explicitly accounting for nonstationary parameter trends with the trial number covariate (Figure~\ref{fig:sim_linear}).
+
+    \item \emph{Misspecification and temporal dependence} ($f_0 \neq f^*$): a misspecified setting where $a$ is fixed and $t_0,|v|,z$ switch jointly under one stationary two-state Markov chain. The working model includes stimulus direction but omits the state, estimating four constant parameters $a,t_0,|v|,z$. This constitutes misspecification of types (i) and (iii) (Section~\ref{sec:misspecification}). Only $\widehat{V}_\text{AR}$ accounts for both marginal misspecification and serial dependence, and $\widehat{V}_\text{MR}$ addresses only the former (Figure~\ref{fig:sim_realistic}).
+
+\end{itemize}
+
+Parameter centers were taken from \citet{matzke_psychological_2009} (Table~3, means), rescaled to the present implementation: $\bar{a} = 0.625$, $\bar{t}_0 = 0.435$, $\overline{|v|} = 2.23$, $\bar{z} = 0.008$. These are the true parameters in the constant setting, with $\bar{a}$ serving as the midpoint $\beta_a$ in the trending boundary setting.
+
+In the third setting, $a=0.625$, while $(t_0,|v|,z)$ switches between engaged $(0.395,3.56,0.008)$ and disengaged $(0.475,0.90,0.350)$ states. The engaged state combines a shorter non-decision time, stronger evidence accumulation, and a nearly neutral starting point. The disengaged state has a longer non-decision time, weaker accumulation, and rightward bias. Measured indicators of engagement, such as features extracted from behavioral videos, could help model these persistent unmodeled decision states. However, such indicators are often unavailable or omitted from the fitted model as this example demonstrates.
+
+State differences were based on the reported across-trial variability in drift rate, non-decision time, and starting point after rescaling to our parameterization \citep{matzke_psychological_2009}. The chain starts with equal probabilities for the two states and remains in its current state with probability $0.95$, giving a mean state duration of 20 trials \citep{ashwood_mice_2022}. In all three settings, stimulus directions are independently randomized with equal probabilities and determine the drift sign.
+
+Pseudo-true parameters (Section~\ref{sec:misspecification}), which need not equal generating means, were approximated by averaging fits of the working model to three independent 50,000-trial sequences from the third setting. Fits in this setting used the model's default initialization, with all four DDM parameters freely estimated.
+
+\subsection{Simulation Results}
+
+We summarize relative bias (RB, in percent) of point and standard error estimates across $b=900$ replications:
+\begin{equation}
+    \text{RB}(\hat{\bm\theta}) = \frac{100}{b} \sum_{j=1}^b \frac{\hat{\bm\theta}_j - \bm\theta^*}{\bm\theta^*}, \quad
+    \text{RB}(\widehat{\text{se}}(\hat{\bm\theta})) = \frac{100}{b} \sum_{j=1}^b \frac{\widehat{\text{se}}(\hat{\bm\theta})_j - \text{se}(\hat{\bm\theta})}{\text{se}(\hat{\bm\theta})}. \label{eq:rb}
+\end{equation}
+Here, $\hat{\bm\theta}_j$ is the point estimate for the $j$-th replication, $\widehat{\text{se}}(\hat{\bm\theta})_j$ is its estimated standard error, and $\text{se}(\hat{\bm\theta})$ is the empirical standard deviation of the $b$ point estimates. The pseudo-true target $\bm\theta^*$ equals the true parameter under correct specification and is approximated by the average of the 50,000-trial fits under misspecification.
+
+\subsubsection{Correct specification, constant parameters}
+Under correct specification and independent trials (Figure~\ref{fig:sim_constant}), point estimates are approximately unbiased (relative point biases within $\pm 3.3\%$), and all four covariance estimators capture their sampling variability, with relative standard error bias below $7\%$ across parameters and estimators. Their agreement is consistent with the information matrix equality in this setting and establishes a baseline for assessing inference under parameter change and temporal dependence.
+
+\begin{SCfigure}[][!h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{docs/manuscript/figures/fig02-sim.pdf}
+    \caption{\emph{Correct specification, constant parameters.}
+    (A) \emph{Diagonals} show sampling distributions of $b=$ 900 point estimates ($\hat{\bm\theta}$; black density curves) around the true parameters ($\bm\theta$; blue vertical lines). Red horizontal bars span $\pm$ one standard deviation around each mean after trimming. \emph{Off-diagonals} show bivariate sampling distributions (black contours) and red dashed regression lines. For display, panel (A) omits estimates beyond three empirical standard deviations from each parameter mean. The schematic below each column indicates how the parameter varies over the $n=$ 1000 trials. Here, $a,t_0,|v|,z$ are constant, and the drift sign follows stimulus direction.
+    (B) \emph{Diagonals} show sampling distributions of the $b=$ 900 analytic standard error estimates (i.e., square roots of the diagonal covariance elements; black=$\widehat{V}_\text{AR}$, dark gray = $\widehat{V}_\text{MR}$, gray = $\widehat{V}_\text{OP}$, light gray = $\widehat{V}_\text{SH}$) and the empirical standard deviations of point estimates across all 900 replications (solid red vertical lines). \emph{Off-diagonals} show analytic pairwise correlation estimates (black-gray density curves) and the corresponding empirical correlations (red dashed vertical lines).}
+    \label{fig:sim_constant}
+\end{SCfigure}
+
+\subsubsection{Correct specification, trending decision boundary}
+Including trial number as a covariate preserves parameter and uncertainty recovery as the decision boundary increases over the session (Figure~\ref{fig:sim_linear}). The model estimates a constant boundary coefficient $\beta_a$, while $a_i$ varies within each replication; estimates of this coefficient and the remaining parameters stay approximately unbiased (relative point biases within $\pm 0.4\%$). All four covariance estimators perform comparably to the constant-parameter setting, demonstrating that systematic changes in decision state can be accommodated within the working likelihood when the relevant trend is modeled.
+
+\begin{SCfigure}[][h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{docs/manuscript/figures/fig03-sim.pdf}
+    \caption{\emph{Correct specification, trending decision boundary.}
+    (A) As in Figure~\ref{fig:sim_constant}A, except the decision boundary $a_i$ increases linearly from $0.8\beta_a$ to $1.2\beta_a$ over the session, while the coefficient $\beta_a=0.625$ and the parameters $t_0,|v|,z$ remain constant. The point estimates are for $\hat\beta_a$ instead of $\hat a$. The schematic below the first column distinguishes the constant coefficient $\beta_a$ from the boundary $a_i$ that changes with the trial number covariate.
+    (B) As in Figure~\ref{fig:sim_constant}B, except that $\beta_a$ replaces $a$.}
+    \label{fig:sim_linear}
+\end{SCfigure}
+
+\subsubsection{Misspecification and temporal dependence}
+Persistent state switching (Figure~\ref{fig:sim_realistic}) separates the performance of the non-robust from robust covariance estimators, while point estimates concentrate near their pseudo-true parameters (relative point biases within $\pm 2.3\%$). Omitted state differences cause marginal misspecification, while state persistence induces dependence between neighboring trials. The fitted constants describe the best working-model approximation to the mixture of engaged and disengaged decision processes. Correcting marginal misspecification alone leaves substantial sampling variability unaccounted for: for $|v|$, MR has relative standard error bias of $-53\%$, compared with $-10\%$ for AR. Accounting for dependence captures much of the additional sampling variability caused by persistent switching. The discrepancy also extends to correlations between parameter estimates. Across replications, boundary ($\hat{a}$) and drift magnitude ($|\hat{v}|$) are negatively correlated, yet SH, OP, and MR covariance estimators give positive estimates, whereas AR accurately recovers the negative direction. Thus, ignoring temporal dependence can misrepresent the joint uncertainty relationships between parameters.
+
+The most noteworthy consequence of inaccurate uncertainties, especially underestimated standard errors, is that confidence intervals built on them will be too narrow, which can lead to undercoverage and inflated false-positive rates in hypothesis tests. AR reduces these sources of overconfidence by accounting for temporal dependence while retaining an approximate working model that omits engaged versus disengaged states as an example of one of the many possible latent states that might exist in real data. Some underestimation remains at this sample size, because persistent states reduce the effective number of independent trials. $\widehat{V}_\text{AR}$ also depends on how many lags the kernel weights $w_{|i-j|}$ \eqref{eq:sample_info} span; we used 40, enough to cover the state persistence, and fewer lags left more bias.
+
+\begin{SCfigure}[][h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{docs/manuscript/figures/fig04-sim.pdf}
+    \caption{\emph{Misspecification and temporal dependence.}
+    (A) As in Figure~\ref{fig:sim_constant}A, with blue lines indicating pseudo-true parameters approximated by averaging three independent 50,000-trial fits. The boundary $a$ is fixed, and $t_0$, $|v|$, and $z$ switch jointly between engaged and disengaged states under one shared chain. Stimulus direction sets the drift sign. The working model estimates four constant parameters and omits the unobserved state.
+    (B) As in Figure~\ref{fig:sim_constant}B. Only black=$\widehat{V}_\text{AR}$ accounts for both misspecification and serial dependence; dark gray=$\widehat{V}_\text{MR}$ corrects only marginal misspecification.}
+    \label{fig:sim_realistic}
+\end{SCfigure}
+
+\end{document}
