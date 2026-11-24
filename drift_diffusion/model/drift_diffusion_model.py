@@ -90,8 +90,8 @@ class DriftDiffusionModel(BaseEstimator):
         >>> beta_v = 0.8; v = beta_v * stim # v as linear function of stimulus
         >>> y = sample_from_pdf(a=1.0, t0=0.2, v=v, z=0, n_samples=n, random_state=1)
         >>> ddm = DriftDiffusionModel(a="+1", t0="+1", v="-1 + stim", z="+1").fit(X, y)
-        >>> ddm.params_, np.sqrt(np.diag(ddm.covariance_))  # parameter/standard error estimates for a, t0, beta_v, z
-        (array([ 0.9896815 ,  0.19565302,  0.81250883, -0.00409812]),
+        >>> ddm.params_, np.sqrt(np.diag(ddm.covariance_))  # a, t0, beta_v, z  # doctest: +NORMALIZE_WHITESPACE
+        (array([ 0.98968148,  0.19565302,  0.81250873, -0.00409811]),
          array([0.0153601 , 0.00802045, 0.05960506, 0.01752478]))
 
         (iii) *Mixed*: set `v = beta0 + beta1*stim + beta2*stim^2`; fix `beta1`, `beta2`; fit `beta0`
