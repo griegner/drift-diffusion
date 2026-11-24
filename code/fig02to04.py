@@ -12,7 +12,7 @@ import pandas as pd
 import seaborn as sns
 from joblib import Parallel, delayed
 from matplotlib.ticker import FuncFormatter
-from pseudotrue import N_FITS, N_TRIALS, REP, pseudotrue_4p
+from pseudotrue import MLE_FITS, MLE_TRIALS, REP, SAMPLES, pseudotrue_4p
 from settings import A_TREND, T0, T0_STATES, V_STATES, Z_STATES, A, V, Z, engagement_states
 from sklearn.base import clone
 from tqdm import tqdm
@@ -34,6 +34,8 @@ def sample_persistent(n_samples, rep, seed=0):
     stim = 2 * rng.integers(2, size=n_samples) - 1
     # state-dependent t0, drift, and starting point from settings.py
     params = dict(a=A, t0=T0_STATES[state], v=stim * V_STATES[state], z=Z_STATES[state])
+    if n_samples == MLE_TRIALS:  # saved reference sample (too large to simulate in one call)
+        return stim, np.load(SAMPLES / f"fig04-n{n_samples}-rep{rep}.npy")
     y = sample_from_pdf(**params, n_samples=n_samples, random_state=int(rng.integers(2**32)))
     return stim, y
 
@@ -225,15 +227,16 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
 
         ddm = DriftDiffusionModel(v="-1+stim", cov_estimator="all", autocorrelation_lags=60, p_outlier=0)
 
-        # compute and cache the large-sample reference (mean of N_FITS fits) before repeats
+        # compute and cache the large-sample reference (mean of MLE_FITS fits) before repeats
         path = Path(__file__).resolve().parents[1] / "data/fig04-pseudotrue.json"
         cache = json.loads(path.read_text()) if path.exists() else {}
-        if (cache.get("n_fits"), cache.get("n_trials")) != (N_FITS, N_TRIALS):
+        if (cache.get("n_fits"), cache.get("n_trials")) != (MLE_FITS, MLE_TRIALS):
             thetas = []
-            for rep in tqdm(range(REP, REP + N_FITS), desc="pseudo-true"):
-                stim, y = sample_persistent(N_TRIALS, rep, seed=kwargs["random_state"])
+            for rep in tqdm(range(REP, REP + MLE_FITS), desc="pseudo-true"):
+                stim, y = sample_persistent(MLE_TRIALS, rep, seed=kwargs["random_state"])
                 thetas.append(pseudotrue_4p(ddm, pd.DataFrame({"stim": stim}), y))
-            cache = dict(zip(param_names, np.mean(thetas, axis=0).tolist())) | dict(n_fits=N_FITS, n_trials=N_TRIALS)
+            cache = dict(zip(param_names, np.mean(thetas, axis=0).tolist()))
+            cache |= dict(n_fits=MLE_FITS, n_trials=MLE_TRIALS)
             path.write_text(json.dumps(cache, indent=2) + "\n")
         pseudotrue_params = {name: cache[name] for name in param_names}
         print("pseudo-true:", {name: round(value, 6) for name, value in pseudotrue_params.items()})

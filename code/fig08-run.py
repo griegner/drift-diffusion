@@ -16,8 +16,7 @@ from fig08 import (
     MCMC_OFFSET,
     MCMC_SCALE,
     METHODS,
-    REFERENCE_N,
-    REFERENCE_REPS,
+    REFERENCE,
     ROOT,
     SEED,
     SESSION,
@@ -30,6 +29,7 @@ from fig08 import (
     trial_inputs,
 )
 from fit_process import bounded_fits
+from pseudotrue import MLE_TRIALS, SAMPLES
 
 
 def simulate(n, rep, config):
@@ -38,14 +38,17 @@ def simulate(n, rep, config):
     from drift_diffusion.sim import sample_from_pdf
 
     design, state, stim, seed = trial_inputs(n, rep, config)
-    y = sample_from_pdf(
-        a=design["a"],
-        t0=design["t0"][state],
-        v=stim * design["magnitude"],
-        z=design["z"][state],
-        n_samples=n,
-        random_state=seed,
-    )
+    if n == MLE_TRIALS:  # saved reference sample (too large to simulate in one call)
+        y = np.load(SAMPLES / f"fig08-n{n}-rep{rep}.npy")
+    else:
+        y = sample_from_pdf(
+            a=design["a"],
+            t0=design["t0"][state],
+            v=stim * design["magnitude"],
+            z=design["z"][state],
+            n_samples=n,
+            random_state=seed,
+        )
     return pd.DataFrame(dict(time=design["time"], pupil_centered=design["pupil_centered"], stim=stim)), y
 
 
@@ -137,9 +140,13 @@ def fit_task(method, n, rep, config, cores, reference):
 
 def run(args, config):
     prepare_folder(args.output, config)
-    n, reps = REFERENCE_N if args.pseudo_true else args.n_trials, args.repeats
     budget = (os.cpu_count() or 1) if args.n_jobs == -1 else args.n_jobs
     for method in args.methods:
+        if args.pseudo_true:  # each method's reference size and reps; --repeats selects among them
+            n, reps = REFERENCE[method]
+            reps = [rep for rep in reps if args.repeats is None or rep in args.repeats]
+        else:
+            n, reps = args.n_trials, args.repeats
         cores = min(config["mcmc"]["chains"], budget) if method == "mcmc" else 1
         # Share the CPU budget across fits; each MCMC fit uses up to one core per chain.
         workers = max(1, budget // cores)
@@ -196,7 +203,7 @@ def parse_args(argv=None):
     parser.add_argument(
         "--repeats",
         type=repeat_range,
-        help="repeat IDs START:STOP (exclusive); default 1000000:1000010 with --pseudo-true, otherwise 0:500",
+        help="repeat IDs START:STOP (exclusive); default: every reference rep with --pseudo-true, otherwise 0:500",
     )
     parser.add_argument("--methods", choices=("mle", "mcmc"), nargs="+", default=["mle", "mcmc"])
     parser.add_argument("--seed", type=int, default=SEED)
@@ -212,13 +219,11 @@ def parse_args(argv=None):
     parser.add_argument(
         "--pseudo-true",
         action="store_true",
-        help="fit the 50,000-trial pseudo-true references (averaged when plotting) instead of repeats",
+        help="fit the pseudo-true references (fig08.REFERENCE: size and reps per method) instead of repeats",
     )
     args = parser.parse_args(argv)
-    if args.repeats is None:
-        args.repeats = REFERENCE_REPS if args.pseudo_true else range(500)
-    if args.pseudo_true and (args.repeats.start < REFERENCE_REPS.start or args.repeats.stop > REFERENCE_REPS.stop):
-        parser.error(f"pseudo-true repeats must lie within {REFERENCE_REPS.start}:{REFERENCE_REPS.stop}")
+    if args.repeats is None and not args.pseudo_true:
+        args.repeats = range(500)
     if args.n_trials < SESSION or args.n_trials % SESSION or args.seed < 0:
         parser.error(f"need a nonnegative seed and n-trials a positive multiple of {SESSION}")
     if args.n_jobs != -1 and args.n_jobs < 1 or args.chains < 2 or args.tune < 0 or args.draws < 4:

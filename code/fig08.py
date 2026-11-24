@@ -6,15 +6,13 @@ from pathlib import Path
 
 import numpy as np
 import settings as sim
-from pseudotrue import N_TRIALS as REFERENCE_N
-from pseudotrue import REP as REFERENCE_REP
+from pseudotrue import MCMC_FITS, MCMC_TRIALS, MLE_FITS, MLE_TRIALS, REP
 
 ROOT = Path(__file__).resolve().parents[1]
 SESSION, SEED = 1000, 20261020
-# pseudo-true targets average REFERENCE_FITS fits per method to reps REFERENCE_REP, REFERENCE_REP + 1, ...
-REFERENCE_FITS = 10
-MIN_REFERENCE_FITS = 8  # plotting averages the valid fits once at least this many are present (MCMC fits can fail)
-REFERENCE_REPS = range(REFERENCE_REP, REFERENCE_REP + REFERENCE_FITS)
+# pseudo-true targets per method: (trials per fit, reps); plotting averages the valid fits
+REFERENCE = {"mle": (MLE_TRIALS, range(REP, REP + MLE_FITS)), "mcmc": (MCMC_TRIALS, range(REP, REP + MCMC_FITS))}
+MIN_REFERENCE_FITS = {"mle": MLE_FITS, "mcmc": 8}  # at least this many valid fits (MCMC fits can fail diagnostics)
 METHODS = ["sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust"]
 PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
 MCMC_NAMES = ["a", "t", "v_stim", "z", "sz", "sv", "st"]
@@ -30,7 +28,7 @@ LABELS = {
     "autocorrelation-robust": "4p MLE (10a) Autocorr. Robust",
     "mcmc": "7p MCMC",
 }
-PATTERN = re.compile(r"(?:n\d+|pseudo-true)-rep\d+-(?:mle|mcmc)\.npz")
+PATTERN = re.compile(r"(?:pseudo-true-)?n\d+-rep\d+-(?:mle|mcmc)\.npz")
 
 
 def scientific_settings(seed, chains, tune, draws):
@@ -40,7 +38,6 @@ def scientific_settings(seed, chains, tune, draws):
         format=1,
         seed=seed,
         session=SESSION,
-        reference=dict(n=REFERENCE_N, rep=REFERENCE_REP),
         simulation={
             name: np.asarray(getattr(sim, name)).tolist()
             for name in "A T0 V_PUPIL_MEAN A_TREND T0_STATES Z_STATES V_PUPIL P_SWITCH PUPIL_SIGMA PUPIL_SD".split()
@@ -95,7 +92,7 @@ def contrasts(n):
 
 
 def checkpoint_path(folder, method, n, rep, reference=False):
-    return Path(folder) / f"{'pseudo-true' if reference else f'n{n}'}-rep{rep}-{method}.npz"
+    return Path(folder) / f"{'pseudo-true-' if reference else ''}n{n}-rep{rep}-{method}.npz"
 
 
 def save_fit(path, **record):
@@ -115,11 +112,17 @@ def load_fit(path):
     return fit
 
 
+def without_reference(settings):
+    """drop the reference record that older settings.json files carry (references are now checked per fit)"""
+
+    return {key: value for key, value in settings.items() if key != "reference"}
+
+
 def prepare_folder(folder, config):
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / "settings.json"
     if path.exists():
-        if json.loads(path.read_text()) != config:
+        if without_reference(json.loads(path.read_text())) != config:
             raise ValueError(f"Scientific settings differ in {folder}; use a different output folder")
     else:
         temporary = path.with_suffix(".tmp.json")
@@ -132,7 +135,7 @@ def collect_results(folders):
 
     config, records = None, {}
     for folder in map(Path, folders):
-        settings = json.loads((folder / "settings.json").read_text())
+        settings = without_reference(json.loads((folder / "settings.json").read_text()))
         expected = scientific_settings(settings["seed"], **settings["mcmc"])
         if settings != expected or (config is not None and settings != config):
             raise ValueError(f"Incompatible scientific settings in {folder}")
@@ -146,7 +149,7 @@ def collect_results(folders):
                 checkpoint_path(folder, key[3], key[1], key[2], key[0]) != path
                 or int(fit["seed"]) != config["seed"]
                 or int(fit["mcmc_seed"]) != mcmc_seed(config, key[1], key[2])
-                or (key[0] and (key[1] != REFERENCE_N or key[2] not in REFERENCE_REPS))
+                or (key[0] and (key[1] != REFERENCE[key[3]][0] or key[2] not in REFERENCE[key[3]][1]))
             ):
                 raise ValueError(f"Inconsistent fit identity in {path}")
             if key in records:
@@ -163,12 +166,14 @@ def collect_results(folders):
 def reference_targets(records, method):
     """mean of the valid pseudo-true fits; None with fewer than MIN_REFERENCE_FITS"""
 
-    fits = {rep: records.get((True, REFERENCE_N, rep, method)) for rep in REFERENCE_REPS}
+    n, reps = REFERENCE[method]
+    fits = {rep: records.get((True, n, rep, method)) for rep in reps}
     missing = [rep for rep, fit in fits.items() if fit is None]
     valid = [rep for rep, fit in fits.items() if fit is not None and fit["valid"]]
     invalid = sorted(set(fits) - set(valid) - set(missing))
-    if len(valid) < MIN_REFERENCE_FITS:
-        print(f"{method} reference: {len(valid)} valid reps {valid}, need {MIN_REFERENCE_FITS} (missing {missing})")
+    need = MIN_REFERENCE_FITS[method]
+    if len(valid) < need:
+        print(f"{method} reference: {len(valid)} valid reps {valid}, need {need} (missing {missing})")
         return None
     print(f"{method} reference: averaging {len(valid)}/{len(fits)} valid reps; invalid {invalid}, missing {missing}")
     return np.mean([fits[rep]["params"] for rep in valid], axis=0)
