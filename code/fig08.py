@@ -20,7 +20,7 @@ MCMC_NAMES = ["a", "t", "v_stim", "z", "sz", "sv", "st"]
 MCMC_SCALE, MCMC_OFFSET = np.array([1, 1, 1, 2, 2, 1, 1]), np.array([0, 0, 0, -1, 0, 0, 0])
 QUANTITY_LABELS = [r"$\bar{a}$", r"$\bar{t}_0$", r"$\overline{|v|}$", r"$\bar{z}$"]
 COLORS = {method: (1, 0, 0, alpha) for method, alpha in zip(METHODS, [0.2, 0.4, 0.6, 0.8])}
-COLORS["mcmc"] = "#3b6fb6"
+COLORS["mcmc"] = "#3b6eb6b1"
 LABELS = {
     "sample-hessian": "4p MLE (10d) Sample Hessian",
     "outer-product": "4p MLE (10c) Outer Product",
