@@ -223,7 +223,7 @@ def main(setting, n_samples, n_repeats, n_jobs, prefer):
         param_names = ["a", "t0", "abs_v", "z"]
         cov_names = [f"{i},{j}" for i in param_names for j in param_names]
 
-        ddm = DriftDiffusionModel(v="-1+stim", cov_estimator="all", autocorrelation_lags=40, p_outlier=0)
+        ddm = DriftDiffusionModel(v="-1+stim", cov_estimator="all", autocorrelation_lags=60, p_outlier=0)
 
         # compute and cache the large-sample reference (mean of N_FITS fits) before repeats
         path = Path(__file__).resolve().parents[1] / "data/fig04-pseudotrue.json"
