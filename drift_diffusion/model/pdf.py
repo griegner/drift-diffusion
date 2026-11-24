@@ -65,13 +65,13 @@ def pdf(y, a, t0, v, z, err=1e-3):
     mask = k_s < k_l
 
     # small t approximation
-    K_s = np.ceil(k_s).astype(int)
+    K_s = np.ceil(np.where(mask, k_s, 1)).astype(int)  # terms for the trials that use this series
     Ks_s = np.arange(-((K_s.max() - 1) // 2), ((K_s.max() - 1) // 2) + 1)
     exp_s = -((w + 2 * Ks_s[:, None]) ** 2) / (2 * t)
     p_s = np.sum((w + 2 * Ks_s[:, None]) * np.exp(exp_s), axis=0) / np.sqrt(2 * np.pi * t**3)
 
     # large t approximation
-    K_l = np.ceil(k_l).astype(int)
+    K_l = np.ceil(np.where(mask, 1, k_l)).astype(int)
     Ks_l = np.arange(1, K_l.max() + 1)
     exp_l = -(Ks_l[:, None] ** 2) * (np.pi**2) * t / 2
     p_l = np.pi * np.sum(Ks_l[:, None] * np.exp(exp_l) * np.sin(Ks_l[:, None] * np.pi * w), axis=0)

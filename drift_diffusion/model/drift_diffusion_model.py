@@ -84,15 +84,15 @@ class DriftDiffusionModel(BaseEstimator):
         >>> y = sample_from_pdf(a=1.0, t0=0.2, v=0.3, z=0, n_samples=n, random_state=0)
         >>> ddm = DriftDiffusionModel(a="+1", t0=0.2, v=0.3, z=0).fit(X, y)  # intercept/constant a
         >>> ddm.params_, np.sqrt(ddm.covariance_) # parameter/standard error estimates for a
-        (array([0.99537521]), array([[0.01201239]]))
+        (array([0.99534687]), array([[0.01201159]]))
 
         (ii) *Free*: set `v = beta * stim`; fit `a`, `beta`, `t0`, `z`
         >>> beta_v = 0.8; v = beta_v * stim # v as linear function of stimulus
         >>> y = sample_from_pdf(a=1.0, t0=0.2, v=v, z=0, n_samples=n, random_state=1)
         >>> ddm = DriftDiffusionModel(a="+1", t0="+1", v="-1 + stim", z="+1").fit(X, y)
         >>> ddm.params_, np.sqrt(np.diag(ddm.covariance_))  # parameter/standard error estimates for a, t0, beta_v, z
-        (array([ 0.98992872,  0.19523826,  0.81235863, -0.00421529]),
-         array([0.01535874, 0.00801454, 0.05959234, 0.0175263 ]))
+        (array([ 0.9896815 ,  0.19565302,  0.81250883, -0.00409812]),
+         array([0.0153601 , 0.00802045, 0.05960506, 0.01752478]))
 
         (iii) *Mixed*: set `v = beta0 + beta1*stim + beta2*stim^2`; fix `beta1`, `beta2`; fit `beta0`
         >>> intercept = -0.5; v = intercept + stim + stim**2  # v as quadratic function of stimulus
@@ -102,14 +102,14 @@ class DriftDiffusionModel(BaseEstimator):
         ...     v={"formula": "+1 + stim + {stim ** 2}", "fixed": {"stim": 1, "stim ** 2": 1}},
         ... ).fit(X, y)
         >>> ddm.params_, np.sqrt(ddm.covariance_)  # parameter/standard error estimates for intercept
-        (array([-0.54279923]), array([[0.03392439]]))
+        (array([-0.54277459]), array([[0.03392432]]))
 
         (iv) *Covariance Estimators*: "sample-hessian" - "autocorrelation-robust"
         >>> ddm.set_params(cov_estimator="all").fit(X, y).covariance_
         {'sample-hessian': array([[0.00115086]]),
-        'outer-product': array([[0.00110442]]),
-        'misspecification-robust': array([[0.00119926]]),
-        'autocorrelation-robust': array([[0.00119337]])}
+        'outer-product': array([[0.0011045]]),
+        'misspecification-robust': array([[0.00119916]]),
+        'autocorrelation-robust': array([[0.00119308]])}
         """
         super().__init__()
         self.a, self.t0, self.v, self.z = a, t0, v, z
