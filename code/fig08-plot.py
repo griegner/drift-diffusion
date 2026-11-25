@@ -51,8 +51,8 @@ def plot_example(axes, config):
     panel_title(axes[0], f"A. Example Simulation (n = {EXAMPLE_N:,}, {EXAMPLE_N // SESSION} sessions)")
 
 
-def plot_runtime(ax, records, runtime_records, machines, per_n=250, stuck=3):
-    """MLE: every benchmark fit; MCMC: the first per_n valid fits per n on the given machines. MCMC fit line and
+def plot_runtime(ax, records, runtime_records, machines, per_n, stuck=3):
+    """MLE: the first per_n valid benchmark fits per n; MCMC: the first per_n valid fits per n on the given machines. MCMC fit line and
     solid bars exclude stuck fits (> stuck x median at n) and fits that ran at the same time as one on that machine"""
 
     runs = {}  # every MCMC run (also failed ones): (machine, n, rep) -> (start, end), end = file time
@@ -69,13 +69,13 @@ def plot_runtime(ax, records, runtime_records, machines, per_n=250, stuck=3):
     for (reference, n, rep, method), fit in sorted(records.items()):  # sorted: lowest repeat IDs first
         if not reference and method == "mcmc" and fit["valid"] and str(fit["machine"]) in machines:
             mcmc.setdefault(n, []).append((fit["runtime"], (str(fit["machine"]), n, rep) not in excluded))
+    mle = {}
+    for (reference, n, rep, method), fit in sorted(runtime_records.items()):  # sorted: lowest repeat IDs first
+        if not reference and method == "mle" and fit["valid"]:
+            mle.setdefault(n, []).append((fit["runtime"], True))
     runtimes = {
-        "mle": [
-            (n, f["runtime"], True)
-            for (ref, n, _, m), f in runtime_records.items()
-            if not ref and m == "mle" and f["valid"]
-        ],
-        "mcmc": [(n, *run) for n, values in mcmc.items() for run in values[:per_n]],
+        method: [(n, *run) for n, values in fits.items() for run in values[:per_n]]
+        for method, fits in [("mle", mle), ("mcmc", mcmc)]
     }
     rng = np.random.default_rng(0)
     for method, color, label in [
@@ -159,14 +159,14 @@ def plot_summary(axes, result, counts, key, methods, title):
     sample_size_axis(axes[-1], sizes)
 
 
-def plot_figure(records, runtime_records, groups, config, machines):
+def plot_figure(records, runtime_records, groups, config, machines, runtime_b):
     """assemble panels A-F"""
 
     fig = plt.figure(figsize=(15, 10), layout="constrained")
     top, bottom = fig.subfigures(2, 1, height_ratios=[1, 1.4])
     left, right = top.subfigures(1, 2, width_ratios=[2.5, 1.5])  # top widths independent of the bottom columns
     plot_example(left.subplots(4, 1, sharex=True), config)
-    plot_runtime(right.subplots(), records, runtime_records, machines)
+    plot_runtime(right.subplots(), records, runtime_records, machines, runtime_b)
 
     axes = bottom.subplots(4, len(SUMMARY), sharex=True)
     result = {n: scores(group) for n, group in groups.items()}
@@ -204,7 +204,7 @@ def main(args):
     plt.rcParams.update(json.loads((ROOT / "code/config.json").read_text())["rc-params"])
     plt.rcParams["font.size"] = 12
     plt.rcParams["axes.titlelocation"] = "left"
-    fig = plot_figure(records, runtime_records, groups, config, args.runtime_machines)
+    fig = plot_figure(records, runtime_records, groups, config, args.runtime_machines, args.runtime_b)
     args.output.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.output / "fig08.svg")
     plt.close(fig)
@@ -227,8 +227,11 @@ def parse_args(argv=None):
     parser.add_argument(
         "--b",
         type=lambda value: value if value == "all" else int(value),
-        default=600,
+        default=780,
         help="repeats per n: the first B paired repeats, or 'all' for every valid fit of each method (unpaired)",
+    )
+    parser.add_argument(
+        "--runtime-b", type=int, default=280, help="panel B fits per n and method: the first valid fits per n"
     )
     return parser.parse_args(argv)
 
