@@ -22,32 +22,23 @@ from fig08 import (
     trial_inputs,
 )
 from matplotlib.lines import Line2D
-from matplotlib.ticker import StrMethodFormatter
+from matplotlib.ticker import MaxNLocator, StrMethodFormatter
 
 EXAMPLE_N, EXAMPLE_REP = 3000, 0
 ORDER = ["autocorrelation-robust", "misspecification-robust", "outer-product", "sample-hessian", "mcmc"]
 MARKERS = dict(zip(ORDER, "os^Do"))
-PARAMS = ["a", "t0", "v", "z"]
-MOSAIC = [
-    ["A_a", "A_a", "B"],
-    ["A_t0", "A_t0", "B"],
-    ["A_v", "A_v", "B"],
-    ["A_z", "A_z", "B"],
-    ["C_a", "D_a", "E_a"],
-    ["C_t0", "D_t0", "E_t0"],
-    ["C_v", "D_v", "E_v"],
-    ["C_z", "D_z", "E_z"],
+DODGE = 10  # trials between neighbouring methods in panels C-F
+SUMMARY = [  # panels C-F: (score, methods, title)
+    ("bias", ["autocorrelation-robust", "mcmc"], "C. Point relative bias (%)"),
+    ("sd", ["autocorrelation-robust", "mcmc"], "D. Point relative SD (%)"),
+    ("se_bias", ORDER, "E. SE relative bias (%)"),
+    ("coverage", ORDER, "F. 95% CI coverage (%)"),
 ]
-DODGE = 10  # trials between neighbouring methods in panels C-E
-SHARE_Y = ["C", "D", "E"]  # panels whose four rows share a y-axis; remove a letter to free that panel's rows
-SUMMARY = {  # panel: (score, methods, title)
-    "C": ("bias", ["autocorrelation-robust", "mcmc"], "C. Point relative bias (%)"),
-    "D": ("se_bias", ORDER, "D. Standard error relative bias (%)"),
-    "E": ("coverage", ORDER, "E. 95% CI coverage (%)"),
-}
 
 
 def plot_example(axes, config):
+    """panel A: parameter trajectories of one example simulation"""
+
     design, state, _, _ = trial_inputs(EXAMPLE_N, EXAMPLE_REP, config)
     values = [design["a"], design["t0"][state], np.abs(design["magnitude"]), design["z"][state]]
     for ax, value, label in zip(axes, values, [r"$a$", r"$t_0$", r"$|v|$", r"$z$"]):
@@ -56,9 +47,8 @@ def plot_example(axes, config):
             ax.axvline(boundary, color=".5", ls="--", lw=1)
         ax.set_ylabel(label, rotation=0, ha="right", va="center", fontsize=18)
         ax.margins(y=0.2)
-        ax.tick_params(labelbottom=ax is axes[-1])
     axes[-1].set(xlim=(0, EXAMPLE_N), xlabel="Trial")
-    axes[0].set_title(f"A. Example Simulation (n = {EXAMPLE_N:,}, {EXAMPLE_N // SESSION} sessions)")
+    panel_title(axes[0], f"A. Example Simulation (n = {EXAMPLE_N:,}, {EXAMPLE_N // SESSION} sessions)")
 
 
 def plot_runtime(ax, records, runtime_records, machines, per_n=250, stuck=3):
@@ -95,32 +85,51 @@ def plot_runtime(ax, records, runtime_records, machines, per_n=250, stuck=3):
         n, seconds, kept = np.array(runtimes[method]).T
         kept = kept.astype(bool)
         sizes, x = np.unique(n), np.linspace(n.min(), n.max(), 100)
-        slope = n[kept] @ seconds[kept] / (n[kept] @ n[kept])  # line through the origin, fit to the kept fits
+        slope, intercept = np.polyfit(n[kept], seconds[kept], 1)  # line with an intercept, fit to the kept fits
         means = np.array([seconds[kept & (n == s)].mean() for s in sizes])
         ax.plot(
-            n + rng.uniform(-250, 250, len(n)), seconds / 60, "o", color=color, ms=3, mec="white", mew=0.3, alpha=0.5
+            n + rng.uniform(-250, 250, len(n)), seconds / 60, "o", color=color, ms=4, mec="white", mew=0.3, alpha=0.5
         )
-        ax.plot(x, slope * x / 60, color=color, lw=1)
-        ax.plot([], [], "o", color=color, ms=5, label=f"{label}: {1000 * slope:.3g} s/1000 trials")
+        ax.plot(x, (intercept + slope * x) / 60, color=color, lw=1)
+        label = f"{label}: {significant(intercept, 1)} s + {significant(1000 * slope, 2)} s/1000 trials"
+        ax.plot([], [], "o", color=color, ms=5, label=label)
         ax.hlines(means / 60, sizes - 400, sizes + 400, color="k", lw=1.2)
         if not kept.all():  # dashed: mean of all fits, also the excluded ones
             ax.hlines(
                 [seconds[n == s].mean() / 60 for s in sizes], sizes - 400, sizes + 400, color="k", lw=1.2, ls="--"
             )
         print(
-            f"{method} mean runtime of kept fits (min):",
-            dict(zip(sizes.astype(int).tolist(), (means / 60).round(3).tolist())),
-        )
-        print(
             f"{method} runtime fits (kept):", {int(s): f"{np.sum(n == s)} ({np.sum(kept & (n == s))})" for s in sizes}
         )
-    ax.set(title="B. Runtime (minutes)", yscale="log", xlim=(0, sizes[-1] * 1.08), xticks=sizes, xlabel="n Trials")
-    ax.legend(loc="upper left", frameon=False, fontsize=10)
-    ax.xaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
+    panel_title(ax, "B. Runtime (minutes)")
+    ax.set(yscale="log", ylabel="log(Minutes)")
     ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,g}"))
+    ax.legend(loc="upper left", frameon=False, fontsize=11)
+    sample_size_axis(ax, sizes)
+
+
+def panel_title(ax, title):
+    """title with a bold panel letter: bold "A." followed by the plain text"""
+    letter, text = title.split(" ", 1)
+    bold = ax.set_title(letter, fontweight="bold")
+    ax.annotate(f" {text}", (1, 0), xycoords=bold, va="bottom", fontsize=bold.get_fontsize())
+
+
+def sample_size_axis(ax, sizes):
+    """format a shared n-trials x-axis"""
+
+    ax.set(xticks=sizes, xlim=(0, sizes[-1] * 1.08), xlabel="n Trials")
+    ax.xaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
+
+
+def significant(value, digits):
+    """round to significant figures without an exponent (30, not 3e+01)"""
+    return f"{float(f'{value:.{digits}g}'):g}"
 
 
 def plot_summary(axes, result, counts, key, methods, title):
+    """one column of panels C-F: a score per parameter row against sample size"""
+
     sizes = np.array(list(result))
     offsets = DODGE * (np.arange(len(methods)) - (len(methods) - 1) / 2)
     for k, ax in enumerate(axes):
@@ -129,44 +138,52 @@ def plot_summary(axes, result, counts, key, methods, title):
             style = dict(color=COLORS[method], marker=MARKERS[method], ms=5, mec="white", mew=0.4)
             ax.plot(sizes + offset, value, color=COLORS[method], lw=0.5)
             ax.errorbar(sizes + offset, value, half, ls="none", lw=1, **style)
-        if key == "coverage":  # 95% Monte Carlo band around nominal coverage
+        ax.yaxis.set_major_locator(MaxNLocator(6, steps=[1, 2, 2.5, 5, 10]))  # round steps
+        ax.tick_params(axis="y", labelsize=10)
+        ax.grid(axis="y", alpha=0.15)
+        if key == "sd":  # spread from zero, no reference line
+            ax.set_ylim(bottom=0)
+        elif key == "coverage":  # nominal 95: Monte Carlo band, dashed line, bold top tick
             for n in sizes:
                 band = 196 * np.sqrt(0.95 * 0.05 / counts[n])
                 ax.fill_between([n - 3 * DODGE, n + 3 * DODGE], 95 - band, 95 + band, color=".92", lw=0, zorder=0)
-        ax.axhline(95 if key == "coverage" else 0, color=".35", ls="--" if key == "coverage" else "-", lw=1)
-        ax.grid(axis="y", alpha=0.15)
-        ax.tick_params(axis="x", labelbottom=ax is axes[-1])
-    axes[0].set_title(title)
-    # if key == "coverage":
-    #     axes[0].set_yticks([50, 95])
-    axes[-1].set(xticks=sizes, xlim=(0, sizes[-1] * 1.08), xlabel="n Trials")
-    axes[-1].xaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
+            ax.axhline(95, color=".35", ls="--", lw=1)
+            low, high = ax.get_ylim()
+            ticks = ax.yaxis.get_major_locator().tick_values(low, high)
+            ticks = [t for t in ticks if low <= t <= 95 - 0.8 * (ticks[1] - ticks[0])] + [95]  # no tick crowding 95
+            ax.set_yticks(ticks, labels=[f"{t:g}" for t in ticks])
+            ax.get_yticklabels()[-1].set_fontweight("bold")
+        else:  # relative biases: zero line
+            ax.axhline(0, color=".35", lw=1)
+    panel_title(axes[0], title)
+    sample_size_axis(axes[-1], sizes)
 
 
 def plot_figure(records, runtime_records, groups, config, machines):
-    fig, ax = plt.subplot_mosaic(MOSAIC, figsize=(12, 11), layout="constrained", height_ratios=[1] * 4 + [1.4] * 4)
-    for p in PARAMS[1:]:  # share x within panel A and within each panel of C-E; y within the SHARE_Y panels
-        ax[f"A_{p}"].sharex(ax["A_a"])
-        for panel in SUMMARY:
-            ax[f"{panel}_{p}"].sharex(ax[f"{panel}_a"])
-            # if panel in SHARE_Y:
-            #     ax[f"{panel}_{p}"].sharey(ax[f"{panel}_a"])
+    """assemble panels A-F"""
 
-    plot_example([ax[f"A_{p}"] for p in PARAMS], config)
-    plot_runtime(ax["B"], records, runtime_records, machines)
+    fig = plt.figure(figsize=(15, 10), layout="constrained")
+    top, bottom = fig.subfigures(2, 1, height_ratios=[1, 1.4])
+    left, right = top.subfigures(1, 2, width_ratios=[2.5, 1.5])  # top widths independent of the bottom columns
+    plot_example(left.subplots(4, 1, sharex=True), config)
+    plot_runtime(right.subplots(), records, runtime_records, machines)
+
+    axes = bottom.subplots(4, len(SUMMARY), sharex=True)
     result = {n: scores(group) for n, group in groups.items()}
     counts = {n: min(len(points) for points, _, _ in group.values()) for n, group in groups.items()}
-    for panel, (key, methods, title) in SUMMARY.items():
-        plot_summary([ax[f"{panel}_{p}"] for p in PARAMS], result, counts, key, methods, title)
-    for p, label in zip(PARAMS, QUANTITY_LABELS):
-        ax[f"C_{p}"].set_ylabel(label, rotation=0, ha="right", va="center", fontsize=18)
+    for column, (key, methods, title) in zip(axes.T, SUMMARY):
+        plot_summary(column, result, counts, key, methods, title)
+    for ax, label in zip(axes[:, 0], QUANTITY_LABELS):
+        ax.set_ylabel(label, rotation=0, ha="right", va="center", fontsize=18)
 
     handles = [Line2D([], [], color=COLORS[m], marker=MARKERS[m], ms=6, lw=0.5, label=LABELS[m]) for m in ORDER]
-    fig.legend(handles=handles, loc="outside lower center", ncol=3, frameon=False)
+    bottom.legend(handles=handles, loc="outside lower center", ncol=3, frameon=False)
     return fig
 
 
 def main(args):
+    """load fits, select paired repeats, and write fig08.svg"""
+
     config, records = collect_results(args.inputs)
     runtime_config, runtime_records = collect_results(args.runtime_inputs)
     if runtime_config != config:
@@ -176,8 +193,8 @@ def main(args):
         raise ValueError("Need the pseudo-true references (fig08-run.py --pseudo-true)")
 
     groups = {}
-    for n in sorted(set(args.n_trials)):  # first b paired repeats (lowest repeat IDs), or every valid fit
-        b = None if args.b == "all" else args.b
+    b = None if args.b == "all" else args.b  # first b paired repeats (lowest repeat IDs), or every valid fit
+    for n in sorted(set(args.n_trials)):
         group = estimates(records, n, targets, paired=b is not None)
         groups[n] = {method: (points[:b], ses[:b], ref) for method, (points, ses, ref) in group.items()}
         print(
@@ -186,7 +203,7 @@ def main(args):
 
     plt.rcParams.update(json.loads((ROOT / "code/config.json").read_text())["rc-params"])
     plt.rcParams["font.size"] = 12
-    plt.rcParams["ytick.labelsize"] = 8
+    plt.rcParams["axes.titlelocation"] = "left"
     fig = plot_figure(records, runtime_records, groups, config, args.runtime_machines)
     args.output.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.output / "fig08.svg")
@@ -194,6 +211,8 @@ def main(args):
 
 
 def parse_args(argv=None):
+    """command-line options"""
+
     parser = argparse.ArgumentParser(description=__doc__)
     folders = [ROOT / f"data/fig08-v1-{machine}" for machine in ("mac1", "mac2", "win")] + [
         ROOT / "data/fig08-reference"

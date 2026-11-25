@@ -213,18 +213,22 @@ def estimates(records, n, targets, paired=True):
 
 
 def scores(estimates):
-    """point/SE relative bias and coverage (%), each with a 95% Monte Carlo half-width"""
+    """point/SE relative bias, empirical SE relative to the pseudo-true, and coverage (%), each with a 95% Monte
+    Carlo half-width"""
 
     result = {}
     for method, (params, uncs, reference) in estimates.items():
         error, sd, unc = params - reference, params.std(ddof=1, axis=0), uncs.mean(axis=0)
+        squared = (params - params.mean(axis=0)) ** 2 - sd**2
         # influence functions give Monte Carlo SEs via the delta method
         influence = dict(
             bias=100 * error / reference,
-            se_bias=100 * ((uncs - unc) / sd - unc * ((params - params.mean(axis=0)) ** 2 - sd**2) / (2 * sd**3)),
+            sd=100 * squared / (2 * sd * reference),
+            se_bias=100 * ((uncs - unc) / sd - unc * squared / (2 * sd**3)),
             coverage=np.where(np.isnan(error), np.nan, 100 * (abs(error) <= 1.96 * uncs)),
         )
-        values = {key: value.mean(axis=0) for key, value in influence.items()} | {"se_bias": 100 * (unc - sd) / sd}
+        values = {key: value.mean(axis=0) for key, value in influence.items()}
+        values |= {"sd": 100 * sd / reference, "se_bias": 100 * (unc - sd) / sd}
         result[method] = {
             key: (values[key], 1.96 * value.std(ddof=1, axis=0) / np.sqrt(len(params)))
             for key, value in influence.items()
