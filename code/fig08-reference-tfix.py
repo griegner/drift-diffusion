@@ -117,7 +117,7 @@ def repeat_range(value):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--n-trials", type=int, choices=(25_000, 50_000))
+    parser.add_argument("--n-trials", type=int, choices=(25_000, 50_000, 100_000))
     parser.add_argument("--repeats", type=repeat_range, default=range(REP, REP + 10))
     parser.add_argument("--n-jobs", type=int, default=4, help="CPU budget; each fit uses one core per chain")
     parser.add_argument("--tune", type=int, default=1000)
