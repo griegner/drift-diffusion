@@ -4,8 +4,6 @@ set -e
 # PyTensor compiles C modules; keep the cache in one place
 export PYTENSOR_FLAGS="${PYTENSOR_FLAGS:+${PYTENSOR_FLAGS},}base_compiledir=C:/pytensor"
 
-# catch-up to ~1000 converged MCMC per n; MCMC only on repeats whose MLE already exists
-pixi run -e code-ocean python code/fig08-run.py --n-trials 10000 --repeats 811:900 --methods mcmc --tune 1000 \
-    --timeout-per-1000 2000 --output data/fig08-v1-win --machine win  # 89 fits
-pixi run -e code-ocean python code/fig08-run.py --n-trials 10000 --repeats 358:479 --methods mcmc --tune 1000 \
-    --timeout-per-1000 2000 --output data/fig08-v1-win --machine win  # 121 fits (MLE in fig08-v1-mac2)
+# fixed-t 7p MCMC references, 50k trials (~11 GB each, four at a time; drop to --n-jobs 12 if memory exceeds ~55 GB)
+pixi run -e code-ocean python code/fig08-reference-tfix.py --n-trials 50000 --repeats 1000000:1000010 --n-jobs 16 \
+    --machine win  # 10 fits, ~20 h

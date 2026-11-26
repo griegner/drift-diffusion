@@ -2,6 +2,6 @@
 
 set -e
 
-# catch-up to ~1000 converged MCMC per n; MCMC only on repeats whose MLE already exists
-pixi run -e code-ocean python code/fig08-run.py --n-trials 10000 --repeats 254:358 --methods mcmc --tune 1000 \
-    --timeout-per-1000 inf --output data/fig08-v1-mac2 --machine mac2  # 100 fits (255:259 done)
+# fixed-t 7p MCMC references, 25k trials (~6 GB each, one at a time)
+pixi run -e code-ocean python code/fig08-reference-tfix.py --n-trials 25000 --repeats 1000005:1000010 --n-jobs 4 \
+    --machine mac2  # 5 fits, ~15 h
