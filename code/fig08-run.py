@@ -38,8 +38,9 @@ def simulate(n, rep, config):
     from drift_diffusion.sim import sample_from_pdf
 
     design, state, stim, seed = trial_inputs(n, rep, config)
-    if n == MLE_TRIALS:  # saved reference sample (too large to simulate in one call)
-        y = np.load(SAMPLES / f"fig08-n{n}-rep{rep}.npy")
+    saved = SAMPLES / f"fig08-n{n}-rep{rep}.npy"
+    if n == MLE_TRIALS or saved.exists():  # saved large sample, identical to simulating it here but lighter on memory
+        y = np.load(saved)
     else:
         y = sample_from_pdf(
             a=design["a"],
