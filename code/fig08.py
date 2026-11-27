@@ -10,8 +10,11 @@ from pseudotrue import MCMC_FITS, MCMC_TRIALS, MLE_FITS, MLE_TRIALS, REP
 
 ROOT = Path(__file__).resolve().parents[1]
 SESSION, SEED = 1000, 20261020
-# pseudo-true targets per method: (trials per fit, reps); plotting averages the valid fits
-REFERENCE = {"mle": (MLE_TRIALS, range(REP, REP + MLE_FITS)), "mcmc": (MCMC_TRIALS, range(REP, REP + MCMC_FITS))}
+# pseudo-true fits per method: (sizes, reps); plotting averages the valid fits of the largest size
+REFERENCE = {
+    "mle": ((MLE_TRIALS,), range(REP, REP + MLE_FITS)),
+    "mcmc": (MCMC_TRIALS, range(REP, REP + MCMC_FITS)),
+}
 MIN_REFERENCE_FITS = {"mle": MLE_FITS, "mcmc": 8}  # at least this many valid fits (MCMC fits can fail diagnostics)
 METHODS = ["sample-hessian", "outer-product", "misspecification-robust", "autocorrelation-robust"]
 PARAM_NAMES = ["a_intercept", "a_time", "t0", "v_stim", "v_stim:pupil", "z"]
@@ -149,7 +152,7 @@ def collect_results(folders):
                 checkpoint_path(folder, key[3], key[1], key[2], key[0]) != path
                 or int(fit["seed"]) != config["seed"]
                 or int(fit["mcmc_seed"]) != mcmc_seed(config, key[1], key[2])
-                or (key[0] and (key[1] != REFERENCE[key[3]][0] or key[2] not in REFERENCE[key[3]][1]))
+                or (key[0] and (key[1] not in REFERENCE[key[3]][0] or key[2] not in REFERENCE[key[3]][1]))
             ):
                 raise ValueError(f"Inconsistent fit identity in {path}")
             if key in records:
@@ -163,19 +166,19 @@ def collect_results(folders):
     return config, records
 
 
-def reference_targets(records, method):
-    """mean of the valid pseudo-true fits; None with fewer than MIN_REFERENCE_FITS"""
+def reference_targets(records, method, n=None):
+    """mean of the valid pseudo-true fits of size n (default: the largest); None with fewer than MIN_REFERENCE_FITS"""
 
-    n, reps = REFERENCE[method]
-    fits = {rep: records.get((True, n, rep, method)) for rep in reps}
-    missing = [rep for rep, fit in fits.items() if fit is None]
-    valid = [rep for rep, fit in fits.items() if fit is not None and fit["valid"]]
-    invalid = sorted(set(fits) - set(valid) - set(missing))
+    sizes, reps = REFERENCE[method]
+    n = max(sizes) if n is None else n
+    fits = {rep: records[key] for rep in reps if (key := (True, n, rep, method)) in records}
+    valid = [rep for rep, fit in fits.items() if fit["valid"]]
+    invalid = sorted(set(fits) - set(valid))
     need = MIN_REFERENCE_FITS[method]
     if len(valid) < need:
-        print(f"{method} reference: {len(valid)} valid reps {valid}, need {need} (missing {missing})")
+        print(f"{method} reference n={n}: {len(valid)} valid reps {valid}, need {need}")
         return None
-    print(f"{method} reference: averaging {len(valid)}/{len(fits)} valid reps; invalid {invalid}, missing {missing}")
+    print(f"{method} reference n={n}: averaging {len(valid)}/{len(fits)} fitted reps; invalid {invalid}")
     return np.mean([fits[rep]["params"] for rep in valid], axis=0)
 
 

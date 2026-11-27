@@ -142,8 +142,11 @@ def run(args, config):
     prepare_folder(args.output, config)
     budget = (os.cpu_count() or 1) if args.n_jobs == -1 else args.n_jobs
     for method in args.methods:
-        if args.pseudo_true:  # each method's reference size and reps; --repeats selects among them
-            n, reps = REFERENCE[method]
+        if args.pseudo_true:  # each method's reference sizes and reps; --n-trials and --repeats select among them
+            sizes, reps = REFERENCE[method]
+            n = sizes[0] if len(sizes) == 1 else args.n_trials
+            if n not in sizes:
+                raise ValueError(f"{method} pseudo-true sizes are {sizes}; got --n-trials {n}")
             reps = [rep for rep in reps if args.repeats is None or rep in args.repeats]
         else:
             n, reps = args.n_trials, args.repeats
@@ -219,7 +222,7 @@ def parse_args(argv=None):
     parser.add_argument(
         "--pseudo-true",
         action="store_true",
-        help="fit the pseudo-true references (fig08.REFERENCE: size and reps per method) instead of repeats",
+        help="fit the pseudo-true references (fig08.REFERENCE: sizes and reps per method) instead of repeats",
     )
     args = parser.parse_args(argv)
     if args.repeats is None and not args.pseudo_true:
